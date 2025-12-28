@@ -1,16 +1,17 @@
 # Roadmap
 
 ## Milestone: MVP (local playable)
-- [ ] Project scaffold: Vite + TS + Phaser + Vitest
-- [ ] Docs system + ADRs
-- [ ] Basic Phaser boot + one world scene renders
-- [ ] 4-direction movement + walk/idle animation hooks
-- [ ] Simple collision (placeholder rectangle or tile collision)
-- [ ] Multiple areas (village/woods/cave) with transitions
-- [ ] NPC interaction + dialog box
-- [ ] Minimal UI overlay (HUD stub)
-- [ ] Auth UI: signup/signin with username+password (no email shown)
-- [ ] Firebase: username uniqueness + user profile doc
+- [x] Project scaffold: Vite + TS + Phaser + Vitest
+- [x] Docs system + ADRs
+- [x] Basic Phaser boot + one world scene renders
+- [x] 4-direction movement + walk/idle animation hooks
+- [x] Simple collision (placeholder rectangle or tile collision)
+- [x] Multiple areas (village/woods/cave) with transitions
+- [x] NPC interaction + dialog box
+- [x] Minimal UI overlay (HUD stub)
+- [x] Auth UI: signup/signin with username+password (no email shown)
+- [x] Firebase: username uniqueness + user profile doc
+- [ ] Cloud save/load (users/{uid}.state) polish + UX
 - [ ] Scoreboard: submit score + view leaderboard
 
 ## Milestone: v0.2 (Zelda/Pokémon feel)

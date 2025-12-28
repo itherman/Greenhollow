@@ -13,12 +13,27 @@
 ## 4) Create Firestore database
 - Firestore Database → Create database (test mode is OK for initial local dev)
 
-## 5) Required Firestore collections (MVP)
-- `usernames/{username}`: `{ uid, createdAt }`
-- `users/{uid}`: `{ username, createdAt }`
-- `leaderboards/global/scores/{uid}`: `{ username, score, updatedAt }`
+## 5) Local environment (.env)
+This repo does not commit `.env`. Create a local `.env` by copying `ENV.template` and filling in your own Firebase project values.
 
-## 6) Local environment
-This repo does not commit `.env`. Create a local `.env` by copying `ENV.template`.
+Required keys (must all be present for Firebase mode to work):
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+
+If these are missing, the game still works in **guest mode** (offline), but login/cloud save will show a friendly error.
+
+## 6) Firestore data used today
+Current auth/profile + save system uses:
+- `usernames/{username}`: `{ uid, createdAt }` (enforces unique usernames)
+- `users/{uid}`: `{ username, createdAt }` (created at signup)
+- `users/{uid}.state`: player save state (merged on save so it won’t overwrite `createdAt`)
+
+## 7) Planned (not implemented yet)
+- `leaderboards/global/scores/{uid}`: `{ username, score, updatedAt }` (global leaderboard)
+
 
 
