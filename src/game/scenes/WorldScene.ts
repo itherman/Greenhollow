@@ -874,7 +874,7 @@ export class WorldScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0.5);
       const versionText = this.add
-        .text(0, 0, "v0.1.0", {
+        .text(0, 0, "v0.1.1", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: "11px",
           color: "#9fb5c4",
