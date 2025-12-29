@@ -7,7 +7,8 @@ Accepted
 We need:
 - Unique usernames
 - User profiles
-- A global scoreboard/leaderboard
+- Cloud save/load of player state (MVP convenience)
+- A global scoreboard/leaderboard (planned)
 
 ## Decision
 Collections/Documents:
@@ -18,6 +19,11 @@ Collections/Documents:
 
 - `users/{uid}`
   - `{ username: string, createdAt: Timestamp }`
+  - Also stores a nested save payload under `state` (see below)
+
+- `users/{uid}.state`
+  - A versioned player state blob (see `src/core/playerStateCodec.ts`)
+  - Written with `merge: true` so `createdAt` and other profile fields are preserved
 
 - `leaderboards/global/scores/{uid}`
   - `{ username: string, score: number, updatedAt: Timestamp }`

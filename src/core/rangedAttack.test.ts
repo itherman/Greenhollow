@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arrowVelocity, createRangedState, tryShoot } from "./rangedAttack";
+import { arrowVelocity, createRangedState, tryShoot, tryShootWithAmmo } from "./rangedAttack";
 
 describe("rangedAttack", () => {
   it("enforces shot cooldown", () => {
@@ -18,6 +18,19 @@ describe("rangedAttack", () => {
     // 3-4-5 triangle => unit dir (0.6, 0.8) => scaled (30, 40)
     expect(Math.round(v.x)).toBe(30);
     expect(Math.round(v.y)).toBe(40);
+  });
+
+  it("requires arrows to shoot and still enforces cooldown", () => {
+    const s0 = createRangedState();
+    const r1 = tryShootWithAmmo({ nowMs: 1000, state: s0, cooldownMs: 400, arrows: 0 });
+    expect(r1).toEqual({ ok: false, reason: "no_arrows" });
+
+    const r2 = tryShootWithAmmo({ nowMs: 1000, state: s0, cooldownMs: 400, arrows: 3 });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) throw new Error("expected ok");
+
+    const r3 = tryShootWithAmmo({ nowMs: 1200, state: r2.next, cooldownMs: 400, arrows: 2 });
+    expect(r3).toEqual({ ok: false, reason: "cooldown" });
   });
 });
 

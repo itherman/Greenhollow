@@ -96,6 +96,24 @@ export const swordTaken: DialogScript = {
   },
 };
 
+export const arrowsChest: DialogScript = {
+  id: "arrowsChest",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "You bundle up 25 arrows.", next: "end" },
+    end: { id: "end", kind: "end", text: "Plenty of shots to practice." },
+  },
+};
+
+export const bowFound: DialogScript = {
+  id: "bowFound",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "The goblin carried a bow. It's yours now.", next: "end" },
+    end: { id: "end", kind: "end", text: "Aim true." },
+  },
+};
+
 export function getDialogScript(scriptId: string): DialogScript | null {
   switch (scriptId) {
     case "elderIntro":
@@ -106,6 +124,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return chestMessage;
     case "chestEmpty":
       return chestEmpty;
+    case "arrowsChest":
+      return arrowsChest;
     case "keyFound":
       return keyFound;
     case "doorLocked":
@@ -114,6 +134,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return swordFound;
     case "swordTaken":
       return swordTaken;
+    case "bowFound":
+      return bowFound;
     default:
       return null;
   }
