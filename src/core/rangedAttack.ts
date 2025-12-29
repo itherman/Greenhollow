@@ -16,6 +16,21 @@ export function tryShoot(params: { nowMs: number; state: RangedState; cooldownMs
   return { ok: true, next: { lastShotAtMs: nowMs } };
 }
 
+export type AmmoShotAttempt =
+  | { ok: true; next: RangedState }
+  | { ok: false; reason: "cooldown" | "no_arrows" };
+
+export function tryShootWithAmmo(params: {
+  nowMs: number;
+  state: RangedState;
+  cooldownMs: number;
+  arrows: number;
+}): AmmoShotAttempt {
+  const { arrows } = params;
+  if (!Number.isFinite(arrows) || arrows <= 0) return { ok: false, reason: "no_arrows" };
+  return tryShoot(params);
+}
+
 export type Vec2 = { x: number; y: number };
 
 export function normalize(v: Vec2): Vec2 {

@@ -5,10 +5,10 @@ export function shouldShowAttackButton(params: {
   screenH: number;
   hasTouch: boolean;
   enemyNearby: boolean;
-  hasSword: boolean;
+  hasWeapon: boolean;
 }): boolean {
-  const { screenW, screenH, hasTouch, enemyNearby, hasSword } = params;
-  if (!hasSword) return false;
+  const { screenW, screenH, hasTouch, enemyNearby, hasWeapon } = params;
+  if (!hasWeapon) return false;
   if (!enemyNearby) return false;
   return shouldShowMobileControls({ screenW, screenH, hasTouch });
 }

@@ -9,7 +9,7 @@ describe("attackButtonVisibility", () => {
         screenH: 375,
         hasTouch: true,
         enemyNearby: true,
-        hasSword: false,
+        hasWeapon: false,
       }),
     ).toBe(false);
   });
@@ -21,7 +21,7 @@ describe("attackButtonVisibility", () => {
         screenH: 375,
         hasTouch: true,
         enemyNearby: false,
-        hasSword: true,
+        hasWeapon: true,
       }),
     ).toBe(false);
   });
@@ -33,7 +33,7 @@ describe("attackButtonVisibility", () => {
         screenH: 375,
         hasTouch: true,
         enemyNearby: true,
-        hasSword: true,
+        hasWeapon: true,
       }),
     ).toBe(true);
   });

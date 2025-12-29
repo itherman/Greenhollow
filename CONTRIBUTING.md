@@ -21,6 +21,12 @@ npm test
 
 ## Project conventions
 
+## Engineering principle (please follow)
+- Start from **first principles**: identify the core building blocks (data shapes, invariants, state transitions) before coding.
+- Prefer the **smallest set of pure functions** that manipulates data to achieve the desired outcome.
+- Make updates / fix bugs by reasoning about **fundamentals + invariants**, not by piling on ad-hoc conditions.
+- Lock behavior in with **tests** (TDD recommended) so refactors stay safe.
+
 ### Prefer pure logic + unit tests
 - Put rules/state transitions in `src/core/` as **pure functions**.
 - Write/extend tests next to the module as `*.test.ts` (Vitest includes `src/**/*.test.ts`).
