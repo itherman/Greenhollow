@@ -9,18 +9,21 @@ function storage(): Storage | null {
   return window.localStorage ?? null;
 }
 
-export function loadInventory(): Inventory {
-  const st = storage();
+export function loadInventory(st: Storage | null = storage()): Inventory {
   if (!st) return createInventory();
   const raw = st.getItem(KEY);
   if (!raw) return createInventory();
   return inventoryFromJSON(raw, 20);
 }
 
-export function saveInventory(inv: Inventory): void {
-  const st = storage();
+export function saveInventory(inv: Inventory, st: Storage | null = storage()): void {
   if (!st) return;
   st.setItem(KEY, inventoryToJSON(inv));
+}
+
+export function clearInventory(st: Storage | null = storage()): void {
+  if (!st) return;
+  st.removeItem(KEY);
 }
 
 

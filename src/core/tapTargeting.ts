@@ -1,4 +1,4 @@
-export type TapCandidateKind = "heart" | "key" | "sword" | "chest" | "npc";
+export type TapCandidateKind = "heart" | "key" | "sword" | "bow" | "chest" | "npc";
 
 export type TapCandidate = {
   kind: TapCandidateKind;
@@ -30,6 +30,7 @@ export function pickTapCandidate(params: {
     heart: 5,
     key: 4,
     sword: 3,
+    bow: 3,
     chest: 2,
     npc: 1,
   };

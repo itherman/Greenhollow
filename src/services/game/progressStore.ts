@@ -12,6 +12,7 @@ export type PlayerProgress = {
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?: (key: string) => void;
 }
 
 const KEY = "game.progress.v1";
@@ -43,6 +44,16 @@ export function loadProgress(storage: StorageLike | null = defaultStorage()): Pl
 export function saveProgress(p: PlayerProgress, storage: StorageLike | null = defaultStorage()): void {
   if (!storage) return;
   storage.setItem(KEY, JSON.stringify(p));
+}
+
+export function clearProgress(storage: StorageLike | null = defaultStorage()): void {
+  if (!storage) return;
+  if (storage.removeItem) {
+    storage.removeItem(KEY);
+    return;
+  }
+  // Fallback: overwrite with empty.
+  storage.setItem(KEY, "");
 }
 
 
