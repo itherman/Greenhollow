@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ITEMS, addItem, createInventory, inventoryFromJSON, inventoryToJSON, removeItem } from "./inventory";
+import {
+  ITEMS,
+  addItem,
+  createInventory,
+  getItemCount,
+  inventoryFromJSON,
+  inventoryToJSON,
+  removeItem,
+} from "./inventory";
 
 describe("inventory", () => {
   it("creates 20-slot inventory by default", () => {
@@ -55,6 +63,13 @@ describe("inventory", () => {
     expect(loaded.size).toBe(3);
     expect(loaded.slots[0]?.id).toBe("coins");
     expect(loaded.slots[0]?.qty).toBe(12);
+  });
+
+  it("counts items across multiple stacks", () => {
+    const inv = createInventory(2);
+    addItem(inv, ITEMS.arrows, 15);
+    addItem(inv, ITEMS.arrows, 10);
+    expect(getItemCount(inv, "arrows")).toBe(25);
   });
 });
 

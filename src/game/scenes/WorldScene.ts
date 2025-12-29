@@ -18,20 +18,21 @@ import {
   ensureMonsterTexture,
   ensureNpcTextures,
   ensurePeasantPlayerSpriteSheet,
+  ensureUiPouchTexture,
   ensureVillageHouseTexture,
 } from "../art/sprites";
-import { hasFlag, setFlag } from "../../services/game/flags";
-import { ITEMS, addItem, removeItem } from "../../core/inventory";
-import { loadInventory, saveInventory } from "../../services/game/inventoryStore";
+import { clearFlags, hasFlag, setFlag } from "../../services/game/flags";
+import { ITEMS, addItem, getItemCount, removeItem, type ItemId } from "../../core/inventory";
+import { clearInventory, loadInventory, saveInventory } from "../../services/game/inventoryStore";
 import { applyContactDamage } from "../../core/combat";
 import { ensureItemAndPropTextures } from "../art/sprites";
 import { clearExitBlockIfLeft, createExitGate, isExitBlocked, blockExit, type TilePos } from "../../core/exitGate";
 import { canToggleInventory } from "../../core/uiGating";
 import { createEquipment, toggleEquipFromInventorySlot, type EquipmentState } from "../../core/equipment";
-import { loadEquipment, saveEquipment } from "../../services/game/equipmentStore";
+import { clearEquipment, loadEquipment, saveEquipment } from "../../services/game/equipmentStore";
 import { computeSwordHitbox, createAttackState, tryStartAttack, type AttackState } from "../../core/playerAttack";
 import { computeHeldSwordPose, computeSwordSwing } from "../../core/swordVisual";
-import { normalize, tryShoot } from "../../core/rangedAttack";
+import { createRangedState, normalize, tryShoot, tryShootWithAmmo, type RangedState } from "../../core/rangedAttack";
 import { applyDamage } from "../../core/hp";
 import { chooseHeartSpawnTile } from "../../core/heartSpawn";
 import { computeDeathTransition } from "../../core/death";
@@ -42,10 +43,13 @@ import { computeDialogTapAction } from "../../core/dialogTap";
 import { pickTapCandidate, type TapCandidateKind } from "../../core/tapTargeting";
 import { getTapInteractRangePx, getTapStopDistancePx } from "../../core/tapIntentMovement";
 import { shouldShowAttackButton } from "../../core/attackButtonVisibility";
-import { saveProgress, type PlayerProgress as LocalProgress } from "../../services/game/progressStore";
-import { loadSession } from "../../services/auth/session";
+import { clearProgress, saveProgress, type PlayerProgress as LocalProgress } from "../../services/game/progressStore";
+import { clearSession, loadSession } from "../../services/auth/session";
 import { saveCloudPlayerState } from "../../services/game/cloudPlayerState";
 import { isTapOnPlayer } from "../../core/tapOnPlayer";
+import { computePouchIconLayout } from "../../core/pouchIconLayout";
+import { needsPouchUiRebuild, shouldAllowPlayerTapInventory } from "../../core/pouchUi";
+import { withLoadingOverlay } from "../../ui/loadingOverlay";
 
 export class WorldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -60,6 +64,12 @@ export class WorldScene extends Phaser.Scene {
   private area!: AreaDef;
   private npcsGroup?: Phaser.Physics.Arcade.StaticGroup;
   private chest?: Phaser.Physics.Arcade.Sprite;
+  private chestContents?: {
+    flag: string;
+    loot: Array<{ itemId: ItemId; qty: number }>;
+    openedDialog: string;
+    emptyDialog: string;
+  };
   private interactKey!: Phaser.Input.Keyboard.Key;
   private choiceKeys!: {
     ONE: Phaser.Input.Keyboard.Key;
@@ -112,12 +122,17 @@ export class WorldScene extends Phaser.Scene {
   // Use -Infinity so contact damage can apply immediately on first touch after entering an area.
   private lastHitAtMs = -Infinity;
   private hpText!: Phaser.GameObjects.Text;
+  private pouchIcon?: Phaser.GameObjects.Image;
+  private pouchHit?: Phaser.GameObjects.Rectangle;
   private keySprite?: Phaser.Physics.Arcade.Sprite;
   private swordSprite?: Phaser.Physics.Arcade.Sprite;
+  private bowSprite?: Phaser.Physics.Arcade.Sprite;
   private houseDoorSprite?: Phaser.GameObjects.Sprite;
   private monstersGroup?: Phaser.Physics.Arcade.Group;
   private goblinsGroup?: Phaser.Physics.Arcade.Group;
   private arrowsGroup?: Phaser.Physics.Arcade.Group;
+  private playerArrowsGroup?: Phaser.Physics.Arcade.Group;
+  private bowState: RangedState = createRangedState();
   private lastRangedHitAtMs = 0;
   private villageHouse?: Phaser.GameObjects.Image;
   private heartSprite?: Phaser.Physics.Arcade.Sprite;
@@ -176,22 +191,47 @@ export class WorldScene extends Phaser.Scene {
       return true;
     };
 
+    const tryBow = () => {
+      const range2 = getTapInteractRangePx("bow") ** 2;
+      if (!this.bowSprite?.active) return false;
+      if (this.dist2(playerPos, this.bowSprite) > range2) return false;
+      setFlag("item.bow.1");
+      this.bowSprite.destroy();
+      this.bowSprite = undefined;
+      const inv = loadInventory();
+      addItem(inv, ITEMS.bow, 1);
+      saveInventory(inv);
+      // Auto-equip bow if nothing is held.
+      if (!this.equipment.heldItemId) {
+        this.equipment = { heldItemId: "bow" };
+        saveEquipment(this.equipment);
+      }
+      if (this.inventoryOpen) this.renderInventoryPanel();
+      this.openNpcDialog("bowFound");
+      return true;
+    };
+
     const tryChest = () => {
       const range2 = getTapInteractRangePx("chest") ** 2;
       if (!this.chest?.active) return false;
       if (this.dist2(playerPos, this.chest) > range2) return false;
-      const opened = hasFlag("chest.house.1");
+      const contents = this.chestContents;
+      if (!contents) return false;
+      const opened = hasFlag(contents.flag);
       if (!opened) {
-        setFlag("chest.house.1");
+        setFlag(contents.flag);
         this.chest.setTexture("chest_open");
         this.chest.setDepth(this.chest.y);
         const inv = loadInventory();
-        addItem(inv, ITEMS.coins, 25);
+        for (const loot of contents.loot) {
+          const def = ITEMS[loot.itemId];
+          addItem(inv, def, loot.qty);
+        }
         saveInventory(inv);
         if (this.inventoryOpen) this.renderInventoryPanel();
-        this.openNpcDialog("chestMessage");
+        this.openNpcDialog(contents.openedDialog);
       } else {
-        this.openNpcDialog("chestEmpty");
+        this.openNpcDialog(contents.emptyDialog);
       }
       return true;
     };
@@ -223,12 +263,14 @@ export class WorldScene extends Phaser.Scene {
         ? [tryKey]
         : prefer === "sword"
           ? [trySword]
+          : prefer === "bow"
+            ? [tryBow]
           : prefer === "chest"
             ? [tryChest]
             : prefer === "npc"
               ? [tryNpc]
               : // default priority
-                [tryKey, trySword, tryChest, tryNpc];
+              [tryKey, trySword, tryBow, tryChest, tryNpc];
 
     for (const fn of ordered) if (fn()) return true;
     return false;
@@ -266,6 +308,69 @@ export class WorldScene extends Phaser.Scene {
       anyM.__attackAnimActive = false;
     });
   }
+
+  private spawnBowDrop(x: number, y: number) {
+    if (this.area.id !== "cave") return;
+    if (hasFlag("item.bow.1")) return;
+    if (this.bowSprite?.active) return;
+    this.bowSprite = this.physics.add.sprite(x, y, "item_bow");
+    this.bowSprite.setDepth(this.bowSprite.y);
+    const bb = this.bowSprite.body as Phaser.Physics.Arcade.Body;
+    bb.setAllowGravity(false);
+    bb.setImmovable(true);
+    bb.setSize(14, 10).setOffset(5, 12);
+    this.uiCam.ignore(this.bowSprite);
+    // slight bob so it feels like a drop
+    this.tweens.add({
+      targets: this.bowSprite,
+      y: y - 3,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
+  }
+
+  private damageGoblin(gob: Phaser.Physics.Arcade.Sprite, damage: number) {
+    const goblins = this.goblinsGroup;
+    if (!goblins || !gob.active) return;
+    const anyG = gob as any;
+    const hp = (anyG.__hp as number | undefined) ?? 0;
+    const wasLast = goblins.countActive(true) === 1;
+    const r = applyDamage({ hp, damage });
+    anyG.__hp = r.hp;
+    gob.setTintFill(0xffffff);
+    this.time.delayedCall(60, () => {
+      if (gob.active) gob.clearTint();
+    });
+    if (r.died) {
+      const dropX = gob.x;
+      const dropY = gob.y;
+      gob.destroy();
+      if (wasLast) this.spawnBowDrop(dropX, dropY);
+    }
+  }
+
+  private shootPlayerArrow(dir: { x: number; y: number }) {
+    if (!this.playerArrowsGroup) return;
+    const v = normalize(dir);
+    if (v.x === 0 && v.y === 0) return;
+    const speed = 230;
+    const spawnDist = 16;
+    const ax = this.player.x + v.x * spawnDist;
+    const ay = this.player.y + v.y * spawnDist;
+    const arrow = this.playerArrowsGroup.create(ax, ay, "proj_arrow") as Phaser.Physics.Arcade.Sprite;
+    arrow.setDepth(arrow.y);
+    const ab = arrow.body as Phaser.Physics.Arcade.Body;
+    ab.setAllowGravity(false);
+    ab.setSize(14, 4).setOffset(1, 1);
+    ab.setVelocity(v.x * speed, v.y * speed);
+    arrow.setRotation(Math.atan2(v.y, v.x));
+    this.uiCam.ignore(arrow);
+    this.time.delayedCall(2400, () => {
+      if (arrow.active) arrow.destroy();
+    });
+  }
   private exitGate = createExitGate();
 
   constructor() {
@@ -291,15 +396,20 @@ export class WorldScene extends Phaser.Scene {
     this.inventorySlotIndexText = [];
     this.inventorySlotNameText = [];
     this.inventorySlotQtyText = [];
+    this.chestContents = undefined;
     this.heldItemSprite = undefined;
     this.slashSwordSprite = undefined;
     this.equipment = loadEquipment();
     this.monstersGroup = undefined;
     this.goblinsGroup = undefined;
     this.arrowsGroup = undefined;
+    this.playerArrowsGroup = undefined;
     this.lastRangedHitAtMs = 0;
     this.villageHouse = undefined;
     this.heartSprite = undefined;
+    this.bowSprite?.destroy();
+    this.bowSprite = undefined;
+    this.bowState = createRangedState();
     this.dead = false;
     this.lastHitAtMs = -Infinity;
     this.deathText?.destroy();
@@ -318,6 +428,11 @@ export class WorldScene extends Phaser.Scene {
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
     this.dialogChoiceBgs = [];
+    // Reset pouch UI refs to avoid stale destroyed objects.
+    this.pouchIcon?.destroy();
+    this.pouchHit?.destroy();
+    this.pouchIcon = undefined;
+    this.pouchHit = undefined;
   }
 
   private getPlayerTilePos(): TilePos {
@@ -356,6 +471,8 @@ export class WorldScene extends Phaser.Scene {
     this.ensureTilesetTexture();
     // Ensure item textures exist for held-item rendering even in areas that don't spawn items.
     ensureItemAndPropTextures(this);
+    // Arrow texture is shared with goblin archers and the player bow.
+    ensureGoblinAndArrowTextures(this);
 
     ensurePeasantPlayerSpriteSheet(this);
     this.ensurePlayerAnimations();
@@ -398,12 +515,12 @@ export class WorldScene extends Phaser.Scene {
         if (this.isPointerOverMobileControls(pointer)) return;
         const wp = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
 
-        // Mobile: tap your own sprite to toggle the pouch.
         const hasTouch =
           !!this.sys.game.device.input.touch ||
           (typeof navigator !== "undefined" && (navigator.maxTouchPoints ?? 0) > 0) ||
           (typeof window !== "undefined" && ("ontouchstart" in window));
         if (
+          shouldAllowPlayerTapInventory() &&
           hasTouch &&
           isTapOnPlayer({
             tapX: wp.x,
@@ -421,7 +538,6 @@ export class WorldScene extends Phaser.Scene {
           this.suppressWorldPointerUntilTs = Date.now() + 250;
           return;
         }
-
         if (this.inventoryOpen) return;
         const candidates = this.getTapCandidates();
         const picked = pickTapCandidate({ tapX: wp.x, tapY: wp.y, candidates, maxDistancePx: 22 });
@@ -476,6 +592,11 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.ignore(this.hpText);
     // Remove debug HUD elements (keep only HP).
 
+    // Inventory button (top-left): small semi-transparent pouch icon.
+    ensureUiPouchTexture(this);
+    this.ensurePouchButton();
+    this.layoutPouchButton();
+
     // Keep UI camera + modal layouts correct across resizes (mobile address bar, rotation, etc).
     if (!this.onScaleResize) {
       this.onScaleResize = (gameSize: Phaser.Structs.Size) => {
@@ -493,6 +614,8 @@ export class WorldScene extends Phaser.Scene {
 
         // Re-layout mobile buttons.
         this.layoutMobileControls();
+        // Re-layout pouch icon.
+        this.layoutPouchButton();
       };
     }
     this.scale.off("resize", this.onScaleResize);
@@ -570,7 +693,7 @@ export class WorldScene extends Phaser.Scene {
       screenH: this.scale.height,
       hasTouch,
       enemyNearby: this.isEnemyNearby(32 * 7),
-      hasSword: this.equipment.heldItemId === "sword",
+      hasWeapon: !!this.equipment.heldItemId,
     });
     this.mobileControlsVisible = showAttack;
 
@@ -630,6 +753,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.heartSprite?.active) out.push({ kind: "heart", x: this.heartSprite.x, y: this.heartSprite.y });
     if (this.keySprite?.active) out.push({ kind: "key", x: this.keySprite.x, y: this.keySprite.y });
     if (this.swordSprite?.active) out.push({ kind: "sword", x: this.swordSprite.x, y: this.swordSprite.y });
+    if (this.bowSprite?.active) out.push({ kind: "bow", x: this.bowSprite.x, y: this.bowSprite.y });
     if (this.chest?.active) out.push({ kind: "chest", x: this.chest.x, y: this.chest.y });
     if (this.npcsGroup) {
       for (const obj of this.npcsGroup.getChildren()) {
@@ -667,20 +791,22 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (!this.inventoryPanel) {
-      const bg = this.add.rectangle(0, 0, 10, 10, 0x0f1418, 0.96).setStrokeStyle(2, 0x2a3a44, 1);
+      const bg = this.add.rectangle(0, 0, 10, 10, 0x0d1a12, 0.97).setStrokeStyle(2, 0x3a2a1a, 0.9);
+      const header = this.add.rectangle(0, 0, 10, 32, 0x1c2b1f, 0.94).setOrigin(0, 0.5).setStrokeStyle(1, 0x3d4a3a, 0.9);
       const title = this.add.text(0, 0, "Pouch", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "16px",
-        color: "#ffffff",
+        color: "#f5d76e",
       });
-      const hint = this.add.text(0, 0, "I / Esc to close • 1-9 to hold item", {
+      const hint = this.add.text(0, 0, "Tap pouch / I / Esc to close • 1-9 to hold item", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "12px",
-        color: "#b7c3cc",
+        color: "#cbd5df",
       });
 
-      this.inventoryPanel = this.add.container(0, 0, [bg, title, hint]);
+      this.inventoryPanel = this.add.container(0, 0, [bg, header, title, hint]);
       (bg as any).invRole = "bg";
+      (header as any).invRole = "header";
       (title as any).invRole = "title";
       (hint as any).invRole = "hint";
       this.inventoryPanel.setDepth(2500).setScrollFactor(0);
@@ -688,7 +814,7 @@ export class WorldScene extends Phaser.Scene {
 
       // Build 20 slots (5x4 grid)
       for (let i = 0; i < 20; i++) {
-        const r = this.add.rectangle(0, 0, 10, 10, 0x111827, 1).setStrokeStyle(1, 0x2a3a44, 1);
+        const r = this.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
         r.on("pointerdown", () => {
           // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
@@ -704,12 +830,12 @@ export class WorldScene extends Phaser.Scene {
         const idx = this.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: "11px",
-          color: "#94a3b8",
+          color: "#9fb5c4",
         });
         const name = this.add.text(0, 0, "", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "12px",
-          color: "#e2e8f0",
+          color: "#e8f0e6",
         });
         const qty = this.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -723,21 +849,47 @@ export class WorldScene extends Phaser.Scene {
         this.inventoryPanel.add([r, idx, name, qty]);
       }
 
-      // Cloud save button (manual)
-      const saveBg = this.add.rectangle(0, 0, 10, 10, 0x0b1220, 1).setStrokeStyle(1, 0x3b6b88, 1);
-      const saveText = this.add.text(0, 0, "Save", {
+      // Cloud save + Exit buttons (bottom center row)
+      const saveBg = this.add.rectangle(0, 0, 10, 10, 0x1a2b20, 1).setStrokeStyle(1, 0x3b6b88, 1);
+      const saveText = this.add
+        .text(0, 0, "Save", {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "13px",
+        fontSize: "20px",
         color: "#ffffff",
-      });
-      const saveMsg = this.add.text(0, 0, "", {
+        })
+        .setOrigin(0, 0.5);
+      const exitBg = this.add.rectangle(0, 0, 10, 10, 0x2a1b1b, 1).setStrokeStyle(1, 0x8b3a3a, 1);
+      const exitText = this.add
+        .text(0, 0, "Save and Exit to Title", {
+          fontFamily: "system-ui, sans-serif",
+          fontSize: "22px",
+          color: "#ffffff",
+        })
+        .setOrigin(0.5, 0.5);
+      const saveMsg = this.add
+        .text(0, 0, "", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "12px",
-        color: "#b7c3cc",
-      });
+          color: "#cbd5df",
+        })
+        .setOrigin(0.5, 0.5);
+      const versionText = this.add
+        .text(0, 0, "v0.1.0", {
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: "11px",
+          color: "#9fb5c4",
+        })
+        .setOrigin(1, 0.5);
       (saveBg as any).invRole = "saveBg";
       (saveText as any).invRole = "saveText";
       (saveMsg as any).invRole = "saveMsg";
+      (exitBg as any).invRole = "exitBg";
+      (exitText as any).invRole = "exitText";
+      (versionText as any).invRole = "version";
+      // Set initial label depending on auth state.
+      const initialSession = loadSession();
+      const initialIsFirebase = initialSession?.mode === "firebase";
+      exitText.setText(initialIsFirebase ? "Save and Exit to Title" : "Exit to Title");
       saveBg.setInteractive({ useHandCursor: true });
       saveBg.on("pointerdown", async () => {
         const session = loadSession();
@@ -753,7 +905,31 @@ export class WorldScene extends Phaser.Scene {
           this.time.delayedCall(2000, () => saveMsg.setText(""));
         }
       });
-      this.inventoryPanel.add([saveBg, saveText, saveMsg]);
+      exitBg.setInteractive({ useHandCursor: true });
+      exitBg.on("pointerdown", async () => {
+        const session = loadSession();
+        const isFirebase = session?.mode === "firebase";
+        // Update label based on auth state before closing so text stays accurate.
+        exitText.setText(isFirebase ? "Save and Exit to Title" : "Exit to Title");
+        this.inventoryOpen = false;
+        this.renderInventoryPanel();
+
+        await withLoadingOverlay(
+          async () => {
+            if (isFirebase) {
+              // Save before exiting
+              this.writeProgress(true);
+              await saveCloudPlayerState(session);
+            }
+            this.exitToTitle();
+          },
+          {
+            message: isFirebase ? "Saving and Exiting to title..." : "Exiting to title",
+            minDurationMs: 2000,
+          }
+        );
+      });
+      this.inventoryPanel.add([saveBg, saveText, saveMsg, exitBg, exitText, versionText]);
     }
 
     // Layout (responsive)
@@ -773,43 +949,67 @@ export class WorldScene extends Phaser.Scene {
     this.inventoryPanel.setPosition(panelX, panelY);
 
     const bg = this.inventoryPanel.list.find((o) => (o as any).invRole === "bg") as Phaser.GameObjects.Rectangle;
+    const header = this.inventoryPanel.list.find((o) => (o as any).invRole === "header") as Phaser.GameObjects.Rectangle;
     const title = this.inventoryPanel.list.find((o) => (o as any).invRole === "title") as Phaser.GameObjects.Text;
     const hint = this.inventoryPanel.list.find((o) => (o as any).invRole === "hint") as Phaser.GameObjects.Text;
     const saveBg = this.inventoryPanel.list.find((o) => (o as any).invRole === "saveBg") as Phaser.GameObjects.Rectangle;
     const saveText = this.inventoryPanel.list.find((o) => (o as any).invRole === "saveText") as Phaser.GameObjects.Text;
     const saveMsg = this.inventoryPanel.list.find((o) => (o as any).invRole === "saveMsg") as Phaser.GameObjects.Text;
+    const exitBg = this.inventoryPanel.list.find((o) => (o as any).invRole === "exitBg") as Phaser.GameObjects.Rectangle;
+    const exitText = this.inventoryPanel.list.find((o) => (o as any).invRole === "exitText") as Phaser.GameObjects.Text;
+    const versionText = this.inventoryPanel.list.find((o) => (o as any).invRole === "version") as Phaser.GameObjects.Text;
 
     bg.setSize(panelW, panelH);
+    header.setSize(panelW, topBarH).setPosition(-panelW / 2, -panelH / 2 + topBarH / 2);
     title.setPosition(-panelW / 2 + pad, -panelH / 2 + 8).setText("Pouch (20)");
     hint.setPosition(panelW / 2 - pad - hint.width, -panelH / 2 + 10);
 
-    // Save button placement (bottom left inside panel)
-    const saveW = 90;
-    const saveH = 28;
-    saveBg.setSize(saveW, saveH).setPosition(-panelW / 2 + pad, panelH / 2 - pad - saveH).setOrigin(0, 0);
-    saveText.setPosition(-panelW / 2 + pad + 12, panelH / 2 - pad - saveH + 6);
-    saveMsg.setPosition(-panelW / 2 + pad + saveW + 10, panelH / 2 - pad - saveH + 7);
+    // Save + Exit row (bottom center, slightly overlapping for a "tab" look)
+    const saveW = 140;
+    const saveH = 44;
+    const exitW = 240;
+    const exitH = 44;
+    const buttonsGap = 16;
     const canSave = (() => {
       const s = loadSession();
       return !!s && s.mode === "firebase";
     })();
-    saveBg.setVisible(canSave);
-    saveText.setVisible(canSave);
+    const rowW = (canSave ? saveW + buttonsGap : 0) + exitW;
+    const buttonsStartX = -rowW / 2;
+    const buttonY = panelH / 2 - saveH / 2 + 38;
+
+    if (canSave) {
+      saveBg.setSize(saveW, saveH).setPosition(buttonsStartX, buttonY).setOrigin(0, 0.5).setVisible(true);
+      saveText.setPosition(buttonsStartX + saveW / 2, buttonY).setOrigin(0.5, 0.5).setVisible(true);
+    } else {
+      saveBg.setVisible(false);
+      saveText.setVisible(false);
+    }
+    saveMsg.setPosition(0, buttonY - saveH / 2 - 8);
+
+    exitBg
+      .setSize(exitW, exitH)
+      .setPosition(buttonsStartX + (canSave ? saveW + buttonsGap : 0), buttonY)
+      .setOrigin(0, 0.5);
+    exitText.setPosition(exitBg.x + exitW / 2, buttonY);
     // saveMsg remains visible only when text is set; still hide when not logged in
     if (!canSave) saveMsg.setText("");
     saveMsg.setVisible(canSave);
+
+    // Version tag at bottom-right of the panel
+    versionText.setPosition(panelW / 2 - pad, panelH / 2 - pad / 2).setVisible(true);
 
     const gridW = panelW - pad * 2;
     const gridH = panelH - pad * 2 - topBarH;
     const slotW = Math.floor((gridW - gap * (cols - 1)) / cols);
     const slotH = Math.floor((gridH - gap * (rows - 1)) / rows);
-    const startX = -panelW / 2 + pad;
+    const gridStartX = -panelW / 2 + pad;
     const startY = -panelH / 2 + pad + topBarH;
 
     for (let i = 0; i < 20; i++) {
       const c = i % cols;
       const r = Math.floor(i / cols);
-      const x = startX + c * (slotW + gap);
+      const x = gridStartX + c * (slotW + gap);
       const y = startY + r * (slotH + gap);
 
       const rect = this.inventorySlotRects[i]!;
@@ -824,15 +1024,15 @@ export class WorldScene extends Phaser.Scene {
 
       const s = inv.slots[i];
       if (!s) {
-        rect.setFillStyle(0x0b1220, 1).setStrokeStyle(1, 0x2a3a44, 1);
-        name.setText("").setColor("#94a3b8");
+        rect.setFillStyle(0x16281d, 1).setStrokeStyle(1, 0x2f3b32, 1);
+        name.setText("").setColor("#9fb5c4");
         qty.setText("");
       } else {
         const held = this.equipment.heldItemId === s.id;
         rect
-          .setFillStyle(0x111827, 1)
-          .setStrokeStyle(held ? 2 : 1, held ? 0xf5d76e : 0x3b6b88, 1);
-        name.setText(truncate(s.name, 10)).setColor("#e2e8f0");
+          .setFillStyle(0x1c2c22, 1)
+          .setStrokeStyle(held ? 2 : 1, held ? 0xf5d76e : 0x4f7a6b, 1);
+        name.setText(truncate(s.name, 10)).setColor("#e8f0e6");
         qty.setText(String(s.qty));
       }
     }
@@ -840,6 +1040,63 @@ export class WorldScene extends Phaser.Scene {
     const visible = this.inventoryOpen;
     this.inventoryBackdrop.setVisible(visible);
     this.inventoryPanel.setVisible(visible);
+  }
+
+  private ensurePouchButton(): void {
+    if (!needsPouchUiRebuild(this.pouchIcon, this.pouchHit)) return;
+
+    // Clean up stale refs (e.g., after scene restart).
+    this.pouchIcon?.destroy();
+    this.pouchHit?.destroy();
+    this.pouchIcon = undefined;
+    this.pouchHit = undefined;
+
+    const hit = this.add.rectangle(0, 0, 10, 10, 0x000000, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(1101);
+    const icon = this.add.image(0, 0, "ui_pouch").setOrigin(0, 0).setScrollFactor(0).setDepth(1100).setAlpha(0.7);
+    icon.setScale(1); // texture is 24x24; layout will size hitbox around it.
+
+    // UI camera only.
+    this.cameras.main.ignore([hit, icon]);
+
+    hit.setInteractive({ useHandCursor: true });
+    hit.on("pointerdown", (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: any) => {
+      // Prevent this click from also becoming a world tap-to-move.
+      event?.stopPropagation?.();
+      this.suppressWorldPointerUntilTs = Date.now() + 250;
+      this.tapTarget = undefined;
+      this.tapIntent = undefined;
+
+      if (!canToggleInventory(this.dialog.open)) return;
+      this.inventoryOpen = !this.inventoryOpen;
+      this.renderInventoryPanel();
+    });
+
+    this.pouchIcon = icon;
+    this.pouchHit = hit;
+  }
+
+  private layoutPouchButton(): void {
+    if (!this.pouchIcon || !this.pouchHit || !this.pouchIcon.active || !this.pouchHit.active) return;
+
+    const { w, h } = normalizeScreenSize(this.scale.width, this.scale.height);
+    const l = computePouchIconLayout({ screenW: w, screenH: h });
+
+    // Position icon; size hit rect generously for touch.
+    this.pouchIcon.setPosition(l.icon.x, l.icon.y);
+    this.pouchIcon.setDisplaySize(l.icon.w, l.icon.h);
+
+    this.pouchHit.setPosition(l.hit.x, l.hit.y);
+    this.pouchHit.setSize(l.hit.w, l.hit.h);
+  }
+
+  private exitToTitle(): void {
+    // Clear local state and sign out before returning to the intro/title.
+    clearInventory();
+    clearEquipment();
+    clearFlags();
+    clearProgress();
+    clearSession();
+    if (typeof window !== "undefined") window.location.reload();
   }
 
   private ensurePlayerAnimations() {
@@ -964,6 +1221,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.area = getArea(areaId);
     // HUD removed (keep only HP).
+    this.bowState = createRangedState();
 
     const tileSize = 32;
     const map = this.make.tilemap({
@@ -985,6 +1243,17 @@ export class WorldScene extends Phaser.Scene {
 
     // Collide player with walls.
     this.physics.add.collider(this.player, layer);
+    // Fresh area: clear single-area objects.
+    this.chest?.destroy();
+    this.chest = undefined;
+    this.chestContents = undefined;
+    this.bowSprite?.destroy();
+    this.bowSprite = undefined;
+    this.playerArrowsGroup = this.physics.add.group();
+    this.physics.add.collider(this.playerArrowsGroup, layer, (_arrow) => {
+      const a = _arrow as Phaser.Physics.Arcade.Sprite;
+      a.destroy();
+    });
 
     // Spawn player
     const spawn = this.area.spawns[entry] ?? this.area.spawns.start;
@@ -1141,6 +1410,12 @@ export class WorldScene extends Phaser.Scene {
       cb.setOffset(4, 10);
       this.physics.add.collider(this.player, this.chest);
       this.uiCam.ignore(this.chest);
+      this.chestContents = {
+        flag: "chest.house.1",
+        loot: [{ itemId: "coins", qty: 25 }],
+        openedDialog: "chestMessage",
+        emptyDialog: "chestEmpty",
+      };
 
       // Locked door prop at top center
       const unlocked = hasFlag("door.house.hallway.unlocked");
@@ -1155,6 +1430,24 @@ export class WorldScene extends Phaser.Scene {
     if (this.area.id === "woods") {
       ensureMonsterTexture(this);
       ensureItemAndPropTextures(this);
+      ensureChestTextures(this);
+      const chestOpened = hasFlag("chest.woods.arrows.1");
+      const cx = (this.area.width - 3) * tileSize + tileSize / 2;
+      const cy = 2 * tileSize + tileSize / 2;
+      this.chest = this.physics.add.sprite(cx, cy, chestOpened ? "chest_open" : "chest_closed");
+      this.chest.setImmovable(true);
+      this.chest.setDepth(this.chest.y);
+      const cb = this.chest.body as Phaser.Physics.Arcade.Body;
+      cb.setSize(16, 12);
+      cb.setOffset(4, 10);
+      this.physics.add.collider(this.player, this.chest);
+      this.uiCam.ignore(this.chest);
+      this.chestContents = {
+        flag: "chest.woods.arrows.1",
+        loot: [{ itemId: "arrows", qty: 25 }],
+        openedDialog: "arrowsChest",
+        emptyDialog: "chestEmpty",
+      };
       // Key in the middle of the forest (once)
       if (!hasFlag("item.rusty_key.woods.1")) {
         const kx = Math.floor(this.area.width / 2) * tileSize + tileSize / 2;
@@ -1187,6 +1480,14 @@ export class WorldScene extends Phaser.Scene {
       // Prevent monsters from crossing the player and each other.
       this.physics.add.collider(this.player, monsters);
       this.physics.add.collider(monsters, monsters);
+      if (this.playerArrowsGroup) {
+        this.physics.add.overlap(this.playerArrowsGroup, monsters, (_a, m) => {
+          const arrow = _a as Phaser.Physics.Arcade.Sprite;
+          const mon = m as Phaser.Physics.Arcade.Sprite;
+          arrow.destroy();
+          mon.destroy();
+        });
+      }
 
       // Roam + chase: update velocities every 500ms
       this.time.addEvent({
@@ -1304,6 +1605,15 @@ export class WorldScene extends Phaser.Scene {
         }
       });
 
+      if (this.playerArrowsGroup) {
+        this.physics.add.overlap(this.playerArrowsGroup, goblins, (_a, g) => {
+          const arrow = _a as Phaser.Physics.Arcade.Sprite;
+          const gob = g as Phaser.Physics.Arcade.Sprite;
+          this.damageGoblin(gob, 1);
+          arrow.destroy();
+        });
+      }
+
       // Shooting loop: goblins fire when player is within range and cooldown allows.
       this.time.addEvent({
         delay: 250,
@@ -1399,6 +1709,10 @@ export class WorldScene extends Phaser.Scene {
       this.goblinsGroup = undefined;
       this.arrowsGroup?.destroy(true);
       this.arrowsGroup = undefined;
+      if (this.bowSprite) {
+        this.bowSprite.destroy();
+        this.bowSprite = undefined;
+      }
     }
 
     // Hallway props: torches + sword
@@ -1800,7 +2114,8 @@ export class WorldScene extends Phaser.Scene {
     const mobileAttackDown = this.mobilePress.attack;
     // Consume mobile press for "JustDown" semantics.
     if (mobileAttackDown) this.mobilePress.attack = false;
-    if ((Phaser.Input.Keyboard.JustDown(this.attackKey) || mobileAttackDown) && this.equipment.heldItemId === "sword") {
+    const wantAttack = Phaser.Input.Keyboard.JustDown(this.attackKey) || mobileAttackDown;
+    if (wantAttack && this.equipment.heldItemId === "sword") {
       const now = this.time.now;
       const r = tryStartAttack({ nowMs: now, state: this.attackState, cooldownMs: 260 });
       if (r.ok) {
@@ -1866,18 +2181,34 @@ export class WorldScene extends Phaser.Scene {
         if (goblins) {
           this.physics.add.overlap(zone, goblins, (_z, g) => {
             const gob = g as Phaser.Physics.Arcade.Sprite;
-            const anyG = gob as any;
-            const hp = (anyG.__hp as number | undefined) ?? 0;
-            const r = applyDamage({ hp, damage: 1 });
-            anyG.__hp = r.hp;
-            gob.setTintFill(0xffffff);
-            this.time.delayedCall(60, () => {
-              if (gob.active) gob.clearTint();
-            });
-            if (r.died) gob.destroy();
+            this.damageGoblin(gob, 1);
           });
         }
         this.time.delayedCall(90, () => zone.destroy());
+      }
+    } else if (wantAttack && this.equipment.heldItemId === "bow") {
+      const now = this.time.now;
+      const inv = loadInventory();
+      const arrows = getItemCount(inv, "arrows");
+      const shot = tryShootWithAmmo({ nowMs: now, state: this.bowState, cooldownMs: 450, arrows });
+      if (shot.ok) {
+        this.bowState = shot.next;
+        const removed = removeItem(inv, "arrows", 1);
+        if (removed) {
+          saveInventory(inv);
+          if (this.inventoryOpen) this.renderInventoryPanel();
+        }
+        const dir =
+          this.facing === "up"
+            ? { x: 0, y: -1 }
+            : this.facing === "down"
+              ? { x: 0, y: 1 }
+              : this.facing === "left"
+                ? { x: -1, y: 0 }
+                : { x: 1, y: 0 };
+        this.shootPlayerArrow(dir);
+      } else if (shot.reason === "no_arrows") {
+        this.cameras.main.shake(80, 0.002);
       }
     }
 
@@ -1966,6 +2297,8 @@ export class WorldScene extends Phaser.Scene {
         this.heldItemSprite = this.add.sprite(this.player.x, this.player.y, "item_sword");
         this.heldItemSprite.setOrigin(0.5, 0.9);
         this.uiCam.ignore(this.heldItemSprite);
+      } else {
+        this.heldItemSprite.setTexture("item_sword");
       }
       const pose = computeHeldSwordPose(this.facing);
       this.heldItemSprite
@@ -1976,6 +2309,28 @@ export class WorldScene extends Phaser.Scene {
       this.heldItemSprite.setDepth(this.player.y + 1);
       // If we're mid-slash, the held sprite stays hidden (slash sprite is shown instead).
       if (!this.slashSwordSprite) this.heldItemSprite.setVisible(true);
+    } else if (this.equipment.heldItemId === "bow") {
+      if (!this.heldItemSprite) {
+        this.heldItemSprite = this.add.sprite(this.player.x, this.player.y, "item_bow");
+        this.heldItemSprite.setOrigin(0.5, 0.9);
+        this.uiCam.ignore(this.heldItemSprite);
+      } else {
+        this.heldItemSprite.setTexture("item_bow");
+      }
+      const offsets = {
+        up: { dx: 0, dy: -4, rotation: -Math.PI / 2 },
+        down: { dx: 0, dy: 6, rotation: Math.PI / 2 },
+        left: { dx: -6, dy: 0, rotation: Math.PI },
+        right: { dx: 6, dy: 0, rotation: 0 },
+      };
+      const pose = offsets[this.facing];
+      this.heldItemSprite
+        .setPosition(this.player.x + pose.dx, this.player.y + pose.dy)
+        .setOrigin(0.5, 0.9)
+        .setScale(1)
+        .setRotation(pose.rotation);
+      this.heldItemSprite.setDepth(this.player.y + 1);
+      this.heldItemSprite.setVisible(true);
     } else if (this.heldItemSprite) {
       this.heldItemSprite.setVisible(false);
     }
@@ -1990,6 +2345,13 @@ export class WorldScene extends Phaser.Scene {
     // Keep projectiles depth-sorted.
     if (this.arrowsGroup) {
       for (const obj of this.arrowsGroup.getChildren()) {
+        const a = obj as Phaser.Physics.Arcade.Sprite;
+        if (!a.active) continue;
+        a.setDepth(a.y);
+      }
+    }
+    if (this.playerArrowsGroup) {
+      for (const obj of this.playerArrowsGroup.getChildren()) {
         const a = obj as Phaser.Physics.Arcade.Sprite;
         if (!a.active) continue;
         a.setDepth(a.y);

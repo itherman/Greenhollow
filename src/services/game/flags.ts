@@ -1,6 +1,7 @@
 export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?: (key: string) => void;
 }
 
 const FLAGS_KEY = "game.flags.v1";
@@ -50,6 +51,15 @@ export function dumpFlags(storage: StorageLike | null = defaultStorage()): Flags
 
 export function replaceFlags(next: FlagsState, storage: StorageLike | null = defaultStorage()): void {
   saveState(storage, next ?? {});
+}
+
+export function clearFlags(storage: StorageLike | null = defaultStorage()): void {
+  if (!storage) return;
+  if (storage.removeItem) {
+    storage.removeItem(FLAGS_KEY);
+    return;
+  }
+  saveState(storage, {});
 }
 
 

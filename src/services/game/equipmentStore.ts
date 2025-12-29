@@ -9,8 +9,7 @@ function storage(): Storage | null {
   return window.localStorage ?? null;
 }
 
-export function loadEquipment(): EquipmentState {
-  const st = storage();
+export function loadEquipment(st: Storage | null = storage()): EquipmentState {
   if (!st) return createEquipment();
   const raw = st.getItem(KEY);
   if (!raw) return createEquipment();
@@ -24,10 +23,14 @@ export function loadEquipment(): EquipmentState {
   }
 }
 
-export function saveEquipment(state: EquipmentState): void {
-  const st = storage();
+export function saveEquipment(state: EquipmentState, st: Storage | null = storage()): void {
   if (!st) return;
   st.setItem(KEY, JSON.stringify(state));
+}
+
+export function clearEquipment(st: Storage | null = storage()): void {
+  if (!st) return;
+  st.removeItem(KEY);
 }
 
 

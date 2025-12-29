@@ -33,6 +33,17 @@ describe("tapTargeting", () => {
     if (!r.ok) throw new Error("expected ok");
     expect(r.picked.kind).toBe("heart");
   });
+
+  it("treats bow like other items in priority", () => {
+    const candidates: TapCandidate[] = [
+      { kind: "chest", x: 5, y: 0 },
+      { kind: "bow", x: 5, y: 0 },
+    ];
+    const r = pickTapCandidate({ tapX: 0, tapY: 0, candidates, maxDistancePx: 10 });
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.picked.kind).toBe("bow");
+  });
 });
 
 
