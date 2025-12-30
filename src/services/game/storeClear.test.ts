@@ -21,7 +21,7 @@ describe("store clearing helpers", () => {
     const inv = createInventory();
     inv.slots[0] = { ...ITEMS.sword, qty: 1 };
     saveInventory(inv, st);
-    saveEquipment({ heldItemId: ITEMS.sword.id, armorItemId: null }, st);
+    saveEquipment({ heldItemId: ITEMS.sword.id, headArmorItemId: null, bodyArmorItemId: null, legArmorItemId: null }, st);
     saveProgress({ areaId: "village" as any, entry: "start" as any, playerX: 1, playerY: 2, hp: 10, maxHp: 10 }, st);
     setFlag("x", st);
 

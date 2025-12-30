@@ -1,4 +1,4 @@
-import type { EquipmentState } from "./equipment";
+import { createEquipment, type EquipmentState } from "./equipment";
 import type { Inventory } from "./inventory";
 import type { AreaId, EntryId } from "./areas";
 
@@ -29,6 +29,10 @@ function isFiniteNumber(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
 
+function isNullOrString(v: unknown): v is null | string {
+  return v === null || typeof v === "string";
+}
+
 function clampInt(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, Math.floor(n)));
 }
@@ -53,8 +57,23 @@ export function decodePlayerState(raw: unknown): DecodeResult {
   if (typeof inv.size !== "number" || !Array.isArray(inv.slots)) return { ok: false, reason: "invalid" };
 
   // Equipment validation
-  const eq = r.equipment as EquipmentState;
-  if (!(eq.heldItemId === null || typeof eq.heldItemId === "string")) return { ok: false, reason: "invalid" };
+  const eqRaw = r.equipment as any;
+  if (!eqRaw || typeof eqRaw !== "object") return { ok: false, reason: "invalid" };
+  if (!isNullOrString(eqRaw.heldItemId ?? null)) return { ok: false, reason: "invalid" };
+  if (!isNullOrString(eqRaw.headArmorItemId ?? null)) return { ok: false, reason: "invalid" };
+  if (!isNullOrString(eqRaw.bodyArmorItemId ?? null)) return { ok: false, reason: "invalid" };
+  if (!isNullOrString(eqRaw.legArmorItemId ?? null)) return { ok: false, reason: "invalid" };
+  // Back-compat: v1 local saves used `armorItemId` for body armor.
+  if (!isNullOrString(eqRaw.armorItemId ?? null)) return { ok: false, reason: "invalid" };
+
+  const eqBase = createEquipment();
+  const eq: EquipmentState = {
+    ...eqBase,
+    heldItemId: (eqRaw.heldItemId ?? null) as any,
+    headArmorItemId: (eqRaw.headArmorItemId ?? null) as any,
+    bodyArmorItemId: (eqRaw.bodyArmorItemId ?? eqRaw.armorItemId ?? null) as any,
+    legArmorItemId: (eqRaw.legArmorItemId ?? null) as any,
+  };
 
   // Flags validation
   const flags: Record<string, true> = {};

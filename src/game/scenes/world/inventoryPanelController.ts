@@ -1,5 +1,7 @@
 import { toggleEquipFromInventorySlot, type EquipmentState } from "../../../core/equipment";
+import { digestFoodFromInventorySlot } from "../../../core/digestFood";
 import { loadInventory } from "../../../services/game/inventoryStore";
+import { saveInventory } from "../../../services/game/inventoryStore";
 import { saveEquipment } from "../../../services/game/equipmentStore";
 import { loadSession } from "../../../services/auth/session";
 import { saveCloudPlayerState } from "../../../services/game/cloudPlayerState";
@@ -31,6 +33,13 @@ export type InventoryPanelHost = {
   /** Updates derived stats (max HP) after equipment changes. */
   updateMaxHpFromArmor: () => void;
 
+  /** Reads current HP from the authoritative place (WorldScene field). */
+  getHp: () => number;
+  /** Reads current max HP from the authoritative place (WorldScene field). */
+  getMaxHp: () => number;
+  /** Updates HP in the authoritative place (WorldScene field). */
+  setHp: (nextHp: number) => void;
+
   /** Persists local progress (used before cloud save / exit). */
   writeProgress: (force: boolean) => void;
 
@@ -52,9 +61,14 @@ export class InventoryPanelController {
   private inventoryBackdrop?: any;
   private inventoryPanel?: any;
   private inventorySlotRects: any[] = [];
-  private inventorySlotIndexText: any[] = [];
+  private inventorySlotIndexText: any[] = []; // kept for back-compat; now hidden
+  private inventorySlotIcons: any[] = [];
   private inventorySlotNameText: any[] = [];
   private inventorySlotQtyText: any[] = [];
+
+  private equipmentSlotRects: any[] = [];
+  private equipmentSlotIcons: any[] = [];
+  private equipmentSlotLabels: any[] = [];
   private host: InventoryPanelHost;
 
   constructor(host: InventoryPanelHost) {
@@ -70,8 +84,12 @@ export class InventoryPanelController {
     this.inventoryPanel = undefined;
     this.inventorySlotRects = [];
     this.inventorySlotIndexText = [];
+    this.inventorySlotIcons = [];
     this.inventorySlotNameText = [];
     this.inventorySlotQtyText = [];
+    this.equipmentSlotRects = [];
+    this.equipmentSlotIcons = [];
+    this.equipmentSlotLabels = [];
   }
 
   /**
@@ -84,6 +102,7 @@ export class InventoryPanelController {
     const { scene } = this.host;
     const inv = loadInventory();
     const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
+    const itemIconKey = (id: string): string => (id === "rusty_key" ? "item_key" : `item_${id}`);
 
     // Lazily create modal elements
     if (!this.inventoryBackdrop) {
@@ -112,7 +131,7 @@ export class InventoryPanelController {
         fontSize: "16px",
         color: "#f5d76e",
       });
-      const hint = scene.add.text(0, 0, "Tap pouch / I / Esc to close • 1-9 to hold item", {
+      const hint = scene.add.text(0, 0, "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "12px",
         color: "#cbd5df",
@@ -126,6 +145,66 @@ export class InventoryPanelController {
       this.inventoryPanel.setDepth(2500).setScrollFactor(0);
       scene.cameras.main.ignore(this.inventoryPanel);
 
+      // Equipment slots (Head/Body/Legs/Held)
+      const mkEquipSlot = (label: string, onClick: () => void) => {
+        const r = scene.add.rectangle(0, 0, 10, 10, 0x102117, 1).setStrokeStyle(1, 0x2f3b32, 1);
+        r.setInteractive({ useHandCursor: true });
+        r.on("pointerdown", () => {
+          if (!this.inventoryPanel?.visible) return;
+          if (this.host.isDialogOpen()) return;
+          onClick();
+        });
+        const icon = scene.add.image(0, 0, "ui_pouch").setOrigin(0.5, 0.5).setVisible(false);
+        const t = scene.add
+          .text(0, 0, label, {
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: "11px",
+            color: "#9fb5c4",
+          })
+          .setOrigin(0.5, 0);
+        this.inventoryPanel.add([r, icon, t]);
+        this.equipmentSlotRects.push(r);
+        this.equipmentSlotIcons.push(icon);
+        this.equipmentSlotLabels.push(t);
+      };
+
+      mkEquipSlot("Head", () => {
+        const eq = this.host.getEquipment();
+        if (!eq.headArmorItemId) return;
+        const next = { ...eq, headArmorItemId: null };
+        this.host.setEquipment(next);
+        saveEquipment(next);
+        this.host.updateMaxHpFromArmor();
+        this.render(true);
+      });
+      mkEquipSlot("Body", () => {
+        const eq = this.host.getEquipment();
+        if (!eq.bodyArmorItemId) return;
+        const next = { ...eq, bodyArmorItemId: null };
+        this.host.setEquipment(next);
+        saveEquipment(next);
+        this.host.updateMaxHpFromArmor();
+        this.render(true);
+      });
+      mkEquipSlot("Legs", () => {
+        const eq = this.host.getEquipment();
+        if (!eq.legArmorItemId) return;
+        const next = { ...eq, legArmorItemId: null };
+        this.host.setEquipment(next);
+        saveEquipment(next);
+        this.host.updateMaxHpFromArmor();
+        this.render(true);
+      });
+      mkEquipSlot("Held", () => {
+        const eq = this.host.getEquipment();
+        if (!eq.heldItemId) return;
+        const next = { ...eq, heldItemId: null };
+        this.host.setEquipment(next);
+        saveEquipment(next);
+        this.host.updateMaxHpFromArmor();
+        this.render(true);
+      });
+
       // Build 20 slots (5x4 grid)
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
@@ -135,6 +214,22 @@ export class InventoryPanelController {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
           const invNow = loadInventory();
+          const slot = invNow.slots[i];
+          if (!slot) return;
+
+          // Food: digest for HP.
+          const hpNow = this.host.getHp();
+          const maxHpNow = this.host.getMaxHp();
+          const eat = digestFoodFromInventorySlot({ inv: invNow, slotIndex: i, hp: hpNow, maxHp: maxHpNow });
+          if (eat.ok) {
+            saveInventory(invNow);
+            this.host.setHp(eat.nextHp);
+            this.host.writeProgress(true);
+            this.render(true);
+            return;
+          }
+
+          // Otherwise: toggle-equip.
           const equipNow = this.host.getEquipment();
           const res = toggleEquipFromInventorySlot(equipNow, invNow, i);
           if (!res.ok) return;
@@ -148,6 +243,8 @@ export class InventoryPanelController {
           fontSize: "11px",
           color: "#9fb5c4",
         });
+        idx.setVisible(false); // remove numeric labels from slots
+        const icon = scene.add.image(0, 0, "ui_pouch").setOrigin(0.5, 0.5).setVisible(false);
         const name = scene.add.text(0, 0, "", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "12px",
@@ -160,9 +257,10 @@ export class InventoryPanelController {
         });
         this.inventorySlotRects.push(r);
         this.inventorySlotIndexText.push(idx);
+        this.inventorySlotIcons.push(icon);
         this.inventorySlotNameText.push(name);
         this.inventorySlotQtyText.push(qty);
-        this.inventoryPanel.add([r, idx, name, qty]);
+        this.inventoryPanel.add([r, idx, icon, name, qty]);
       }
 
       // Cloud save + Exit buttons (bottom center row)
@@ -252,11 +350,12 @@ export class InventoryPanelController {
     const W = scene.scale.width;
     const H = scene.scale.height;
     const panelW = Math.min(520, W - 40);
-    const panelH = Math.min(360, H - 40);
+    const panelH = Math.min(420, H - 40);
     const panelX = W / 2;
     const panelY = H / 2;
     const pad = 14;
     const topBarH = 34;
+    const equipRowH = 56;
     const cols = 5;
     const rows = 4;
     const gap = 10;
@@ -279,6 +378,44 @@ export class InventoryPanelController {
     header.setSize(panelW, topBarH).setPosition(-panelW / 2, -panelH / 2 + topBarH / 2);
     title.setPosition(-panelW / 2 + pad, -panelH / 2 + 8).setText("Pouch (20)");
     hint.setPosition(panelW / 2 - pad - hint.width, -panelH / 2 + 10);
+
+    // Equipment slots row
+    const eqCols = 4;
+    const eqGap = 10;
+    const eqAreaW = panelW - pad * 2;
+    const eqSlotW = Math.floor((eqAreaW - eqGap * (eqCols - 1)) / eqCols);
+    const eqSlotH = 40;
+    const eqStartX = -panelW / 2 + pad;
+    const eqY = -panelH / 2 + pad + topBarH + eqSlotH / 2;
+
+    const equipment = this.host.getEquipment();
+    const eqKeys: Array<{ label: string; itemId: string | null }> = [
+      { label: "Head", itemId: equipment.headArmorItemId },
+      { label: "Body", itemId: equipment.bodyArmorItemId },
+      { label: "Legs", itemId: equipment.legArmorItemId },
+      { label: "Held", itemId: equipment.heldItemId },
+    ];
+    for (let i = 0; i < this.equipmentSlotRects.length; i++) {
+      const c = i % eqCols;
+      const x = eqStartX + c * (eqSlotW + eqGap);
+      const rect = this.equipmentSlotRects[i]!;
+      const icon = this.equipmentSlotIcons[i]!;
+      const label = this.equipmentSlotLabels[i]!;
+      rect.setPosition(x + eqSlotW / 2, eqY).setSize(eqSlotW, eqSlotH);
+      label.setPosition(x + eqSlotW / 2, eqY + eqSlotH / 2 - 2).setText(eqKeys[i]?.label ?? "");
+
+      const itemId = eqKeys[i]?.itemId ?? null;
+      if (!itemId) {
+        rect.setFillStyle(0x102117, 1).setStrokeStyle(1, 0x2f3b32, 1);
+        icon.setVisible(false);
+      } else {
+        rect.setFillStyle(0x1a2b20, 1).setStrokeStyle(2, 0xf5d76e, 1);
+        const key = itemIconKey(itemId);
+        const exists = scene.textures?.exists?.(key) ?? true;
+        if (exists) icon.setTexture(key);
+        icon.setPosition(x + eqSlotW / 2, eqY).setDisplaySize(20, 20).setVisible(exists);
+      }
+    }
 
     // Save + Exit row (bottom center, slightly overlapping for a "tab" look)
     const saveW = 140;
@@ -313,13 +450,12 @@ export class InventoryPanelController {
     versionText.setPosition(panelW / 2 - pad, panelH / 2 - pad / 2).setVisible(true);
 
     const gridW = panelW - pad * 2;
-    const gridH = panelH - pad * 2 - topBarH;
+    const gridH = panelH - pad * 2 - topBarH - equipRowH;
     const slotW = Math.floor((gridW - gap * (cols - 1)) / cols);
     const slotH = Math.floor((gridH - gap * (rows - 1)) / rows);
     const gridStartX = -panelW / 2 + pad;
-    const startY = -panelH / 2 + pad + topBarH;
+    const startY = -panelH / 2 + pad + topBarH + equipRowH;
 
-    const equipment = this.host.getEquipment();
     for (let i = 0; i < 20; i++) {
       const c = i % cols;
       const r = Math.floor(i / cols);
@@ -328,22 +464,33 @@ export class InventoryPanelController {
 
       const rect = this.inventorySlotRects[i]!;
       const idx = this.inventorySlotIndexText[i]!;
+      const icon = this.inventorySlotIcons[i]!;
       const name = this.inventorySlotNameText[i]!;
       const qty = this.inventorySlotQtyText[i]!;
 
       rect.setPosition(x + slotW / 2, y + slotH / 2).setSize(slotW, slotH);
-      idx.setPosition(x + 6, y + 4).setText(String(i + 1));
-      name.setPosition(x + 6, y + 18);
+      idx.setPosition(x + 6, y + 4).setText("");
+      icon.setPosition(x + 14, y + 14).setDisplaySize(18, 18);
+      name.setPosition(x + 30, y + 10);
       qty.setPosition(x + slotW - 6, y + slotH - 18).setOrigin(1, 0);
 
       const s = inv.slots[i];
       if (!s) {
         rect.setFillStyle(0x16281d, 1).setStrokeStyle(1, 0x2f3b32, 1);
+        icon.setVisible(false);
         name.setText("").setColor("#9fb5c4");
         qty.setText("");
       } else {
-        const held = equipment.heldItemId === s.id;
-        rect.setFillStyle(0x1c2c22, 1).setStrokeStyle(held ? 2 : 1, held ? 0xf5d76e : 0x4f7a6b, 1);
+        const equipped =
+          equipment.heldItemId === s.id ||
+          equipment.headArmorItemId === s.id ||
+          equipment.bodyArmorItemId === s.id ||
+          equipment.legArmorItemId === s.id;
+        rect.setFillStyle(0x1c2c22, 1).setStrokeStyle(equipped ? 2 : 1, equipped ? 0xf5d76e : 0x4f7a6b, 1);
+        const key = itemIconKey(s.id);
+        const exists = scene.textures?.exists?.(key) ?? true;
+        if (exists) icon.setTexture(key);
+        icon.setVisible(exists);
         name.setText(truncate(s.name, 10)).setColor("#e8f0e6");
         qty.setText(String(s.qty));
       }
