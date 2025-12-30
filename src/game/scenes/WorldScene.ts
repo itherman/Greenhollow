@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { computeMovement, type Direction } from "../../core/movement";
-import { getArea, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
+import { VILLAGE_HOUSE_TOP_LEFTS, getArea, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
 import {
   advanceLine,
   choose,
@@ -50,6 +50,12 @@ import { isTapOnPlayer } from "../../core/tapOnPlayer";
 import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild, shouldAllowPlayerTapInventory } from "../../core/pouchUi";
 import { withLoadingOverlay } from "../../ui/loadingOverlay";
+import { attemptPurchase } from "../../core/shopLogic";
+import { getMeleeWeaponStats, getArmorBonus } from "../../core/shopCatalog";
+import { paginateDialogChoices } from "../../core/dialogPagination";
+import { ARROW_HITBOX } from "../../core/physicsTuning";
+import { chooseEnemySpawnTiles } from "../../core/enemySpawn";
+import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 
 export class WorldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -75,6 +81,7 @@ export class WorldScene extends Phaser.Scene {
     ONE: Phaser.Input.Keyboard.Key;
     TWO: Phaser.Input.Keyboard.Key;
     THREE: Phaser.Input.Keyboard.Key;
+    FOUR: Phaser.Input.Keyboard.Key;
   };
   private escapeKey!: Phaser.Input.Keyboard.Key;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
@@ -84,6 +91,7 @@ export class WorldScene extends Phaser.Scene {
   private dialogChoicesText?: Phaser.GameObjects.Text;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
+  private shopDialogPage = 0;
   private startAreaId: AreaId = "village";
   private startEntry: EntryId = "start";
   private startProgress?: LocalProgress;
@@ -115,6 +123,7 @@ export class WorldScene extends Phaser.Scene {
   private heldItemSprite?: Phaser.GameObjects.Sprite;
   private slashSwordSprite?: Phaser.GameObjects.Sprite;
 
+  private baseMaxHp = 20;
   private maxHp = 20;
   private hp = 20;
   private dead = false;
@@ -132,9 +141,10 @@ export class WorldScene extends Phaser.Scene {
   private goblinsGroup?: Phaser.Physics.Arcade.Group;
   private arrowsGroup?: Phaser.Physics.Arcade.Group;
   private playerArrowsGroup?: Phaser.Physics.Arcade.Group;
+  private dropsGroup?: Phaser.Physics.Arcade.Group;
   private bowState: RangedState = createRangedState();
   private lastRangedHitAtMs = 0;
-  private villageHouse?: Phaser.GameObjects.Image;
+  private villageHouses: Phaser.GameObjects.Image[] = [];
   private heartSprite?: Phaser.Physics.Arcade.Sprite;
   private tapTarget?: { x: number; y: number };
   private tapIntent?: { kind: TapCandidateKind; id?: string };
@@ -203,7 +213,7 @@ export class WorldScene extends Phaser.Scene {
       saveInventory(inv);
       // Auto-equip bow if nothing is held.
       if (!this.equipment.heldItemId) {
-        this.equipment = { heldItemId: "bow" };
+        this.equipment = { ...this.equipment, heldItemId: "bow" };
         saveEquipment(this.equipment);
       }
       if (this.inventoryOpen) this.renderInventoryPanel();
@@ -346,9 +356,27 @@ export class WorldScene extends Phaser.Scene {
     if (r.died) {
       const dropX = gob.x;
       const dropY = gob.y;
+      this.spawnEnemyDrop(dropX, dropY);
       gob.destroy();
       if (wasLast) this.spawnBowDrop(dropX, dropY);
     }
+  }
+
+  private spawnEnemyDrop(x: number, y: number) {
+    if (!this.dropsGroup) return;
+    ensureItemAndPropTextures(this);
+    const drop: EnemyDrop = rollEnemyDrop(() => Math.random());
+    const key = drop.kind === "heart" ? "item_heart" : "item_coins";
+    const s = this.dropsGroup.create(x, y, key) as Phaser.Physics.Arcade.Sprite;
+    s.setDepth(s.y);
+    const b = s.body as Phaser.Physics.Arcade.Body;
+    b.setAllowGravity(false);
+    b.setImmovable(true);
+    b.setSize(12, 12).setOffset(6, 6);
+    (s as any).__drop = drop;
+    this.uiCam.ignore(s);
+    // subtle bob
+    this.tweens.add({ targets: s, y: y - 3, duration: 650, yoyo: true, repeat: -1, ease: "Sine.InOut" });
   }
 
   private shootPlayerArrow(dir: { x: number; y: number }) {
@@ -363,7 +391,7 @@ export class WorldScene extends Phaser.Scene {
     arrow.setDepth(arrow.y);
     const ab = arrow.body as Phaser.Physics.Arcade.Body;
     ab.setAllowGravity(false);
-    ab.setSize(14, 4).setOffset(1, 1);
+    ab.setSize(ARROW_HITBOX.w, ARROW_HITBOX.h).setOffset(ARROW_HITBOX.offsetX, ARROW_HITBOX.offsetY);
     ab.setVelocity(v.x * speed, v.y * speed);
     arrow.setRotation(Math.atan2(v.y, v.x));
     this.uiCam.ignore(arrow);
@@ -400,12 +428,14 @@ export class WorldScene extends Phaser.Scene {
     this.heldItemSprite = undefined;
     this.slashSwordSprite = undefined;
     this.equipment = loadEquipment();
+    this.updateMaxHpFromArmor();
     this.monstersGroup = undefined;
     this.goblinsGroup = undefined;
     this.arrowsGroup = undefined;
     this.playerArrowsGroup = undefined;
+    this.dropsGroup = undefined;
     this.lastRangedHitAtMs = 0;
-    this.villageHouse = undefined;
+    this.villageHouses = [];
     this.heartSprite = undefined;
     this.bowSprite?.destroy();
     this.bowSprite = undefined;
@@ -443,6 +473,19 @@ export class WorldScene extends Phaser.Scene {
     return { x: tx, y: ty };
   }
 
+  private updateMaxHpFromArmor() {
+    const armorBonus = getArmorBonus(this.equipment.armorItemId);
+    const newMaxHp = this.baseMaxHp + armorBonus;
+    const oldMaxHp = this.maxHp;
+    this.maxHp = newMaxHp;
+    // Clamp current HP to new max (in case armor was removed)
+    if (this.hp > this.maxHp) this.hp = this.maxHp;
+    // If maxHp increased and we're at full health, increase HP too
+    if (newMaxHp > oldMaxHp && this.hp === oldMaxHp) {
+      this.hp = newMaxHp;
+    }
+  }
+
   private expandRect(rect: { x: number; y: number; w: number; h: number }, by: number) {
     return { x: rect.x - by, y: rect.y - by, w: rect.w + by * 2, h: rect.h + by * 2 };
   }
@@ -462,10 +505,11 @@ export class WorldScene extends Phaser.Scene {
     this.inventoryKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.attackKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.invSelectKeys = this.input.keyboard!.addKeys("ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE") as any;
-    this.choiceKeys = this.input.keyboard!.addKeys("ONE,TWO,THREE") as {
+    this.choiceKeys = this.input.keyboard!.addKeys("ONE,TWO,THREE,FOUR") as {
       ONE: Phaser.Input.Keyboard.Key;
       TWO: Phaser.Input.Keyboard.Key;
       THREE: Phaser.Input.Keyboard.Key;
+      FOUR: Phaser.Input.Keyboard.Key;
     };
 
     this.ensureTilesetTexture();
@@ -825,6 +869,7 @@ export class WorldScene extends Phaser.Scene {
           if (!res.ok) return;
           this.equipment = res.next;
           saveEquipment(this.equipment);
+          this.updateMaxHpFromArmor();
           this.renderInventoryPanel();
         });
         const idx = this.add.text(0, 0, "", {
@@ -874,7 +919,7 @@ export class WorldScene extends Phaser.Scene {
         })
         .setOrigin(0.5, 0.5);
       const versionText = this.add
-        .text(0, 0, "v0.1.1", {
+        .text(0, 0, "v0.1.2", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: "11px",
           color: "#9fb5c4",
@@ -1255,6 +1300,31 @@ export class WorldScene extends Phaser.Scene {
       a.destroy();
     });
 
+    // Drop items (coins/hearts) created by enemy deaths.
+    this.dropsGroup = this.physics.add.group();
+    this.physics.add.collider(this.dropsGroup, layer);
+    this.physics.add.overlap(this.player, this.dropsGroup, (_p, d) => {
+      const drop = d as Phaser.Physics.Arcade.Sprite;
+      const meta = (drop as any).__drop as EnemyDrop | undefined;
+      if (!meta) {
+        drop.destroy();
+        return;
+      }
+      if (meta.kind === "heart") {
+        const heal = 5;
+        this.hp = Math.min(this.maxHp, this.hp + heal);
+        this.writeProgress(true);
+        drop.destroy();
+        return;
+      }
+      // coins
+      const inv = loadInventory();
+      addItem(inv, ITEMS.coins, meta.qty);
+      saveInventory(inv);
+      if (this.inventoryOpen) this.renderInventoryPanel();
+      drop.destroy();
+    });
+
     // Spawn player
     const spawn = this.area.spawns[entry] ?? this.area.spawns.start;
     this.currentEntry = entry;
@@ -1262,10 +1332,12 @@ export class WorldScene extends Phaser.Scene {
     const sp = this.startProgress && this.startProgress.areaId === areaId ? this.startProgress : undefined;
     if (sp) {
       this.player.setPosition(sp.playerX, sp.playerY);
-      this.hp = Math.max(0, Math.min(sp.maxHp, sp.hp));
-      this.maxHp = Math.max(1, sp.maxHp);
+      // Recompute maxHp from armor (in case armor changed since save)
+      this.updateMaxHpFromArmor();
+      this.hp = Math.max(0, Math.min(this.maxHp, sp.hp));
     } else {
       this.player.setPosition(spawn.x * tileSize + tileSize / 2, spawn.y * tileSize + tileSize / 2);
+      this.updateMaxHpFromArmor();
     }
     this.player.setVelocity(0, 0);
     // Persist progress locally (localStorage) so it can be saved to cloud by button.
@@ -1383,15 +1455,18 @@ export class WorldScene extends Phaser.Scene {
     }
     this.npcsGroup = npcs;
 
-    // Village house prop (visual only; collision is handled by wall tiles).
+    // Village houses (visual only; collision is handled by wall tiles).
     if (this.area.id === "village") {
       ensureVillageHouseTexture(this);
-      const houseX = (6 * tileSize) + (7 * tileSize) / 2;
-      const houseY = (7 * tileSize) + (4 * tileSize) / 2;
-      this.villageHouse = this.add.image(houseX, houseY, "prop_house_village");
-      // Depth near the bottom edge of the house so the player can appear in front when below it.
-      this.villageHouse.setDepth(7 * tileSize + 4 * tileSize - 2);
-      this.uiCam.ignore(this.villageHouse);
+      for (const topLeft of VILLAGE_HOUSE_TOP_LEFTS) {
+        const houseX = topLeft.x * tileSize + (7 * tileSize) / 2;
+        const houseY = topLeft.y * tileSize + (4 * tileSize) / 2;
+        const img = this.add.image(houseX, houseY, "prop_house_village");
+        // Depth near the bottom edge of the house so the player can appear in front when below it.
+        img.setDepth(topLeft.y * tileSize + 4 * tileSize - 2);
+        this.uiCam.ignore(img);
+        this.villageHouses.push(img);
+      }
     }
 
     // House chest
@@ -1465,9 +1540,17 @@ export class WorldScene extends Phaser.Scene {
       const monsters = this.physics.add.group();
       this.monstersGroup = monsters;
 
-      for (let i = 0; i < 5; i++) {
-        const mx = (6 + i * 6) * tileSize + tileSize / 2;
-        const my = (6 + (i % 2) * 8) * tileSize + tileSize / 2;
+      const avoid = this.getPlayerTilePos();
+      const monsterTiles = chooseEnemySpawnTiles({
+        area: this.area,
+        count: 5,
+        rng: () => Math.random(),
+        avoid: [avoid],
+        minDistTiles: 4,
+      });
+      for (const p of monsterTiles) {
+        const mx = p.x * tileSize + tileSize / 2;
+        const my = p.y * tileSize + tileSize / 2;
         const m = this.physics.add.sprite(mx, my, "monster_slime");
         m.setDepth(m.y);
         (m.body as Phaser.Physics.Arcade.Body).setSize(14, 10).setOffset(5, 12);
@@ -1485,6 +1568,7 @@ export class WorldScene extends Phaser.Scene {
           const arrow = _a as Phaser.Physics.Arcade.Sprite;
           const mon = m as Phaser.Physics.Arcade.Sprite;
           arrow.destroy();
+          this.spawnEnemyDrop(mon.x, mon.y);
           mon.destroy();
         });
       }
@@ -1550,12 +1634,15 @@ export class WorldScene extends Phaser.Scene {
       this.arrowsGroup = arrows;
 
       // Spawn a few goblin archers near pillars.
-      const spawnPts = [
-        { x: 10, y: 8 },
-        { x: this.area.width - 11, y: 10 },
-        { x: 12, y: this.area.height - 9 },
-      ];
-      for (const p of spawnPts) {
+      const avoid = this.getPlayerTilePos();
+      const goblinTiles = chooseEnemySpawnTiles({
+        area: this.area,
+        count: 3,
+        rng: () => Math.random(),
+        avoid: [avoid],
+        minDistTiles: 5,
+      });
+      for (const p of goblinTiles) {
         const gx = p.x * tileSize + tileSize / 2;
         const gy = p.y * tileSize + tileSize / 2;
         const g = this.physics.add.sprite(gx, gy, "enemy_goblin");
@@ -1647,7 +1734,7 @@ export class WorldScene extends Phaser.Scene {
             arrow.setDepth(arrow.y);
             const ab = arrow.body as Phaser.Physics.Arcade.Body;
             ab.setAllowGravity(false);
-            ab.setSize(14, 4).setOffset(1, 1);
+            ab.setSize(ARROW_HITBOX.w, ARROW_HITBOX.h).setOffset(ARROW_HITBOX.offsetX, ARROW_HITBOX.offsetY);
             ab.setVelocity(dir.x * speed, dir.y * speed);
             arrow.setRotation(Math.atan2(dir.y, dir.x));
             this.uiCam.ignore(arrow);
@@ -1758,6 +1845,8 @@ export class WorldScene extends Phaser.Scene {
     // into triggers (like a locked door) immediately after closing.
     this.tapTarget = undefined;
     this.tapIntent = undefined;
+    // Reset paging state whenever a dialog is opened (especially for shop menus).
+    this.shopDialogPage = 0;
     this.dialog = openDialog(script);
     this.renderDialog(script);
   }
@@ -1852,8 +1941,26 @@ export class WorldScene extends Phaser.Scene {
       const headerH = Math.max(18, Math.ceil(this.dialogText!.getBounds().height));
       const baseY = (layout.y - layout.h / 2 + 10) + headerH + 6;
       const lineH = 22;
-      for (let i = 0; i < node.choices.length; i++) {
-        const ch = node.choices[i]!;
+
+      const MORE_ID = "__more_items__";
+      const isShop = script.id === "shopkeeper";
+      let choicesToRender = node.choices;
+      let nextPage: number | null = null;
+      if (isShop) {
+        const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
+        choicesToRender = page.visible;
+        nextPage = page.nextPage;
+        if (page.hasMore) {
+          choicesToRender = [
+            ...choicesToRender,
+            // Synthetic; handled locally and does not advance the dialog node.
+            { id: MORE_ID, text: "More items...", next: node.id },
+          ];
+        }
+      }
+
+      for (let i = 0; i < choicesToRender.length; i++) {
+        const ch = choicesToRender[i]!;
         const y = baseY + i * lineH;
         const bg = this.add
           .rectangle(baseX, y + 2, layout.w - layout.padding * 2, lineH - 2, 0x000000, 0.14)
@@ -1882,7 +1989,30 @@ export class WorldScene extends Phaser.Scene {
           if (!this.dialog.open) return;
           const n = getNode(script, this.dialog);
           if (!n || n.kind !== "choice") return;
+
+          // Shop paging: keep choices within the dialog box by paging in chunks of 3.
+          if (isShop && ch.id === MORE_ID) {
+            this.shopDialogPage = nextPage ?? 0;
+            this.renderDialog(script);
+            return;
+          }
+
+          // Shopkeeper purchases: apply side effects before re-render.
+          if (isShop && ch.id.startsWith("buy_")) {
+            const itemId = ch.id.slice("buy_".length) as any;
+            const inv = loadInventory();
+            const res = attemptPurchase(inv, itemId);
+            saveInventory(inv);
+            if (this.inventoryOpen) this.renderInventoryPanel();
+            const nodeId = res.ok ? "buyOk" : res.reason === "insufficient_coins" ? "buyNoCoins" : "buyNoSpace";
+            this.shopDialogPage = 0;
+            this.dialog = { open: true, scriptId: script.id, nodeId } as DialogState;
+            this.renderDialog(script);
+            return;
+          }
+
           this.dialog = choose(script, this.dialog, ch.id);
+          if (isShop) this.shopDialogPage = 0;
           this.renderDialog(script);
         };
         for (const obj of [bg, t] as const) {
@@ -1914,6 +2044,7 @@ export class WorldScene extends Phaser.Scene {
     this.dialogBox = undefined;
     this.dialogText = undefined;
     this.dialogChoicesText = undefined;
+    this.shopDialogPage = 0;
   }
 
   update() {
@@ -2056,6 +2187,7 @@ export class WorldScene extends Phaser.Scene {
         if (r.ok) {
           this.equipment = r.next;
           saveEquipment(this.equipment);
+          this.updateMaxHpFromArmor();
           this.renderInventoryPanel();
         }
       }
@@ -2089,7 +2221,7 @@ export class WorldScene extends Phaser.Scene {
         if (!this.dialog.open) this.closeDialogUi();
       }
 
-      // Choice selection (1..3)
+      // Choice selection (1..4)
       const node = getNode(script, this.dialog);
       if (node && node.kind === "choice") {
         const pick =
@@ -2099,10 +2231,35 @@ export class WorldScene extends Phaser.Scene {
               ? 1
               : Phaser.Input.Keyboard.JustDown(this.choiceKeys.THREE)
                 ? 2
+                : Phaser.Input.Keyboard.JustDown(this.choiceKeys.FOUR)
+                  ? 3
                 : -1;
-        if (pick >= 0 && pick < node.choices.length) {
-          this.dialog = choose(script, this.dialog, node.choices[pick]!.id);
-          this.renderDialog(script);
+        if (pick >= 0 && node.kind === "choice") {
+          const isShop = script.id === "shopkeeper";
+          if (isShop) {
+            const MORE_ID = "__more_items__";
+            const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
+            const list = page.hasMore
+              ? [...page.visible, { id: MORE_ID, text: "More items...", next: node.id }]
+              : page.visible;
+            if (pick < list.length) {
+              const ch = list[pick]!;
+              if (ch.id === MORE_ID) {
+                this.shopDialogPage = page.nextPage ?? 0;
+                this.renderDialog(script);
+                return;
+              }
+              this.shopDialogPage = 0;
+              this.dialog = choose(script, this.dialog, ch.id);
+              this.renderDialog(script);
+            }
+            return;
+          }
+
+          if (pick < node.choices.length) {
+            this.dialog = choose(script, this.dialog, node.choices[pick]!.id);
+            this.renderDialog(script);
+          }
         }
       }
 
@@ -2110,18 +2267,20 @@ export class WorldScene extends Phaser.Scene {
       return;
     }
 
-    // Sword slash (Space or mobile Attack) when holding sword.
+    // Melee attack (Space or mobile Attack) when holding any melee weapon.
     const mobileAttackDown = this.mobilePress.attack;
     // Consume mobile press for "JustDown" semantics.
     if (mobileAttackDown) this.mobilePress.attack = false;
     const wantAttack = Phaser.Input.Keyboard.JustDown(this.attackKey) || mobileAttackDown;
-    if (wantAttack && this.equipment.heldItemId === "sword") {
+    const heldWeaponId = this.equipment.heldItemId;
+    const meleeStats = heldWeaponId ? getMeleeWeaponStats(heldWeaponId) : null;
+    if (wantAttack && meleeStats) {
       const now = this.time.now;
-      const r = tryStartAttack({ nowMs: now, state: this.attackState, cooldownMs: 260 });
+      const r = tryStartAttack({ nowMs: now, state: this.attackState, cooldownMs: meleeStats.cooldownMs });
       if (r.ok) {
         this.attackState = r.next;
 
-        // Visual slash: swing a sword sprite around the handle pivot.
+        // Visual slash: swing weapon sprite around the handle pivot.
         const pose = computeHeldSwordPose(this.facing);
         const handX = this.player.x + pose.dx;
         const handY = this.player.y + pose.dy;
@@ -2129,7 +2288,7 @@ export class WorldScene extends Phaser.Scene {
 
         // Keep one active slash sprite (cooldown should prevent overlaps, but be safe).
         this.slashSwordSprite?.destroy();
-        this.slashSwordSprite = this.add.sprite(handX, handY, "item_sword");
+        this.slashSwordSprite = this.add.sprite(handX, handY, meleeStats.textureKey);
         this.slashSwordSprite
           .setOrigin(pose.originX, pose.originY)
           .setScale(pose.scale * 1.08)
@@ -2137,7 +2296,7 @@ export class WorldScene extends Phaser.Scene {
           .setAlpha(0.95);
         this.uiCam.ignore(this.slashSwordSprite);
 
-        // Briefly hide the held sword so it doesn't look like two swords at once.
+        // Briefly hide the held weapon so it doesn't look like two weapons at once.
         if (this.heldItemSprite) this.heldItemSprite.setVisible(false);
 
         this.tweens.add({
@@ -2158,9 +2317,9 @@ export class WorldScene extends Phaser.Scene {
           playerX: this.player.x,
           playerY: this.player.y,
           facing: this.facing,
-          reachPx: 18,
-          widthPx: 22,
-          heightPx: 16,
+          reachPx: meleeStats.reachPx,
+          widthPx: meleeStats.widthPx,
+          heightPx: meleeStats.heightPx,
         });
         const zone = this.add.zone(hb.x + hb.w / 2, hb.y + hb.h / 2, hb.w, hb.h);
         this.physics.add.existing(zone);
@@ -2173,6 +2332,7 @@ export class WorldScene extends Phaser.Scene {
         if (monsters) {
           this.physics.add.overlap(zone, monsters, (_z, m) => {
             const mon = m as Phaser.Physics.Arcade.Sprite;
+            this.spawnEnemyDrop(mon.x, mon.y);
             mon.destroy();
           });
         }
@@ -2181,7 +2341,7 @@ export class WorldScene extends Phaser.Scene {
         if (goblins) {
           this.physics.add.overlap(zone, goblins, (_z, g) => {
             const gob = g as Phaser.Physics.Arcade.Sprite;
-            this.damageGoblin(gob, 1);
+            this.damageGoblin(gob, meleeStats.damage);
           });
         }
         this.time.delayedCall(90, () => zone.destroy());
@@ -2291,14 +2451,16 @@ export class WorldScene extends Phaser.Scene {
       this.layoutMobileControls();
     }
 
-    // Held item rendering (currently only visual for sword; easy to extend).
-    if (this.equipment.heldItemId === "sword") {
+    // Held item rendering: melee weapons and bow.
+    const heldId = this.equipment.heldItemId;
+    const meleeWeaponStats = heldId ? getMeleeWeaponStats(heldId) : null;
+    if (meleeWeaponStats) {
       if (!this.heldItemSprite) {
-        this.heldItemSprite = this.add.sprite(this.player.x, this.player.y, "item_sword");
+        this.heldItemSprite = this.add.sprite(this.player.x, this.player.y, meleeWeaponStats.textureKey);
         this.heldItemSprite.setOrigin(0.5, 0.9);
         this.uiCam.ignore(this.heldItemSprite);
       } else {
-        this.heldItemSprite.setTexture("item_sword");
+        this.heldItemSprite.setTexture(meleeWeaponStats.textureKey);
       }
       const pose = computeHeldSwordPose(this.facing);
       this.heldItemSprite

@@ -1,5 +1,7 @@
 import { hash2d01 } from "../core/hashNoise";
+import { computeIntroOverlayLayout } from "../core/introOverlayLayout";
 import { applyGreenhollowButton, getGreenhollowTheme } from "./greenhollowTheme";
+import { createOverlayFrame } from "./overlayFrame";
 
 type MountIntroOverlayOptions = {
   onStart: () => void;
@@ -238,14 +240,14 @@ function drawIntro(canvas: HTMLCanvasElement) {
 }
 
 export function mountIntroOverlay(opts: MountIntroOverlayOptions) {
-  const root = el("div", { id: "intro-overlay" });
-  root.style.position = "fixed";
-  root.style.inset = "0";
-  root.style.background = "radial-gradient(circle at 50% 40%, rgba(20,58,38,0.55), rgba(11,18,32,0.92))";
-  root.style.display = "flex";
-  root.style.alignItems = "center";
-  root.style.justifyContent = "center";
-  root.style.zIndex = "10000";
+  const overlay = createOverlayFrame({
+    id: "intro-overlay",
+    zIndex: 10000,
+    background: "radial-gradient(circle at 50% 40%, rgba(20,58,38,0.55), rgba(11,18,32,0.92))",
+    paddingPx: 16,
+    minScale: 0.6,
+    maxScale: 1.0,
+  });
 
   const wrap = el("div");
   wrap.style.display = "flex";
@@ -254,10 +256,10 @@ export function mountIntroOverlay(opts: MountIntroOverlayOptions) {
   wrap.style.gap = "14px";
   wrap.style.padding = "24px";
   wrap.style.boxSizing = "border-box";
+  wrap.style.maxWidth = "94vw";
 
   const canvas = el("canvas") as HTMLCanvasElement;
-  // Scale generously on desktop but remain responsive on smaller viewports.
-  canvas.style.width = "clamp(1200px, 94vw, 1800px)";
+  canvas.style.width = "900px";
   canvas.style.height = "auto";
   canvas.style.aspectRatio = "16 / 9";
   canvas.style.border = "3px solid #5b4122";
@@ -274,9 +276,18 @@ export function mountIntroOverlay(opts: MountIntroOverlayOptions) {
   btn.style.minWidth = "200px";
   btn.style.marginTop = "12px";
 
+  const applyLayout = () => {
+    // Keep the canvas width in a sensible range so it stays crisp at scale=1,
+    // while overlayFrame guarantees it will still fit without scroll.
+    const layout = computeIntroOverlayLayout(window.innerWidth, window.innerHeight);
+    canvas.style.width = `${layout.canvasCssWidthPx}px`;
+    overlay.update();
+  };
+
   const start = () => {
     window.removeEventListener("keydown", onKeyDown);
-    root.remove();
+    window.removeEventListener("resize", applyLayout);
+    overlay.destroy();
     opts.onStart();
   };
   const onKeyDown = (e: KeyboardEvent) => {
@@ -284,17 +295,18 @@ export function mountIntroOverlay(opts: MountIntroOverlayOptions) {
   };
 
   btn.onclick = () => start();
-  root.onclick = (e) => {
+  overlay.root.onclick = (e) => {
     // Clicking the dim background shouldn't immediately start by accident.
-    if (e.target === root) return;
+    if (e.target === overlay.root) return;
   };
 
   window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("resize", applyLayout, { passive: true });
 
   wrap.appendChild(canvas);
   wrap.appendChild(btn);
-  root.appendChild(wrap);
-  document.body.appendChild(root);
+  overlay.frame.appendChild(wrap);
+  applyLayout();
 }
 
 

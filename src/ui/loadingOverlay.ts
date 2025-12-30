@@ -1,4 +1,5 @@
 import { getGreenhollowTheme } from "./greenhollowTheme";
+import { createOverlayFrame, type OverlayFrame } from "./overlayFrame";
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -16,6 +17,7 @@ export async function withMinDuration<T>(task: () => Promise<T>, minMs: number):
 }
 
 let overlayRoot: HTMLDivElement | null = null;
+let overlayFrame: OverlayFrame | null = null;
 let treeEls: HTMLDivElement[] = [];
 let msgEl: HTMLDivElement | null = null;
 
@@ -28,22 +30,21 @@ function ensureOverlay(message: string) {
   }
 
   const theme = getGreenhollowTheme();
-  const root = document.createElement("div");
-  root.id = "gh-loading-overlay";
-  Object.assign(root.style, {
-    position: "fixed",
-    inset: "0",
+  const frame = createOverlayFrame({
+    id: "gh-loading-overlay",
+    zIndex: 12000,
     background: "radial-gradient(circle at 50% 40%, rgba(16,26,20,0.9), rgba(11,18,32,0.92))",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: "12000",
-    transition: "opacity 160ms ease",
+    paddingPx: 16,
+    minScale: 0.6,
+    maxScale: 1.0,
   });
+  overlayFrame = frame;
+  const root = frame.root;
+  root.style.transition = "opacity 160ms ease";
 
   const card = document.createElement("div");
   Object.assign(card.style, {
-    width: "clamp(720px, 92vw, 1100px)",
+    width: "920px",
     padding: "28px 32px 34px",
     background: "#0f171f",
     border: "2px solid #2b3a33",
@@ -51,6 +52,7 @@ function ensureOverlay(message: string) {
     borderRadius: "10px",
     color: "#e8f0e6",
     fontFamily: "system-ui, sans-serif",
+    boxSizing: "border-box",
   });
 
   const title = document.createElement("div");
@@ -82,7 +84,8 @@ function ensureOverlay(message: string) {
     borderRadius: "10px",
     padding: "14px 16px 18px",
     boxShadow: "inset 0 2px 6px rgba(0,0,0,0.35)",
-    minWidth: "520px",
+    width: "100%",
+    boxSizing: "border-box",
   });
 
   const makeTree = () => {
@@ -152,8 +155,8 @@ function ensureOverlay(message: string) {
   card.appendChild(title);
   card.appendChild(msg);
   card.appendChild(row);
-  root.appendChild(card);
-  document.body.appendChild(root);
+  frame.frame.appendChild(card);
+  frame.update();
 
   overlayRoot = root;
   msgEl = msg;
@@ -177,8 +180,9 @@ async function fadeOut() {
   overlayRoot.style.opacity = "0";
   overlayRoot.style.pointerEvents = "none";
   await wait(200);
-  overlayRoot?.remove();
+  overlayFrame?.destroy();
   overlayRoot = null;
+  overlayFrame = null;
   treeEls = [];
   msgEl = null;
 }

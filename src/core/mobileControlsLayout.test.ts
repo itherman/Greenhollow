@@ -21,6 +21,14 @@ describe("mobileControlsLayout", () => {
     }
   });
 
+  it("makes attack larger than interact for touch viewports", () => {
+    const l = computeMobileControlsLayout({ screenW: 640, screenH: 360 });
+    expect(l.attack.w).toBeGreaterThan(l.interact.w);
+    expect(l.attack.h).toBeGreaterThan(l.interact.h);
+    // Keep this intentionally "noticeably larger" (not just +1px from rounding).
+    expect(l.attack.w).toBeGreaterThanOrEqual(Math.floor(l.interact.w * 1.35));
+  });
+
   it("stacks attack above interact", () => {
     const l = computeMobileControlsLayout({ screenW: 800, screenH: 400 });
     expect(l.attack.y + l.attack.h).toBeLessThanOrEqual(l.interact.y);

@@ -466,6 +466,127 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     ctx.fillRect(11, 21, 2, 1);
   });
 
+  mk("item_dagger", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // short blade
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(11, 7, 2, 7);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(12, 7, 1, 7);
+    // small guard
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(10, 14, 4, 1);
+    // handle
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(11, 15, 2, 5);
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(11, 20, 2, 1);
+  });
+
+  mk("item_longsword", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // longer blade
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(11, 3, 2, 14);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(12, 3, 1, 14);
+    // guard
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(8, 17, 8, 2);
+    // handle
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(11, 19, 2, 3);
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(11, 22, 2, 1);
+  });
+
+  mk("item_spear", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // shaft
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(11, 4, 2, 16);
+    ctx.fillStyle = "#5b4122";
+    ctx.fillRect(12, 4, 1, 16);
+    // tip
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(10, 2, 4, 3);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(12, 2, 1, 3);
+    // wrap
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(10, 12, 4, 2);
+  });
+
+  mk("item_bread", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(6, 10, 12, 7);
+    ctx.fillStyle = "#a46a33";
+    ctx.fillRect(6, 10, 12, 2);
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(6, 16, 12, 1);
+    // scoring lines
+    ctx.fillStyle = "#c9a36a";
+    ctx.fillRect(9, 11, 1, 4);
+    ctx.fillRect(12, 11, 1, 4);
+    ctx.fillRect(15, 11, 1, 4);
+  });
+
+  mk("item_stew", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // bowl
+    ctx.fillStyle = "#3b1a10";
+    ctx.fillRect(6, 13, 12, 5);
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(7, 14, 10, 3);
+    // stew surface
+    ctx.fillStyle = "#f97316";
+    ctx.fillRect(8, 14, 8, 2);
+    ctx.fillStyle = "#fde68a";
+    ctx.fillRect(10, 14, 1, 1);
+    ctx.fillRect(13, 15, 1, 1);
+    // steam
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(9, 8, 1, 3);
+    ctx.fillRect(12, 7, 1, 4);
+    ctx.fillRect(15, 8, 1, 3);
+  });
+
+  mk("item_leather_armor", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // chest piece
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(8, 7, 8, 12);
+    ctx.fillStyle = "#5b4122";
+    ctx.fillRect(8, 15, 8, 4);
+    // straps
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(9, 7, 2, 4);
+    ctx.fillRect(13, 7, 2, 4);
+    // buckle
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(11, 15, 2, 2);
+  });
+
+  mk("item_iron_armor", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // chest plate
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(8, 7, 8, 12);
+    ctx.fillStyle = "#64748b";
+    ctx.fillRect(8, 15, 8, 4);
+    // highlights
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(9, 8, 2, 9);
+    // rivets
+    ctx.fillStyle = "#0b1220";
+    ctx.fillRect(9, 10, 1, 1);
+    ctx.fillRect(14, 10, 1, 1);
+    // buckle
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(11, 15, 2, 2);
+  });
+
   mk("item_bow", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     // Curved single-piece longbow (pixel arc)
@@ -529,6 +650,37 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
       [11,14], [11,15], [11,16], [11,17], [11,18],
     ];
     hiPixels.forEach(([x, y]) => px(x, y, limbHi));
+  });
+
+  mk("item_coins", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // Small coin stack + sparkle. Keep it readable at 24x24.
+    const gold = "#f5d76e";
+    const goldShadow = "#d6b24c";
+    const outline = "#3a2a1a";
+
+    // Stack base
+    ctx.fillStyle = outline;
+    ctx.fillRect(7, 14, 10, 6);
+    ctx.fillStyle = goldShadow;
+    ctx.fillRect(8, 15, 8, 4);
+    ctx.fillStyle = gold;
+    ctx.fillRect(8, 15, 8, 2);
+
+    // Top coin
+    ctx.fillStyle = outline;
+    ctx.fillRect(9, 9, 6, 5);
+    ctx.fillStyle = goldShadow;
+    ctx.fillRect(10, 10, 4, 3);
+    ctx.fillStyle = gold;
+    ctx.fillRect(10, 10, 4, 1);
+
+    // Sparkle
+    ctx.fillStyle = "#fde68a";
+    ctx.fillRect(16, 7, 1, 1);
+    ctx.fillRect(15, 8, 1, 1);
+    ctx.fillRect(17, 8, 1, 1);
+    ctx.fillRect(16, 9, 1, 1);
   });
 
   mk("item_arrows", (ctx) => {

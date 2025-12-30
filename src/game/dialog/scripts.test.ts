@@ -5,7 +5,12 @@ import {
   chestMessage,
   doorLocked,
   elderIntro,
+  homeowner1Advice,
+  homeowner2Advice,
+  homeowner3Advice,
+  homeowner4Advice,
   keyFound,
+  shopkeeper,
   swordFound,
   swordTaken,
   villagerGossip,
@@ -26,6 +31,16 @@ describe("dialog scripts", () => {
 
   it("chestEmpty validates", () => {
     expect(validateScript(chestEmpty)).toEqual({ ok: true });
+  });
+
+  it("homeowner advice scripts validate", () => {
+    for (const s of [homeowner1Advice, homeowner2Advice, homeowner3Advice, homeowner4Advice]) {
+      expect(validateScript(s)).toEqual({ ok: true });
+    }
+  });
+
+  it("shopkeeper validates", () => {
+    expect(validateScript(shopkeeper)).toEqual({ ok: true });
   });
 
   it("keyFound validates", () => {

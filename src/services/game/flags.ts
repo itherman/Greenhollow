@@ -1,32 +1,16 @@
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem?: (key: string) => void;
-}
+import { loadJsonOr } from "../storage/jsonStorage";
+import { defaultBrowserStorage, type StorageLike } from "../storage/storageLike";
 
 const FLAGS_KEY = "game.flags.v1";
 
 type FlagsState = Record<string, true>;
 
 function defaultStorage(): StorageLike | null {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (typeof window === "undefined") return null;
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!window.localStorage) return null;
-  return window.localStorage;
+  return defaultBrowserStorage();
 }
 
 function loadState(storage: StorageLike | null): FlagsState {
-  if (!storage) return {};
-  const raw = storage.getItem(FLAGS_KEY);
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw) as FlagsState;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed;
-  } catch {
-    return {};
-  }
+  return loadJsonOr(storage, FLAGS_KEY, {}, isFlagsState);
 }
 
 function saveState(storage: StorageLike | null, state: FlagsState) {
@@ -60,6 +44,15 @@ export function clearFlags(storage: StorageLike | null = defaultStorage()): void
     return;
   }
   saveState(storage, {});
+}
+
+function isFlagsState(v: unknown): v is FlagsState {
+  if (!v || typeof v !== "object") return false;
+  // Ensure values are `true` only (defensive against corruption).
+  for (const value of Object.values(v as Record<string, unknown>)) {
+    if (value !== true) return false;
+  }
+  return true;
 }
 
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { loadProgress, saveProgress, type PlayerProgress, type StorageLike } from "./progressStore";
+import { loadProgress, saveProgress, type PlayerProgress } from "./progressStore";
+import type { StorageLike } from "../storage/storageLike";
 
 function memStore(): StorageLike & { _m: Map<string, string> } {
   const _m = new Map<string, string>();
