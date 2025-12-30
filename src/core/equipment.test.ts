@@ -11,12 +11,12 @@ describe("equipment", () => {
     const r1 = toggleEquipFromInventorySlot(eq0, inv, 0);
     expect(r1.ok).toBe(true);
     if (r1.ok) expect(r1.next.heldItemId).toBe("sword");
-    if (r1.ok) expect(r1.next.armorItemId).toBe(null);
+    if (r1.ok) expect(r1.next.bodyArmorItemId).toBe(null);
 
     const r2 = toggleEquipFromInventorySlot(r1.ok ? r1.next : eq0, inv, 0);
     expect(r2.ok).toBe(true);
     if (r2.ok) expect(r2.next.heldItemId).toBe(null);
-    if (r2.ok) expect(r2.next.armorItemId).toBe(null);
+    if (r2.ok) expect(r2.next.bodyArmorItemId).toBe(null);
   });
 
   it("equips armor into the armor slot", () => {
@@ -26,7 +26,7 @@ describe("equipment", () => {
     const r1 = toggleEquipFromInventorySlot(eq0, inv, 0);
     expect(r1.ok).toBe(true);
     if (r1.ok) {
-      expect(r1.next.armorItemId).toBe("leather_armor");
+      expect(r1.next.bodyArmorItemId).toBe("leather_armor");
       expect(r1.next.heldItemId).toBe(null);
     }
   });
@@ -35,6 +35,13 @@ describe("equipment", () => {
     const inv = createInventory(3);
     const r = toggleEquipFromInventorySlot(createEquipment(), inv, 1);
     expect(r).toEqual({ ok: false, reason: "empty_slot" });
+  });
+
+  it("rejects non-equippable items (food/currency/ammo)", () => {
+    const inv = createInventory(3);
+    addItem(inv, ITEMS.bread, 1);
+    const r = toggleEquipFromInventorySlot(createEquipment(), inv, 0);
+    expect(r).toEqual({ ok: false, reason: "not_equippable" });
   });
 
   it("rejects out of bounds slots", () => {

@@ -129,6 +129,72 @@ export function ensurePeasantPlayerSpriteSheet(scene: Phaser.Scene) {
   scene.textures.get("player").setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
+export function ensurePeasantPlayerBodyArmorSpriteSheets(scene: Phaser.Scene) {
+  const ensure = (key: string, colors: { main: string; shadow: string; strap: string; buckle: string }) => {
+    if (scene.textures.exists(key)) return;
+
+    // 4 directions (rows) x 4 frames (cols), each frame 24x24.
+    const frameW = 24;
+    const frameH = 24;
+    const cols = 4;
+    const rows = 4;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = frameW * cols;
+    canvas.height = frameH * rows;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get canvas context");
+
+    const fill = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    };
+
+    const clearFrame = (ox: number, oy: number) => ctx.clearRect(ox, oy, frameW, frameH);
+
+    const drawFrame = (col: number, row: number) => {
+      const ox = col * frameW;
+      const oy = row * frameH;
+      clearFrame(ox, oy);
+
+      // Torso overlay (matches `ensurePeasantPlayerSpriteSheet` tunic region).
+      fill(ox + 9, oy + 8, 6, 6, colors.main);
+      fill(ox + 9, oy + 8, 2, 6, colors.shadow);
+      // Lower skirt/plates band
+      fill(ox + 9, oy + 13, 6, 1, colors.shadow);
+      // Simple straps (more visible in down/left/right; subtler for up)
+      const strapAlpha = row === 3 ? 0.6 : 1;
+      ctx.globalAlpha = strapAlpha;
+      fill(ox + 10, oy + 8, 1, 4, colors.strap);
+      fill(ox + 13, oy + 8, 1, 4, colors.strap);
+      ctx.globalAlpha = 1;
+      // Buckle
+      fill(ox + 11, oy + 12, 2, 1, colors.buckle);
+    };
+
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) drawFrame(col, row);
+
+    scene.textures.addSpriteSheet(key, canvas as unknown as HTMLImageElement, {
+      frameWidth: frameW,
+      frameHeight: frameH,
+    });
+    scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  };
+
+  ensure("player_armor_body_leather", {
+    main: "#6b4f2a",
+    shadow: "#5b4122",
+    strap: "#3a2a1a",
+    buckle: "#f5d76e",
+  });
+  ensure("player_armor_body_iron", {
+    main: "#94a3b8",
+    shadow: "#64748b",
+    strap: "#0b1220",
+    buckle: "#f5d76e",
+  });
+}
+
 export function ensureNpcTextures(scene: Phaser.Scene) {
   if (scene.textures.exists("npc_elder")) return;
 
