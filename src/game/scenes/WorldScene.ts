@@ -63,6 +63,7 @@ import { pickNpcForDialog } from "./npcInteract";
 import { tryPickupSprite } from "./world/tryPickupSprite";
 import { configureStaticPickupBody } from "./world/arcadeBody";
 import { addBobbingTween } from "./world/bobbingTween";
+import { depthSortByY, depthSortManyByFeet, depthSortManyByY } from "./world/depthSorting";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -2593,14 +2594,9 @@ export class WorldScene extends Phaser.Scene {
     this.facing = facing;
     this.player.setVelocity(vx, vy);
     // Feet-based depth sorting: lower feet draw in front.
-    this.player.setDepth(getFeetDepth(this.player as any));
-    if (this.chest) this.chest.setDepth(this.chest.y);
-    if (this.npcsGroup) {
-      for (const obj of this.npcsGroup.getChildren()) {
-        const s = obj as Phaser.GameObjects.Sprite;
-        s.setDepth(getFeetDepth(s as any));
-      }
-    }
+    depthSortManyByFeet([this.player as any], getFeetDepth);
+    depthSortByY(this.chest as any);
+    if (this.npcsGroup) depthSortManyByFeet(this.npcsGroup.getChildren() as any, getFeetDepth);
 
     const moving = vx !== 0 || vy !== 0;
     const anim = getPlayerAnim(this.facing, moving);
@@ -2676,18 +2672,12 @@ export class WorldScene extends Phaser.Scene {
 
     // Keep projectiles depth-sorted.
     if (this.arrowsGroup) {
-      for (const obj of this.arrowsGroup.getChildren()) {
-        const a = obj as Phaser.Physics.Arcade.Sprite;
-        if (!a.active) continue;
-        a.setDepth(a.y);
-      }
+      const list = (this.arrowsGroup.getChildren() as Phaser.Physics.Arcade.Sprite[]).filter((a) => a.active);
+      depthSortManyByY(list as any);
     }
     if (this.playerArrowsGroup) {
-      for (const obj of this.playerArrowsGroup.getChildren()) {
-        const a = obj as Phaser.Physics.Arcade.Sprite;
-        if (!a.active) continue;
-        a.setDepth(a.y);
-      }
+      const list = (this.playerArrowsGroup.getChildren() as Phaser.Physics.Arcade.Sprite[]).filter((a) => a.active);
+      depthSortManyByY(list as any);
     }
   }
 
