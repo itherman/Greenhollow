@@ -60,6 +60,7 @@ import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { addNpcColliders } from "./physicsColliders";
 import { getFeetDepth } from "./depthSort";
 import { pickNpcForDialog } from "./npcInteract";
+import { tryPickupSprite } from "./world/tryPickupSprite";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -178,12 +179,6 @@ export class WorldScene extends Phaser.Scene {
   private mobileControlsVisible = false;
   private lastMobileControlsEvalAtMs = 0;
 
-  private dist2(a: { x: number; y: number }, b: { x: number; y: number }) {
-    const dx = a.x - b.x;
-    const dy = a.y - b.y;
-    return dx * dx + dy * dy;
-  }
-
   private setNpcPaused(npc: Phaser.GameObjects.Sprite, paused: boolean) {
     const state = this.npcMoveStates.get(npc);
     if (!state) return;
@@ -213,78 +208,90 @@ export class WorldScene extends Phaser.Scene {
     const playerPos = { x: this.player.x, y: this.player.y };
 
     const tryKey = () => {
-      const range2 = getTapInteractRangePx("key") ** 2;
-      if (!this.keySprite?.active) return false;
-      if (this.dist2(playerPos, this.keySprite) > range2) return false;
-      setFlag("item.rusty_key.woods.1");
-      this.keySprite.destroy();
-      this.keySprite = undefined;
-      const inv = loadInventory();
-      addItem(inv, ITEMS.rusty_key, 1);
-      saveInventory(inv);
-      if (this.inventoryOpen) this.renderInventoryPanel();
-      this.openNpcDialog("keyFound");
-      return true;
+      return tryPickupSprite({
+        player: playerPos,
+        sprite: this.keySprite,
+        rangePx: getTapInteractRangePx("key"),
+        onPickup: () => {
+          setFlag("item.rusty_key.woods.1");
+          this.keySprite?.destroy();
+          this.keySprite = undefined;
+          const inv = loadInventory();
+          addItem(inv, ITEMS.rusty_key, 1);
+          saveInventory(inv);
+          if (this.inventoryOpen) this.renderInventoryPanel();
+          this.openNpcDialog("keyFound");
+        },
+      });
     };
 
     const trySword = () => {
-      const range2 = getTapInteractRangePx("sword") ** 2;
-      if (!this.swordSprite?.active) return false;
-      if (this.dist2(playerPos, this.swordSprite) > range2) return false;
-      setFlag("item.sword.1");
-      this.swordSprite.destroy();
-      this.swordSprite = undefined;
-      const inv = loadInventory();
-      addItem(inv, ITEMS.sword, 1);
-      saveInventory(inv);
-      if (this.inventoryOpen) this.renderInventoryPanel();
-      this.openNpcDialog("swordFound");
-      return true;
+      return tryPickupSprite({
+        player: playerPos,
+        sprite: this.swordSprite,
+        rangePx: getTapInteractRangePx("sword"),
+        onPickup: () => {
+          setFlag("item.sword.1");
+          this.swordSprite?.destroy();
+          this.swordSprite = undefined;
+          const inv = loadInventory();
+          addItem(inv, ITEMS.sword, 1);
+          saveInventory(inv);
+          if (this.inventoryOpen) this.renderInventoryPanel();
+          this.openNpcDialog("swordFound");
+        },
+      });
     };
 
     const tryBow = () => {
-      const range2 = getTapInteractRangePx("bow") ** 2;
-      if (!this.bowSprite?.active) return false;
-      if (this.dist2(playerPos, this.bowSprite) > range2) return false;
-      setFlag("item.bow.1");
-      this.bowSprite.destroy();
-      this.bowSprite = undefined;
-      const inv = loadInventory();
-      addItem(inv, ITEMS.bow, 1);
-      saveInventory(inv);
-      // Auto-equip bow if nothing is held.
-      if (!this.equipment.heldItemId) {
-        this.equipment = { ...this.equipment, heldItemId: "bow" };
-        saveEquipment(this.equipment);
-      }
-      if (this.inventoryOpen) this.renderInventoryPanel();
-      this.openNpcDialog("bowFound");
-      return true;
+      return tryPickupSprite({
+        player: playerPos,
+        sprite: this.bowSprite,
+        rangePx: getTapInteractRangePx("bow"),
+        onPickup: () => {
+          setFlag("item.bow.1");
+          this.bowSprite?.destroy();
+          this.bowSprite = undefined;
+          const inv = loadInventory();
+          addItem(inv, ITEMS.bow, 1);
+          saveInventory(inv);
+          // Auto-equip bow if nothing is held.
+          if (!this.equipment.heldItemId) {
+            this.equipment = { ...this.equipment, heldItemId: "bow" };
+            saveEquipment(this.equipment);
+          }
+          if (this.inventoryOpen) this.renderInventoryPanel();
+          this.openNpcDialog("bowFound");
+        },
+      });
     };
 
     const tryChest = () => {
-      const range2 = getTapInteractRangePx("chest") ** 2;
-      if (!this.chest?.active) return false;
-      if (this.dist2(playerPos, this.chest) > range2) return false;
       const contents = this.chestContents;
       if (!contents) return false;
-      const opened = hasFlag(contents.flag);
-      if (!opened) {
-        setFlag(contents.flag);
-        this.chest.setTexture("chest_open");
-        this.chest.setDepth(this.chest.y);
-        const inv = loadInventory();
-        for (const loot of contents.loot) {
-          const def = ITEMS[loot.itemId];
-          addItem(inv, def, loot.qty);
-        }
-        saveInventory(inv);
-        if (this.inventoryOpen) this.renderInventoryPanel();
-        this.openNpcDialog(contents.openedDialog);
-      } else {
-        this.openNpcDialog(contents.emptyDialog);
-      }
-      return true;
+      return tryPickupSprite({
+        player: playerPos,
+        sprite: this.chest,
+        rangePx: getTapInteractRangePx("chest"),
+        onPickup: () => {
+          const opened = hasFlag(contents.flag);
+          if (!opened) {
+            setFlag(contents.flag);
+            this.chest?.setTexture("chest_open");
+            if (this.chest) this.chest.setDepth(this.chest.y);
+            const inv = loadInventory();
+            for (const loot of contents.loot) {
+              const def = ITEMS[loot.itemId];
+              addItem(inv, def, loot.qty);
+            }
+            saveInventory(inv);
+            if (this.inventoryOpen) this.renderInventoryPanel();
+            this.openNpcDialog(contents.openedDialog);
+          } else {
+            this.openNpcDialog(contents.emptyDialog);
+          }
+        },
+      });
     };
 
     const tryNpc = () => {
