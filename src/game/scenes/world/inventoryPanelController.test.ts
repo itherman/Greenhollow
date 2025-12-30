@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InventoryPanelController, type InventoryPanelHost } from "./inventoryPanelController";
+import { InventoryPanelController } from "./inventoryPanelController";
 import { createInventory } from "../../../core/inventory";
 import * as inventoryStore from "../../../services/game/inventoryStore";
 import * as sessionModule from "../../../services/auth/session";
