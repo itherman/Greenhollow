@@ -131,7 +131,6 @@ export class WorldScene extends Phaser.Scene {
   private heldItemSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private slashSwordSprite?: Phaser.GameObjects.Sprite;
-  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private bodyArmorSprite?: Phaser.GameObjects.Sprite;
 
   private baseMaxHp = 20;
