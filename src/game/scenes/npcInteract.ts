@@ -1,14 +1,10 @@
+import { dist2 } from "../../core/math2d";
+
 export type NpcDialogSpriteLike = {
   x: number;
   y: number;
   npcDef?: { dialogScriptId?: string };
 };
-
-function dist2(a: { x: number; y: number }, b: { x: number; y: number }) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy;
-}
 
 /**
  * Picks which NPC should receive an interaction.
