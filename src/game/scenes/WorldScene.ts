@@ -56,6 +56,7 @@ import { paginateDialogChoices } from "../../core/dialogPagination";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { chooseEnemySpawnTiles } from "../../core/enemySpawn";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
+import { addNpcColliders } from "./physicsColliders";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -1545,6 +1546,8 @@ export class WorldScene extends Phaser.Scene {
 
     // NPCs
     const npcs = this.physics.add.group({ allowGravity: false, immovable: true });
+    // Dynamic physics groups require explicit colliders.
+    addNpcColliders({ physics: this.physics as any, player: this.player, npcs, worldLayer: layer });
     ensureNpcTextures(this);
     for (const npc of this.area.npcs) {
       const x = npc.pos.x * tileSize + tileSize / 2;
