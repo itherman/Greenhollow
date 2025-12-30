@@ -1,5 +1,7 @@
 import { signInWithUsernamePassword, signUpWithUsernamePassword } from "../services/auth/authService";
 import { getOrCreateGuestSession, saveSession, type Session } from "../services/auth/session";
+import { computeAuthOverlayLayout } from "../core/authOverlayLayout";
+import { createOverlayFrame } from "./overlayFrame";
 import {
   applyGreenhollowButton,
   applyGreenhollowCard,
@@ -18,65 +20,56 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs?: Record<string
 }
 
 export function mountAuthOverlay(opts: MountAuthOverlayOptions) {
-  const root = el("div", { id: "auth-overlay" });
-  root.style.position = "fixed";
-  root.style.inset = "0";
-  root.style.background = "radial-gradient(circle at 50% 40%, rgba(31,91,53,0.45), rgba(11,18,32,0.88))";
-  root.style.display = "flex";
-  root.style.alignItems = "center";
-  root.style.justifyContent = "center";
-  root.style.zIndex = "9999";
+  const overlay = createOverlayFrame({
+    id: "auth-overlay",
+    zIndex: 9999,
+    background: "radial-gradient(circle at 50% 40%, rgba(31,91,53,0.45), rgba(11,18,32,0.88))",
+    paddingPx: 16,
+    minScale: 0.6,
+    maxScale: 1.0,
+  });
 
   const card = el("div");
-  card.style.width = "clamp(640px, 60vw, 900px)";
-  card.style.maxWidth = "900px";
   card.style.textAlign = "center";
   applyGreenhollowCard(card);
 
   const title = el("div");
   title.textContent = "Greenhollow";
-  title.style.fontSize = "48px";
-  title.style.marginBottom = "14px";
   title.style.letterSpacing = "0.6px";
   title.style.textAlign = "center";
   card.appendChild(title);
 
   const subtitle = el("div");
   subtitle.textContent = "Enter the woods.";
-  subtitle.style.fontSize = "28px";
   subtitle.style.color = getGreenhollowTheme().colors.muted;
-  subtitle.style.marginBottom = "24px";
   subtitle.style.textAlign = "center";
   card.appendChild(subtitle);
 
   const msg = el("div");
-  msg.style.minHeight = "20px";
-  msg.style.marginBottom = "18px";
-  msg.style.fontSize = "20px";
   msg.style.color = getGreenhollowTheme().colors.danger;
   msg.style.textAlign = "center";
   card.appendChild(msg);
 
   const username = el("input", { placeholder: "Username" }) as HTMLInputElement;
   applyGreenhollowInput(username);
-  username.style.marginBottom = "18px";
-  username.style.fontSize = "22px";
-  username.style.padding = "18px 20px";
   username.style.textAlign = "center";
-  username.style.width = "60%";
+  username.style.width = "100%";
+  username.style.maxWidth = "520px";
   username.style.marginLeft = "auto";
   username.style.marginRight = "auto";
   username.style.textAlign = "center";
+  username.autocapitalize = "none";
+  username.autocomplete = "username";
+  username.spellcheck = false;
 
   const password = el("input", { placeholder: "Password", type: "password" }) as HTMLInputElement;
   applyGreenhollowInput(password);
-  password.style.marginBottom = "20px";
-  password.style.fontSize = "22px";
-  password.style.padding = "18px 20px";
   password.style.textAlign = "center";
-  password.style.width = "60%";
+  password.style.width = "100%";
+  password.style.maxWidth = "520px";
   password.style.marginLeft = "auto";
   password.style.marginRight = "auto";
+  password.autocomplete = "current-password";
 
   card.appendChild(username);
   card.appendChild(password);
@@ -92,9 +85,7 @@ export function mountAuthOverlay(opts: MountAuthOverlayOptions) {
     const b = el("button") as HTMLButtonElement;
     b.textContent = label;
     b.style.boxSizing = "border-box";
-    b.style.fontSize = "24px";
-    b.style.padding = "18px 24px";
-    b.style.minWidth = "190px";
+    b.style.width = "100%";
     return b;
   }
 
@@ -104,12 +95,6 @@ export function mountAuthOverlay(opts: MountAuthOverlayOptions) {
   applyGreenhollowButton(signIn, "primary");
   applyGreenhollowButton(signUp, "secondary");
   applyGreenhollowButton(guest, "secondary");
-  // Enlarge buttons after theme defaults so overrides stick.
-  [signIn, signUp, guest].forEach((b) => {
-    b.style.fontSize = "24px";
-    b.style.padding = "18px 24px";
-    b.style.minWidth = "190px";
-  });
   guest.style.borderColor = getGreenhollowTheme().colors.wood0;
 
   row.appendChild(signIn);
@@ -118,17 +103,88 @@ export function mountAuthOverlay(opts: MountAuthOverlayOptions) {
   card.appendChild(row);
 
   const note = el("div");
-  note.style.marginTop = "20px";
-  note.style.fontSize = "20px";
   note.style.color = getGreenhollowTheme().colors.muted;
   note.style.textAlign = "center";
   note.textContent =
     "Guest mode works offline. Login enables cloud features (leaderboard later).";
   card.appendChild(note);
 
+  function applyLayout() {
+    const l = computeAuthOverlayLayout(window.innerWidth, window.innerHeight);
+
+    card.style.width = "100%";
+    card.style.maxWidth = `${l.cardMaxWidthPx}px`;
+    card.style.margin = l.variant === "compact" ? "0 auto" : "0";
+    card.style.padding = `${l.cardPaddingPx}px`;
+
+    title.style.fontSize = `${l.titleFontPx}px`;
+    title.style.marginBottom = `${l.titleMarginBottomPx}px`;
+    subtitle.style.fontSize = `${l.subtitleFontPx}px`;
+    subtitle.style.marginBottom = `${l.subtitleMarginBottomPx}px`;
+    msg.style.fontSize = `${l.messageFontPx}px`;
+    msg.style.marginBottom = `${l.messageMarginBottomPx}px`;
+
+    username.style.fontSize = `${l.fieldFontPx}px`;
+    username.style.padding = `${l.fieldPaddingYpx}px ${l.fieldPaddingXpx}px`;
+    username.style.width = `${l.fieldWidthPct}%`;
+    username.style.marginBottom = `${l.fieldGapPx}px`;
+
+    password.style.fontSize = `${l.fieldFontPx}px`;
+    password.style.padding = `${l.fieldPaddingYpx}px ${l.fieldPaddingXpx}px`;
+    password.style.width = `${l.fieldWidthPct}%`;
+    password.style.marginBottom = `${l.fieldGapPx}px`;
+
+    row.style.flexDirection = l.rowDirection;
+    row.style.gap = `${l.rowGapPx}px`;
+    row.style.marginTop = "6px";
+
+    [signIn, signUp, guest].forEach((b) => {
+      b.style.fontSize = `${l.buttonFontPx}px`;
+      b.style.padding = `${l.buttonPaddingYpx}px ${l.buttonPaddingXpx}px`;
+      b.style.minWidth = l.buttonMinWidthPx ? `${l.buttonMinWidthPx}px` : "0";
+      b.style.width = l.variant === "compact" ? "100%" : "auto";
+      b.style.maxWidth = l.variant === "compact" ? "520px" : "none";
+      b.style.flex = "0 1 auto";
+    });
+
+    if (l.variant === "compact" && l.buttonLayout === "twoPlusOne") {
+      // Two buttons side-by-side, with guest below full width.
+      row.style.flexWrap = "wrap";
+      signIn.style.width = "calc(50% - 6px)";
+      signUp.style.width = "calc(50% - 6px)";
+      guest.style.width = "100%";
+      signIn.style.flex = "1 1 calc(50% - 6px)";
+      signUp.style.flex = "1 1 calc(50% - 6px)";
+      guest.style.flex = "1 1 100%";
+      [signIn, signUp, guest].forEach((b) => (b.style.maxWidth = "none"));
+    } else if (l.variant === "compact") {
+      // Stacked buttons (less horizontal thinking on portrait).
+      row.style.flexWrap = "nowrap";
+      [signIn, signUp, guest].forEach((b) => {
+        b.style.width = "100%";
+        b.style.maxWidth = "520px";
+        b.style.flex = "0 1 auto";
+      });
+    } else {
+      row.style.flexWrap = "wrap";
+      [signIn, signUp, guest].forEach((b) => {
+        b.style.width = "auto";
+        b.style.maxWidth = "none";
+        b.style.flex = "0 1 auto";
+      });
+    }
+
+    note.style.fontSize = `${l.noteFontPx}px`;
+    note.style.marginTop = `${l.noteMarginTopPx}px`;
+
+    // After internal layout changes, refit the overlay frame so it never requires scroll.
+    overlay.update();
+  }
+
   function done(session: Session) {
     saveSession(session);
-    root.remove();
+    window.removeEventListener("resize", applyLayout);
+    overlay.destroy();
     opts.onContinue(session);
   }
 
@@ -161,8 +217,10 @@ export function mountAuthOverlay(opts: MountAuthOverlayOptions) {
   signIn.onclick = () => void doAuth("signin");
   signUp.onclick = () => void doAuth("signup");
 
-  root.appendChild(card);
-  document.body.appendChild(root);
+  applyLayout();
+  window.addEventListener("resize", applyLayout);
+
+  overlay.frame.appendChild(card);
 }
 
 

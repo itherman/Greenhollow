@@ -47,6 +47,118 @@ export const villagerGossip: DialogScript = {
   },
 };
 
+export const homeowner1Advice: DialogScript = {
+  id: "homeowner1Advice",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "Mind the flowers. I planted those.", next: "b" },
+    b: {
+      id: "b",
+      kind: "choice",
+      text: "Need advice?",
+      choices: [
+        { id: "combat", text: "How do I survive out there?", next: "c" },
+        { id: "loot", text: "Anything worth collecting?", next: "d" },
+        { id: "bye", text: "Thanks.", next: "end" },
+      ],
+    },
+    c: { id: "c", kind: "line", text: "Keep moving. Strike, step back, strike again.", next: "b" },
+    d: { id: "d", kind: "line", text: "Hearts mend you. Coins buy you better tools.", next: "b" },
+    end: { id: "end", kind: "end", text: "Stay sharp." },
+  },
+};
+
+export const homeowner2Advice: DialogScript = {
+  id: "homeowner2Advice",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "The woods whisper at night.", next: "b" },
+    b: {
+      id: "b",
+      kind: "choice",
+      text: "What do you want to know?",
+      choices: [
+        { id: "path", text: "Where should I go?", next: "c" },
+        { id: "bow", text: "Any ranged tips?", next: "d" },
+        { id: "bye", text: "I'll be going.", next: "end" },
+      ],
+    },
+    c: { id: "c", kind: "line", text: "Follow the dirt path. It keeps you out of trouble.", next: "b" },
+    d: { id: "d", kind: "line", text: "If you find a bow, count your arrows. Shots vanish fast.", next: "b" },
+    end: { id: "end", kind: "end", text: "Good luck." },
+  },
+};
+
+export const homeowner3Advice: DialogScript = {
+  id: "homeowner3Advice",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "Careful—slimes take a few hits to put down.", next: "b" },
+    b: {
+      id: "b",
+      kind: "choice",
+      text: "Want a tip?",
+      choices: [
+        { id: "spacing", text: "How do I fight safely?", next: "c" },
+        { id: "gear", text: "What gear should I get?", next: "d" },
+        { id: "bye", text: "That's enough.", next: "end" },
+      ],
+    },
+    c: { id: "c", kind: "line", text: "Don't get surrounded. Pull one foe at a time.", next: "b" },
+    d: { id: "d", kind: "line", text: "A sturdier blade helps. Food helps too, if you can spare coins.", next: "b" },
+    end: { id: "end", kind: "end", text: "Stay alive." },
+  },
+};
+
+export const homeowner4Advice: DialogScript = {
+  id: "homeowner4Advice",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "You look like you could use a rest.", next: "b" },
+    b: {
+      id: "b",
+      kind: "choice",
+      text: "Need guidance?",
+      choices: [
+        { id: "hearts", text: "How do hearts work?", next: "c" },
+        { id: "coins", text: "What about coins?", next: "d" },
+        { id: "bye", text: "I'll be off.", next: "end" },
+      ],
+    },
+    c: { id: "c", kind: "line", text: "Hearts heal you when you pick them up. Don't ignore them.", next: "b" },
+    d: { id: "d", kind: "line", text: "Coins pile up. Spend them on weapons, armor, and food when you find a shop.", next: "b" },
+    end: { id: "end", kind: "end", text: "Take care." },
+  },
+};
+
+export const shopkeeper: DialogScript = {
+  id: "shopkeeper",
+  start: "menu",
+  nodes: {
+    menu: {
+      id: "menu",
+      kind: "choice",
+      text: "Welcome. What are you buying?",
+      choices: [
+        { id: "buy_dagger", text: "Dagger (40c)", next: "menu" },
+        { id: "buy_sword", text: "Sword (60c)", next: "menu" },
+        { id: "buy_longsword", text: "Longsword (120c)", next: "menu" },
+        { id: "buy_spear", text: "Spear (90c)", next: "menu" },
+        { id: "buy_arrows", text: "Arrows x25 (15c)", next: "menu" },
+        { id: "buy_bread", text: "Bread (12c)", next: "menu" },
+        { id: "buy_stew", text: "Stew (30c)", next: "menu" },
+        { id: "buy_leather_armor", text: "Leather Armor (80c)", next: "menu" },
+        { id: "buy_iron_armor", text: "Iron Armor (160c)", next: "menu" },
+        { id: "bye", text: "Nothing. Bye.", next: "end" },
+      ],
+    },
+    buyOk: { id: "buyOk", kind: "line", text: "A fine choice.", next: "menu" },
+    buyNoCoins: { id: "buyNoCoins", kind: "line", text: "You don't have enough coins.", next: "menu" },
+    buyNoSpace: { id: "buyNoSpace", kind: "line", text: "Your pouch is full.", next: "menu" },
+    end: { id: "end", kind: "end", text: "Come back anytime." },
+  },
+};
+
 export const chestMessage: DialogScript = {
   id: "chestMessage",
   start: "a",
@@ -120,6 +232,16 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return elderIntro;
     case "villagerGossip":
       return villagerGossip;
+    case "homeowner1Advice":
+      return homeowner1Advice;
+    case "homeowner2Advice":
+      return homeowner2Advice;
+    case "homeowner3Advice":
+      return homeowner3Advice;
+    case "homeowner4Advice":
+      return homeowner4Advice;
+    case "shopkeeper":
+      return shopkeeper;
     case "chestMessage":
       return chestMessage;
     case "chestEmpty":

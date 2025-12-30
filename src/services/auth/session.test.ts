@@ -5,8 +5,8 @@ import {
   getOrCreateGuestSession,
   loadSession,
   saveSession,
-  type StorageLike,
 } from "./session";
+import type { StorageLike } from "../storage/storageLike";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();

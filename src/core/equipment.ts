@@ -2,21 +2,26 @@ import type { ItemId, Inventory } from "./inventory";
 
 export type EquipmentState = {
   heldItemId: ItemId | null;
+  armorItemId: ItemId | null;
 };
 
 export function createEquipment(): EquipmentState {
-  return { heldItemId: null };
+  return { heldItemId: null, armorItemId: null };
 }
 
 export type ToggleEquipResult =
   | { ok: true; next: EquipmentState }
   | { ok: false; reason: "invalid_slot" | "empty_slot" };
 
+function isArmorItemId(id: ItemId): boolean {
+  return id === "leather_armor" || id === "iron_armor";
+}
+
 /**
  * Toggle-equip the item in a given inventory slot.
  * - If the slot is empty -> error
- * - If the slot item is already held -> unequip (heldItemId=null)
- * - Otherwise -> hold that item id
+ * - If the slot item is armor -> toggles armor slot
+ * - Otherwise -> toggles held item slot
  */
 export function toggleEquipFromInventorySlot(
   equipment: EquipmentState,
@@ -29,8 +34,13 @@ export function toggleEquipFromInventorySlot(
   const s = inv.slots[i];
   if (!s) return { ok: false, reason: "empty_slot" };
 
+  if (isArmorItemId(s.id)) {
+    const armorItemId = equipment.armorItemId === s.id ? null : s.id;
+    return { ok: true, next: { ...equipment, armorItemId } };
+  }
+
   const heldItemId = equipment.heldItemId === s.id ? null : s.id;
-  return { ok: true, next: { heldItemId } };
+  return { ok: true, next: { ...equipment, heldItemId } };
 }
 
 

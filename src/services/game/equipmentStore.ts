@@ -16,8 +16,10 @@ export function loadEquipment(st: Storage | null = storage()): EquipmentState {
   try {
     const parsed = JSON.parse(raw) as Partial<EquipmentState>;
     const heldItemId = (parsed?.heldItemId ?? null) as EquipmentState["heldItemId"];
+    const armorItemId = (parsed?.armorItemId ?? null) as EquipmentState["armorItemId"];
     if (heldItemId !== null && typeof heldItemId !== "string") return createEquipment();
-    return { heldItemId };
+    if (armorItemId !== null && typeof armorItemId !== "string") return createEquipment();
+    return { heldItemId, armorItemId };
   } catch {
     return createEquipment();
   }

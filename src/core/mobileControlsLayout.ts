@@ -27,23 +27,28 @@ export function computeMobileControlsLayout(params: {
   const W = Math.max(320, Math.floor(screenW || 0));
   const H = Math.max(240, Math.floor(screenH || 0));
 
-  // Make buttons scale a bit with height while staying tappable.
-  const size = Math.max(minButtonPx, Math.min(110, Math.floor(H * 0.18)));
-  const x = W - marginPx - size;
+  // Base size scales a bit with height while staying tappable.
+  const base = Math.max(minButtonPx, Math.min(110, Math.floor(H * 0.18)));
+
+  // Make ATTACK larger on mobile for better tap-ability, without forcing other buttons larger.
+  const attackScale = 1.4;
+  const attackMaxPx = 160;
+  const interactSize = base;
+  const attackSize = Math.max(interactSize, Math.min(attackMaxPx, Math.floor(base * attackScale)));
+
   const centerY = Math.floor(H * 0.62);
+  const stackH = attackSize + gapPx + interactSize;
+  const startY = Math.max(marginPx, Math.min(H - marginPx - stackH, Math.round(centerY - stackH / 2)));
 
-  const attack: Rect = { x, y: centerY - size - Math.floor(gapPx / 2), w: size, h: size };
-  const interact: Rect = { x, y: centerY + Math.ceil(gapPx / 2), w: size, h: size };
+  const attack: Rect = { x: W - marginPx - attackSize, y: startY, w: attackSize, h: attackSize };
+  const interact: Rect = {
+    x: W - marginPx - interactSize,
+    y: startY + attackSize + gapPx,
+    w: interactSize,
+    h: interactSize,
+  };
 
-  // Clamp to keep fully on-screen.
-  const clampRect = (r: Rect): Rect => ({
-    x: Math.max(marginPx, Math.min(W - marginPx - r.w, r.x)),
-    y: Math.max(marginPx, Math.min(H - marginPx - r.h, r.y)),
-    w: r.w,
-    h: r.h,
-  });
-
-  return { attack: clampRect(attack), interact: clampRect(interact) };
+  return { attack, interact };
 }
 
 

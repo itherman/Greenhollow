@@ -1,4 +1,16 @@
-export type ItemId = "coins" | "rusty_key" | "sword" | "bow" | "arrows";
+export type ItemId =
+  | "coins"
+  | "rusty_key"
+  | "sword"
+  | "bow"
+  | "arrows"
+  | "dagger"
+  | "longsword"
+  | "spear"
+  | "bread"
+  | "stew"
+  | "leather_armor"
+  | "iron_armor";
 
 export type ItemStack = {
   id: ItemId;
@@ -103,6 +115,13 @@ export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
   sword: { id: "sword", name: "Sword", maxStack: 1 },
   bow: { id: "bow", name: "Bow", maxStack: 1 },
   arrows: { id: "arrows", name: "Arrows", maxStack: 999 },
+  dagger: { id: "dagger", name: "Dagger", maxStack: 1 },
+  longsword: { id: "longsword", name: "Longsword", maxStack: 1 },
+  spear: { id: "spear", name: "Spear", maxStack: 1 },
+  bread: { id: "bread", name: "Bread", maxStack: 20 },
+  stew: { id: "stew", name: "Stew", maxStack: 10 },
+  leather_armor: { id: "leather_armor", name: "Leather Armor", maxStack: 1 },
+  iron_armor: { id: "iron_armor", name: "Iron Armor", maxStack: 1 },
 };
 
 export function getItemCount(inv: Inventory, itemId: ItemId): number {

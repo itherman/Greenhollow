@@ -11,10 +11,24 @@ describe("equipment", () => {
     const r1 = toggleEquipFromInventorySlot(eq0, inv, 0);
     expect(r1.ok).toBe(true);
     if (r1.ok) expect(r1.next.heldItemId).toBe("sword");
+    if (r1.ok) expect(r1.next.armorItemId).toBe(null);
 
     const r2 = toggleEquipFromInventorySlot(r1.ok ? r1.next : eq0, inv, 0);
     expect(r2.ok).toBe(true);
     if (r2.ok) expect(r2.next.heldItemId).toBe(null);
+    if (r2.ok) expect(r2.next.armorItemId).toBe(null);
+  });
+
+  it("equips armor into the armor slot", () => {
+    const inv = createInventory(5);
+    addItem(inv, ITEMS.leather_armor, 1);
+    const eq0 = createEquipment();
+    const r1 = toggleEquipFromInventorySlot(eq0, inv, 0);
+    expect(r1.ok).toBe(true);
+    if (r1.ok) {
+      expect(r1.next.armorItemId).toBe("leather_armor");
+      expect(r1.next.heldItemId).toBe(null);
+    }
   });
 
   it("rejects empty slots", () => {

@@ -3,6 +3,8 @@ import { createGame } from "./game/createGame";
 import { setGameKeyboardEnabled } from "./game/keyboardGate";
 import { mountAuthOverlay } from "./ui/authOverlay";
 import { mountIntroOverlay } from "./ui/introOverlay";
+import { computeGameParentSize } from "./core/viewportFit";
+import { computeGameBaseSize } from "./core/gameViewportPolicy";
 import { loadSession, type Session } from "./services/auth/session";
 import { loadCloudPlayerState } from "./services/game/cloudPlayerState";
 import { applyLocalPlayerState } from "./services/game/playerStateLocal";
@@ -14,7 +16,33 @@ if (!app) throw new Error("Missing #app element");
 
 app.innerHTML = `<div id="game-root"></div>`;
 
+const gameRoot = document.querySelector<HTMLDivElement>("#game-root");
+if (!gameRoot) throw new Error("Missing #game-root element");
+
+function applyGameRootSizing() {
+  if (!gameRoot) return;
+  const r = computeGameParentSize(window.innerWidth, window.innerHeight, {
+    desktopMinWidthPx: 900,
+    desktopMinHeightPx: 600,
+    desktopCapFactor: 0.85,
+  });
+  gameRoot.style.setProperty("--game-root-width", `${r.parentWidthPx}px`);
+  gameRoot.style.setProperty("--game-root-height", `${r.parentHeightPx}px`);
+}
+
+applyGameRootSizing();
+window.addEventListener("resize", applyGameRootSizing, { passive: true });
+
 const game = createGame("game-root");
+
+function applyGameBaseSize() {
+  const base = computeGameBaseSize(window.innerWidth, window.innerHeight);
+  // Update the virtual game size so FIT reduces extreme letterboxing on orientation changes.
+  game.scale.setGameSize(base.width, base.height);
+}
+
+applyGameBaseSize();
+window.addEventListener("resize", applyGameBaseSize, { passive: true });
 
 async function continueWithSession(session: Session) {
   console.info("session", session);

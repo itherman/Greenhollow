@@ -1,3 +1,6 @@
+import { loadJsonOrNull } from "../storage/jsonStorage";
+import { defaultBrowserStorage, type StorageLike } from "../storage/storageLike";
+
 export type SessionMode = "guest" | "firebase";
 
 export type Session = {
@@ -8,22 +11,6 @@ export type Session = {
 
 const SESSION_KEY = "game.session.v1";
 
-export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
-function defaultStorage(): StorageLike | null {
-  // In tests (node), window/localStorage may not exist.
-  // In browser, localStorage should exist.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (typeof window === "undefined") return null;
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!window.localStorage) return null;
-  return window.localStorage;
-}
-
 function randomId(): string {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -31,18 +18,7 @@ function randomId(): string {
 }
 
 export function loadSession(storage: StorageLike | null = defaultStorage()): Session | null {
-  if (!storage) return null;
-  const raw = storage.getItem(SESSION_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Session;
-    if (!parsed || typeof parsed !== "object") return null;
-    if (parsed.mode !== "guest" && parsed.mode !== "firebase") return null;
-    if (typeof parsed.uid !== "string" || typeof parsed.username !== "string") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  return loadJsonOrNull(storage, SESSION_KEY, isSession);
 }
 
 export function saveSession(session: Session, storage: StorageLike | null = defaultStorage()): void {
@@ -52,7 +28,12 @@ export function saveSession(session: Session, storage: StorageLike | null = defa
 
 export function clearSession(storage: StorageLike | null = defaultStorage()): void {
   if (!storage) return;
-  storage.removeItem(SESSION_KEY);
+  if (storage.removeItem) {
+    storage.removeItem(SESSION_KEY);
+    return;
+  }
+  // Fallback: overwrite with empty.
+  storage.setItem(SESSION_KEY, "");
 }
 
 export function createGuestSession(username?: string): Session {
@@ -71,6 +52,18 @@ export function getOrCreateGuestSession(storage: StorageLike | null = defaultSto
   const created = createGuestSession();
   saveSession(created, storage);
   return created;
+}
+
+function defaultStorage(): StorageLike | null {
+  return defaultBrowserStorage();
+}
+
+function isSession(v: unknown): v is Session {
+  if (!v || typeof v !== "object") return false;
+  const s = v as Session;
+  if (s.mode !== "guest" && s.mode !== "firebase") return false;
+  if (typeof s.uid !== "string" || typeof s.username !== "string") return false;
+  return true;
 }
 
 

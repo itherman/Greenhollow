@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hasFlag, setFlag, type StorageLike } from "./flags";
+import { hasFlag, setFlag } from "./flags";
+import type { StorageLike } from "../storage/storageLike";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();

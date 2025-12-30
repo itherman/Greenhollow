@@ -1,5 +1,26 @@
-export type AreaId = "village" | "woods" | "cave" | "house" | "hallway";
-export type EntryId = "fromVillage" | "fromWoods" | "fromCave" | "fromHouse" | "fromHallway" | "start";
+export type AreaId =
+  | "village"
+  | "woods"
+  | "cave"
+  | "house"
+  | "hallway"
+  | "store"
+  | "house1"
+  | "house2"
+  | "house3"
+  | "house4";
+export type EntryId =
+  | "fromVillage"
+  | "fromWoods"
+  | "fromCave"
+  | "fromHouse"
+  | "fromHallway"
+  | "fromStore"
+  | "fromHouse1"
+  | "fromHouse2"
+  | "fromHouse3"
+  | "fromHouse4"
+  | "start";
 
 /**
  * Tile indices in our generated tilesheet (see WorldScene).
@@ -42,6 +63,17 @@ export type AreaDef = {
 export function isWalkable(tile: TileId): boolean {
   return tile !== 1 && tile !== 5;
 }
+
+/**
+ * Village houses are 7x4 tiles, matching `prop_house_village` in `WorldScene`.
+ * These are TOP-LEFT tile coordinates for each house footprint.
+ */
+export const VILLAGE_HOUSE_TOP_LEFTS: Point[] = [
+  { x: 3, y: 3 },
+  { x: 18, y: 3 },
+  { x: 3, y: 11 },
+  { x: 18, y: 11 },
+];
 
 export function getTile(area: AreaDef, p: Point): TileId | null {
   if (p.x < 0 || p.y < 0 || p.x >= area.width || p.y >= area.height) return null;
@@ -103,9 +135,26 @@ function borderWalls(width: number, height: number, fill: TileId): TileId[][] {
   return tiles;
 }
 
+function fullSpawnMap(p: Point): Record<EntryId, Point> {
+  return {
+    fromVillage: p,
+    fromWoods: p,
+    fromCave: p,
+    fromHouse: p,
+    fromHallway: p,
+    fromStore: p,
+    fromHouse1: p,
+    fromHouse2: p,
+    fromHouse3: p,
+    fromHouse4: p,
+    start: p,
+  };
+}
+
 export function makeVillage(): AreaDef {
-  const width = 40;
-  const height = 28;
+  // Smaller again, but still fits 4 house footprints + main path.
+  const width = 28;
+  const height = 18;
   const tiles = borderWalls(width, height, 0);
 
   // Tree border for the starting area (village), with openings carved below.
@@ -118,28 +167,52 @@ export function makeVillage(): AreaDef {
     tiles[y]![width - 1] = 5;
   }
 
-  // Small "house" block (slightly smaller than before)
-  for (let y = 7; y <= 10; y++) for (let x = 6; x <= 12; x++) tiles[y]![x] = 1;
-  // Door opening (walkable)
-  tiles[10]![9] = 0;
+  // Gate line: slightly below mid so the main path runs in front of top houses.
+  const gateY = Math.min(height - 4, Math.max(4, Math.floor(height * 0.6)));
 
-  // Dirt path from spawn toward woods gate and the house door.
-  const gateY = Math.floor(height / 2);
-  // Vertical from spawn down to gate line
-  for (let y = 3; y <= gateY; y++) {
-    if (tiles[y]![3] !== 1) tiles[y]![3] = 4;
+  // House footprints (7x4 each), with a door tile at bottom-center (walkable).
+  const doorForHouse = (topLeft: Point) => ({ x: topLeft.x + 3, y: topLeft.y + 3 });
+  const frontForDoor = (d: Point) => ({ x: d.x, y: Math.min(height - 2, d.y + 1) });
+  const houseDoors = VILLAGE_HOUSE_TOP_LEFTS.map(doorForHouse);
+  const houseFronts = houseDoors.map(frontForDoor);
+
+  for (const topLeft of VILLAGE_HOUSE_TOP_LEFTS) {
+    for (let y = topLeft.y; y <= topLeft.y + 3; y++) {
+      for (let x = topLeft.x; x <= topLeft.x + 6; x++) {
+        tiles[y]![x] = 1;
+      }
+    }
   }
-  // Horizontal toward woods gate
-  for (let x = 3; x < width - 1; x++) {
-    if (tiles[gateY]![x] !== 1) tiles[gateY]![x] = 4;
+  for (const d of houseDoors) {
+    // Door tile is walkable (and we paint it as path to avoid a grass sliver under the door).
+    tiles[d.y]![d.x] = 4;
   }
-  // Path to house door column
-  // NOTE: gateY is below the house door (y=10), so we must iterate upward-to-downward correctly.
-  for (let y = 10; y <= gateY; y++) {
-    if (tiles[y]![9] !== 1) tiles[y]![9] = 4;
+
+  // Main horizontal path across the village at gateY (connects to woods gate).
+  for (let x = 2; x < width; x++) if (tiles[gateY]![x] !== 1) tiles[gateY]![x] = 4;
+  // Vertical spur from spawn to the main path.
+  for (let y = 2; y <= gateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
+
+  // House spurs: connect each house-front tile to the main gate line, without cutting through footprints.
+  for (let i = 0; i < houseFronts.length; i++) {
+    const f = houseFronts[i]!;
+    const topLeft = VILLAGE_HOUSE_TOP_LEFTS[i]!;
+    const belowGate = f.y > gateY;
+    const spurX = belowGate
+      ? (topLeft.x - 1 >= 2 ? topLeft.x - 1 : topLeft.x + 7)
+      : f.x;
+
+    const y0 = Math.min(gateY, f.y);
+    const y1 = Math.max(gateY, f.y);
+    for (let y = y0; y <= y1; y++) if (tiles[y]![spurX] !== 1) tiles[y]![spurX] = 4;
+
+    const x0 = Math.min(spurX, f.x);
+    const x1 = Math.max(spurX, f.x);
+    for (let x = x0; x <= x1; x++) if (tiles[f.y]![x] !== 1) tiles[f.y]![x] = 4;
+
+    // Ensure the front tile itself is path.
+    tiles[f.y]![f.x] = 4;
   }
-  // Keep the door tile as path so the entrance reads clearly.
-  tiles[10]![9] = 4;
 
   // Carve the woods gate opening through the border wall so the player can step onto the exit zone.
   tiles[gateY - 1]![width - 1] = 4;
@@ -152,37 +225,45 @@ export function makeVillage(): AreaDef {
     height,
     tiles,
     spawns: {
-      start: { x: 3, y: 3 },
-      fromWoods: { x: width - 4, y: Math.floor(height / 2) },
-      fromCave: { x: 3, y: height - 4 },
-      fromHouse: { x: 9, y: 11 },
-      fromHallway: { x: 9, y: 11 },
-      fromVillage: { x: 3, y: 3 },
+      start: { x: 2, y: 2 },
+      fromWoods: { x: width - 4, y: gateY },
+      fromCave: { x: 2, y: height - 4 },
+      fromStore: { x: width - 4, y: gateY },
+      fromHouse: houseFronts[0]!,
+      fromHallway: houseFronts[0]!,
+      fromHouse1: houseFronts[0]!,
+      fromHouse2: houseFronts[1]!,
+      fromHouse3: houseFronts[2]!,
+      fromHouse4: houseFronts[3]!,
+      fromVillage: { x: 2, y: 2 },
     },
     exits: [
       {
         id: "toWoods",
-        rect: { x: width - 1, y: Math.floor(height / 2) - 1, w: 1, h: 2 },
+        rect: { x: width - 1, y: gateY - 1, w: 1, h: 2 },
         toArea: "woods",
         toEntry: "fromVillage",
       },
-      {
-        id: "enterHouse",
-        rect: { x: 9, y: 10, w: 1, h: 1 },
-        toArea: "house",
-        toEntry: "fromVillage",
-      },
+      // Enter house triggers are on the DOOR tiles (so walking on the path doesn't auto-enter).
+      // Top-left house is the special interior with the locked door -> hallway.
+      { id: "enterHouse1", rect: { x: houseDoors[0]!.x, y: houseDoors[0]!.y, w: 1, h: 1 }, toArea: "house", toEntry: "fromVillage" },
+      { id: "enterHouse2", rect: { x: houseDoors[1]!.x, y: houseDoors[1]!.y, w: 1, h: 1 }, toArea: "house2", toEntry: "fromVillage" },
+      { id: "enterHouse3", rect: { x: houseDoors[2]!.x, y: houseDoors[2]!.y, w: 1, h: 1 }, toArea: "house3", toEntry: "fromVillage" },
+      { id: "enterHouse4", rect: { x: houseDoors[3]!.x, y: houseDoors[3]!.y, w: 1, h: 1 }, toArea: "house4", toEntry: "fromVillage" },
     ],
     npcs: [
-      { id: "elder", name: "Village Elder", pos: { x: 5, y: 5 }, dialogScriptId: "elderIntro" },
-      { id: "villager1", name: "Villager", pos: { x: 18, y: 8 }, dialogScriptId: "villagerGossip" },
+      { id: "elder", name: "Village Elder", pos: { x: 13, y: gateY - 2 }, dialogScriptId: "elderIntro" },
+      { id: "homeowner1", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[0]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[0]!.y + 4 }, dialogScriptId: "homeowner1Advice" },
+      { id: "homeowner2", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[1]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[1]!.y + 4 }, dialogScriptId: "homeowner2Advice" },
+      { id: "homeowner3", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[2]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[2]!.y + 4 }, dialogScriptId: "homeowner3Advice" },
+      { id: "homeowner4", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[3]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[3]!.y + 4 }, dialogScriptId: "homeowner4Advice" },
     ],
   };
 }
 
 export function makeWoods(): AreaDef {
-  const width = 44;
-  const height = 30;
+  const width = 22;
+  const height = 15;
   const tiles = borderWalls(width, height, 2);
 
   // Replace border with dense trees (tile 5) for a forest feel.
@@ -208,6 +289,30 @@ export function makeWoods(): AreaDef {
   tiles[midY - 1]![0] = 2;
   tiles[midY]![0] = 2;
   for (let yy = height - 4; yy <= height - 2; yy++) tiles[yy]![width - 1] = 2;
+  // Store opening on the top border (2 tiles wide).
+  const storeX = Math.max(2, Math.min(width - 3, Math.floor(width / 2)));
+  tiles[0]![storeX] = 2;
+  tiles[0]![storeX + 1] = 2;
+
+  // Dirt paths: ensure there's a clear route between village <-> store <-> cave.
+  const canPaintPath = (t: TileId) => t !== 1 && t !== 5;
+  const setPath = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    if (!canPaintPath(tiles[y]![x] as TileId)) return;
+    tiles[y]![x] = 4;
+  };
+  // Main east/west trail through the woods at midY.
+  for (let x = 0; x < width; x++) setPath(x, midY);
+  // Spur down to the cave exit region (right side).
+  for (let y = midY; y <= height - 3; y++) {
+    setPath(width - 2, y);
+    setPath(width - 1, y);
+  }
+  // Spur up to the store opening.
+  for (let y = 0; y <= midY; y++) {
+    setPath(storeX, y);
+    setPath(storeX + 1, y);
+  }
 
   return {
     id: "woods",
@@ -219,7 +324,12 @@ export function makeWoods(): AreaDef {
       fromVillage: { x: 2, y: Math.floor(height / 2) },
       fromCave: { x: width - 4, y: height - 4 },
       fromHouse: { x: 2, y: Math.floor(height / 2) },
+      fromHouse1: { x: 2, y: Math.floor(height / 2) },
+      fromHouse2: { x: 2, y: Math.floor(height / 2) },
+      fromHouse3: { x: 2, y: Math.floor(height / 2) },
+      fromHouse4: { x: 2, y: Math.floor(height / 2) },
       fromHallway: { x: 2, y: Math.floor(height / 2) },
+      fromStore: { x: storeX, y: 2 },
       start: { x: 2, y: Math.floor(height / 2) },
       fromWoods: { x: 2, y: Math.floor(height / 2) },
     },
@@ -228,6 +338,12 @@ export function makeWoods(): AreaDef {
         id: "toVillage",
         rect: { x: 0, y: Math.floor(height / 2) - 1, w: 1, h: 2 },
         toArea: "village",
+        toEntry: "fromWoods",
+      },
+      {
+        id: "toStore",
+        rect: { x: storeX, y: 0, w: 2, h: 1 },
+        toArea: "store",
         toEntry: "fromWoods",
       },
       {
@@ -242,19 +358,50 @@ export function makeWoods(): AreaDef {
 }
 
 export function makeCave(): AreaDef {
-  const width = 34;
-  const height = 24;
-  const tiles = borderWalls(width, height, 3);
+  const width = 17;
+  const height = 12;
+  // Start as solid rock; carve corridors and a single cathedral room.
+  const tiles = borderWalls(width, height, 1);
 
-  // Pillars
-  for (let y = 6; y < height - 6; y += 4) {
-    for (let x = 6; x < width - 6; x += 6) {
-      tiles[y]![x] = 1;
-    }
-  }
+  const setFloor = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    tiles[y]![x] = 3;
+  };
+  const carveH = (y: number, x0: number, x1: number) => {
+    const a = Math.min(x0, x1);
+    const b = Math.max(x0, x1);
+    for (let x = a; x <= b; x++) setFloor(x, y);
+  };
+  const carveV = (x: number, y0: number, y1: number) => {
+    const a = Math.min(y0, y1);
+    const b = Math.max(y0, y1);
+    for (let y = a; y <= b; y++) setFloor(x, y);
+  };
+  const carveRect = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) setFloor(x, y);
+  };
 
-  // Carve border opening back to woods.
-  for (let yy = height - 4; yy <= height - 2; yy++) tiles[yy]![0] = 3;
+  // Entrance opening back to woods.
+  for (let yy = height - 4; yy <= height - 2; yy++) setFloor(0, yy);
+
+  // Main corridor from entrance toward the center.
+  carveH(height - 4, 0, 6); // y=8, x 0..6
+  carveV(6, 5, height - 4); // x=6, y 5..8
+
+  // Junction toward the cathedral room.
+  carveH(5, 6, 9); // y=5, x 6..9
+
+  // Cathedral/open area (single main room).
+  carveRect(9, 1, 14, 6); // 6x6 room in the top-right
+
+  // Side hallway 1: small annex room off the junction.
+  carveH(5, 4, 6);
+  carveV(4, 4, 5);
+  carveRect(2, 3, 4, 4);
+
+  // Side hallway 2: short dead-end branch near the entrance corridor.
+  carveV(6, height - 2, height - 4); // x=6, y 10..8
+  carveH(height - 2, 6, 8); // y=10, x 6..8
 
   return {
     id: "cave",
@@ -266,7 +413,12 @@ export function makeCave(): AreaDef {
       fromWoods: { x: 2, y: height - 4 },
       fromVillage: { x: 2, y: height - 4 },
       fromHouse: { x: 2, y: height - 4 },
+      fromHouse1: { x: 2, y: height - 4 },
+      fromHouse2: { x: 2, y: height - 4 },
+      fromHouse3: { x: 2, y: height - 4 },
+      fromHouse4: { x: 2, y: height - 4 },
       fromHallway: { x: 2, y: height - 4 },
+      fromStore: { x: 2, y: height - 4 },
       start: { x: 2, y: height - 4 },
       fromCave: { x: 2, y: height - 4 },
     },
@@ -292,6 +444,10 @@ export function makeHouse(): AreaDef {
   // Door opening on top wall (locked door to hallway, but must be walkable for exit validation)
   tiles[0]![Math.floor(width / 2)] = 3;
 
+  const doorX = Math.floor(width / 2);
+  const spawnFromVillage = { x: doorX, y: height - 2 };
+  const spawnFromHallway = { x: doorX, y: 1 }; // just inside the locked door
+
   return {
     id: "house",
     name: "House",
@@ -299,12 +455,17 @@ export function makeHouse(): AreaDef {
     height,
     tiles,
     spawns: {
-      fromVillage: { x: Math.floor(width / 2), y: height - 2 },
-      fromWoods: { x: Math.floor(width / 2), y: height - 2 },
-      fromCave: { x: Math.floor(width / 2), y: height - 2 },
-      fromHouse: { x: Math.floor(width / 2), y: height - 2 },
-      fromHallway: { x: Math.floor(width / 2), y: 2 },
-      start: { x: Math.floor(width / 2), y: height - 2 },
+      start: spawnFromVillage,
+      fromVillage: spawnFromVillage,
+      fromWoods: spawnFromVillage,
+      fromCave: spawnFromVillage,
+      fromStore: spawnFromVillage,
+      fromHouse: spawnFromVillage,
+      fromHouse1: spawnFromVillage,
+      fromHouse2: spawnFromVillage,
+      fromHouse3: spawnFromVillage,
+      fromHouse4: spawnFromVillage,
+      fromHallway: spawnFromHallway,
     },
     exits: [
       {
@@ -324,6 +485,46 @@ export function makeHouse(): AreaDef {
   };
 }
 
+function makeSimpleHouseInterior(params: { id: AreaId; backEntry: EntryId; name: string }): AreaDef {
+  const width = 9;
+  const height = 7;
+  const tiles = borderWalls(width, height, 3);
+  const doorX = Math.floor(width / 2);
+  tiles[height - 1]![doorX] = 3;
+  const spawn = { x: doorX, y: height - 2 };
+
+  return {
+    id: params.id,
+    name: params.name,
+    width,
+    height,
+    tiles,
+    spawns: fullSpawnMap(spawn),
+    exits: [
+      {
+        id: "exitToVillage",
+        rect: { x: doorX, y: height - 1, w: 1, h: 1 },
+        toArea: "village",
+        toEntry: params.backEntry,
+      },
+    ],
+    npcs: [],
+  };
+}
+
+export function makeHouse1(): AreaDef {
+  return makeSimpleHouseInterior({ id: "house1", backEntry: "fromHouse1", name: "House" });
+}
+export function makeHouse2(): AreaDef {
+  return makeSimpleHouseInterior({ id: "house2", backEntry: "fromHouse2", name: "House" });
+}
+export function makeHouse3(): AreaDef {
+  return makeSimpleHouseInterior({ id: "house3", backEntry: "fromHouse3", name: "House" });
+}
+export function makeHouse4(): AreaDef {
+  return makeSimpleHouseInterior({ id: "house4", backEntry: "fromHouse4", name: "House" });
+}
+
 export function makeHallway(): AreaDef {
   const width = 14;
   const height = 22;
@@ -337,14 +538,7 @@ export function makeHallway(): AreaDef {
     width,
     height,
     tiles,
-    spawns: {
-      fromHouse: { x: Math.floor(width / 2), y: height - 2 },
-      fromVillage: { x: Math.floor(width / 2), y: height - 2 },
-      fromWoods: { x: Math.floor(width / 2), y: height - 2 },
-      fromCave: { x: Math.floor(width / 2), y: height - 2 },
-      fromHallway: { x: Math.floor(width / 2), y: height - 2 },
-      start: { x: Math.floor(width / 2), y: height - 2 },
-    },
+    spawns: fullSpawnMap({ x: Math.floor(width / 2), y: height - 2 }),
     exits: [
       {
         id: "backToHouse",
@@ -354,6 +548,37 @@ export function makeHallway(): AreaDef {
       },
     ],
     npcs: [],
+  };
+}
+
+export function makeStore(): AreaDef {
+  const width = 16;
+  const height = 10;
+  const tiles = borderWalls(width, height, 3);
+  const doorX = Math.floor(width / 2);
+  tiles[height - 1]![doorX] = 3;
+
+  // Simple counter wall with an opening.
+  const counterY = 3;
+  for (let x = 3; x <= width - 4; x++) tiles[counterY]![x] = 1;
+  tiles[counterY]![doorX] = 3;
+
+  return {
+    id: "store",
+    name: "Store",
+    width,
+    height,
+    tiles,
+    spawns: fullSpawnMap({ x: doorX, y: height - 2 }),
+    exits: [
+      {
+        id: "toWoods",
+        rect: { x: doorX, y: height - 1, w: 1, h: 1 },
+        toArea: "woods",
+        toEntry: "fromStore",
+      },
+    ],
+    npcs: [{ id: "shopkeeper", name: "Shopkeeper", pos: { x: doorX, y: 2 }, dialogScriptId: "shopkeeper" }],
   };
 }
 
@@ -369,6 +594,16 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeHouse();
     case "hallway":
       return makeHallway();
+    case "store":
+      return makeStore();
+    case "house1":
+      return makeHouse1();
+    case "house2":
+      return makeHouse2();
+    case "house3":
+      return makeHouse3();
+    case "house4":
+      return makeHouse4();
   }
 }
 
