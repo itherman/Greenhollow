@@ -1,0 +1,610 @@
+import Phaser from "phaser";
+import {
+  VILLAGE_HOUSE_TOP_LEFTS,
+  getArea,
+  type AreaId,
+  type EntryId,
+} from "../../../core/areas";
+import { ITEMS, addItem, removeItem } from "../../../core/inventory";
+import { applyContactDamage } from "../../../core/combat";
+import { chooseHeartSpawnTile } from "../../../core/heartSpawn";
+import { createRangedState, normalize, tryShoot } from "../../../core/rangedAttack";
+import { ARROW_HITBOX } from "../../../core/physicsTuning";
+import { chooseEnemySpawnTiles } from "../../../core/enemySpawn";
+import type { EnemyDrop } from "../../../core/enemyDrops";
+import { hasFlag, setFlag } from "../../../services/game/flags";
+import { loadInventory, saveInventory } from "../../../services/game/inventoryStore";
+import {
+  blockExit,
+  isExitBlocked,
+  type TilePos,
+} from "../../../core/exitGate";
+import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureVillageHouseTexture } from "../../art/sprites";
+import { addNpcColliders } from "../physicsColliders";
+import { configureStaticPickupBody } from "./arcadeBody";
+import { addBobbingTween } from "./bobbingTween";
+
+/**
+ * Loads an area into the running `WorldScene` instance.
+ *
+ * This is extracted from `WorldScene.loadArea(...)` to shrink `WorldScene.ts`.
+ *
+ * Design notes:
+ * - Uses `scene: any` so we can call private fields/methods without TypeScript fighting us.
+ * - Intentionally keeps behavior the same by preserving the original imperative structure.
+ */
+export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryId): void {
+  // WorldScene is designed to be restarted between areas.
+  // loadArea assumes a fresh scene state.
+
+  scene.area = getArea(areaId);
+  scene.npcMoveStates.clear();
+  scene.interactingNpc = undefined;
+  // HUD removed (keep only HP).
+  scene.bowState = createRangedState();
+
+  const tileSize = 32;
+  const map = scene.make.tilemap({
+    data: scene.area.tiles,
+    tileWidth: tileSize,
+    tileHeight: tileSize,
+  });
+  const tileset = map.addTilesetImage("tileset_2x2");
+  const layer = map.createLayer(0, tileset!, 0, 0);
+  if (!layer) throw new Error("Failed to create tilemap layer");
+  layer.setCollision([1, 5]);
+  layer.setDepth(-10000);
+  scene.uiCam.ignore(layer);
+
+  const worldW = scene.area.width * tileSize;
+  const worldH = scene.area.height * tileSize;
+  scene.physics.world.setBounds(0, 0, worldW, worldH);
+  scene.cameras.main.setBounds(0, 0, worldW, worldH);
+
+  // Collide player with walls.
+  scene.physics.add.collider(scene.player, layer);
+  // Fresh area: clear single-area objects.
+  scene.chest?.destroy();
+  scene.chest = undefined;
+  scene.chestContents = undefined;
+  scene.bowSprite?.destroy();
+  scene.bowSprite = undefined;
+  scene.playerArrowsGroup = scene.physics.add.group();
+  scene.physics.add.collider(scene.playerArrowsGroup, layer, (_arrow: unknown) => {
+    const a = _arrow as Phaser.Physics.Arcade.Sprite;
+    a.destroy();
+  });
+
+  // Drop items (coins/hearts) created by enemy deaths.
+  scene.dropsGroup = scene.physics.add.group();
+  scene.physics.add.collider(scene.dropsGroup, layer);
+  scene.physics.add.overlap(scene.player, scene.dropsGroup, (_p: unknown, d: unknown) => {
+    const drop = d as Phaser.Physics.Arcade.Sprite;
+    const meta = (drop as any).__drop as EnemyDrop | undefined;
+    if (!meta) {
+      drop.destroy();
+      return;
+    }
+    if (meta.kind === "heart") {
+      const heal = 5;
+      scene.hp = Math.min(scene.maxHp, scene.hp + heal);
+      scene.writeProgress(true);
+      drop.destroy();
+      return;
+    }
+    // coins
+    const inv = loadInventory();
+    addItem(inv, ITEMS.coins, meta.qty);
+    saveInventory(inv);
+    if (scene.inventoryOpen) scene.renderInventoryPanel();
+    drop.destroy();
+  });
+
+  // Spawn player
+  const spawn = scene.area.spawns[entry] ?? scene.area.spawns.start;
+  scene.currentEntry = entry;
+  // If we have a saved progress for this area, prefer exact coordinates.
+  const sp = scene.startProgress && scene.startProgress.areaId === areaId ? scene.startProgress : undefined;
+  if (sp) {
+    scene.player.setPosition(sp.playerX, sp.playerY);
+    // Recompute maxHp from armor (in case armor changed since save)
+    scene.updateMaxHpFromArmor();
+    scene.hp = Math.max(0, Math.min(scene.maxHp, sp.hp));
+  } else {
+    scene.player.setPosition(spawn.x * tileSize + tileSize / 2, spawn.y * tileSize + tileSize / 2);
+    scene.updateMaxHpFromArmor();
+  }
+  scene.player.setVelocity(0, 0);
+  // Persist progress locally (localStorage) so it can be saved to cloud by button.
+  scene.writeProgress(true);
+
+  // One random heart pickup per area load.
+  scene.heartSprite?.destroy();
+  const heartTile = chooseHeartSpawnTile(scene.area);
+  if (heartTile) {
+    ensureItemAndPropTextures(scene); // ensures item_heart exists too
+    const hx = heartTile.x * tileSize + tileSize / 2;
+    const hy = heartTile.y * tileSize + tileSize / 2;
+    scene.heartSprite = scene.physics.add.sprite(hx, hy, "item_heart");
+    scene.heartSprite.setDepth(scene.heartSprite.y);
+    const hb = scene.heartSprite.body as Phaser.Physics.Arcade.Body;
+    configureStaticPickupBody(hb, { w: 12, h: 12, offsetX: 6, offsetY: 6 });
+    scene.uiCam.ignore(scene.heartSprite);
+    // little bob
+    addBobbingTween(scene.tweens, scene.heartSprite, { baseY: hy, durationMs: 650 });
+
+    scene.physics.add.overlap(scene.player, scene.heartSprite, () => {
+      if (!scene.heartSprite?.active) return;
+      const heal = 5;
+      scene.hp = Math.min(scene.maxHp, scene.hp + heal);
+      scene.writeProgress(true);
+      scene.heartSprite.destroy();
+      scene.heartSprite = undefined;
+    });
+  }
+
+  // Exits
+  const exits = scene.physics.add.staticGroup();
+  for (const ex of scene.area.exits) {
+    const r = ex.rect;
+    const x = r.x * tileSize;
+    const y = r.y * tileSize;
+    const w = r.w * tileSize;
+    const h = r.h * tileSize;
+
+    const zone = scene.add.zone(x + w / 2, y + h / 2, w, h);
+    scene.physics.add.existing(zone, true);
+    (zone as any).exitDef = ex;
+    exits.add(zone);
+    scene.uiCam.ignore(zone);
+  }
+  scene.physics.add.overlap(scene.player, exits, (_player: unknown, z: unknown) => {
+    if (Date.now() < scene.suppressExitUntilTs) return;
+    if (scene.dialog.open) return;
+    const exitDef = (z as any).exitDef as {
+      id: string;
+      rect: { x: number; y: number; w: number; h: number };
+      toArea: AreaId;
+      toEntry: EntryId;
+    };
+    const playerTile: TilePos = scene.getPlayerTilePos();
+
+    // Sticky suppression: if we already showed a "blocked" dialog for this exit and the
+    // player hasn't moved away from the doorway region, don't re-trigger it.
+    if (scene.blockedExitSticky?.exitId === exitDef.id) {
+      const r = scene.blockedExitSticky.clearRect;
+      const inside = playerTile.x >= r.x && playerTile.x < r.x + r.w && playerTile.y >= r.y && playerTile.y < r.y + r.h;
+      if (inside) return;
+      scene.blockedExitSticky = undefined;
+    }
+
+    if (isExitBlocked(scene.exitGate, exitDef.id, playerTile)) return;
+
+    // Locked door logic (house -> hallway)
+    if (scene.area.id === "house" && exitDef.id === "toHallway") {
+      if (!hasFlag("door.house.hallway.unlocked")) {
+        const inv = loadInventory();
+        const ok = removeItem(inv, "rusty_key", 1);
+        if (!ok) {
+          scene.exitGate = blockExit(exitDef.id, exitDef.rect);
+          // Suppress re-showing until the player leaves the doorway region.
+          scene.blockedExitSticky = { exitId: exitDef.id, clearRect: scene.expandRect(exitDef.rect, 1) };
+          // Give the player a moment to step away after dismissing the dialog.
+          scene.suppressExitUntilTs = Date.now() + 700;
+          scene.openNpcDialog("doorLocked");
+          return;
+        }
+        saveInventory(inv);
+        setFlag("door.house.hallway.unlocked");
+        scene.houseDoorSprite?.setTexture("prop_door_open");
+      }
+    }
+
+    // Full reset between areas to avoid lingering physics/overlap/input state.
+    scene.scene.restart({ areaId: exitDef.toArea, entry: exitDef.toEntry });
+  });
+
+  // NPCs
+  const npcs = scene.physics.add.group({ allowGravity: false, immovable: true });
+  // Dynamic physics groups require explicit colliders.
+  addNpcColliders({ physics: scene.physics as any, player: scene.player, npcs, worldLayer: layer });
+  ensureNpcTextures(scene);
+  for (const npc of scene.area.npcs) {
+    const x = npc.pos.x * tileSize + tileSize / 2;
+    const y = npc.pos.y * tileSize + tileSize / 2;
+    const tex = npc.id === "elder" ? "npc_elder" : "npc_villager";
+    const s = npcs.create(x, y, tex) as Phaser.Physics.Arcade.Sprite;
+    s.setDepth(s.y);
+    (s as any).npcDef = npc;
+    const nb = s.body as Phaser.Physics.Arcade.Body;
+    // Feet collision: 12x10 near bottom of 24x24.
+    nb.setSize(12, 10);
+    nb.setOffset(6, 13);
+    nb.setAllowGravity(false);
+    nb.setImmovable(true);
+    scene.npcMoveStates.set(s, {
+      home: { x, y },
+      target: undefined,
+      nextDecisionAt: scene.time.now + Phaser.Math.Between(400, 900),
+      paused: tex !== "npc_villager",
+      speed: tex === "npc_villager" ? Phaser.Math.Between(18, 26) : 0,
+      wanderBounds: tex === "npc_villager" ? scene.computeNpcWanderBounds(npc) : undefined,
+    });
+    scene.uiCam.ignore(s);
+  }
+  scene.npcsGroup = npcs;
+
+  // Village houses (visual only; collision is handled by wall tiles).
+  if (scene.area.id === "village") {
+    ensureVillageHouseTexture(scene);
+    for (const topLeft of VILLAGE_HOUSE_TOP_LEFTS) {
+      const houseX = topLeft.x * tileSize + (7 * tileSize) / 2;
+      const houseY = topLeft.y * tileSize + (4 * tileSize) / 2;
+      const img = scene.add.image(houseX, houseY, "prop_house_village");
+      // Depth near the bottom edge of the house so the player can appear in front when below it.
+      img.setDepth(topLeft.y * tileSize + 4 * tileSize - 2);
+      scene.uiCam.ignore(img);
+      scene.villageHouses.push(img);
+    }
+  }
+
+  // House chest
+  if (scene.area.id === "house") {
+    ensureChestTextures(scene);
+    ensureItemAndPropTextures(scene);
+    const opened = hasFlag("chest.house.1");
+    const tx = opened ? "chest_open" : "chest_closed";
+    const cx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+    const cy = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
+    scene.chest = scene.physics.add.sprite(cx, cy, tx);
+    scene.chest.setImmovable(true);
+    scene.chest.setDepth(scene.chest.y);
+    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
+    cb.setSize(16, 12);
+    cb.setOffset(4, 10);
+    scene.physics.add.collider(scene.player, scene.chest);
+    scene.uiCam.ignore(scene.chest);
+    scene.chestContents = {
+      flag: "chest.house.1",
+      loot: [{ itemId: "coins", qty: 25 }],
+      openedDialog: "chestMessage",
+      emptyDialog: "chestEmpty",
+    };
+
+    // Locked door prop at top center
+    const unlocked = hasFlag("door.house.hallway.unlocked");
+    const dx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+    const dy = tileSize / 2;
+    scene.houseDoorSprite = scene.add.sprite(dx, dy, unlocked ? "prop_door_open" : "prop_door_locked");
+    scene.houseDoorSprite.setDepth(scene.houseDoorSprite.y);
+    scene.uiCam.ignore(scene.houseDoorSprite);
+  }
+
+  // Woods monsters
+  if (scene.area.id === "woods") {
+    ensureMonsterTexture(scene);
+    ensureItemAndPropTextures(scene);
+    ensureChestTextures(scene);
+    const chestOpened = hasFlag("chest.woods.arrows.1");
+    const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
+    const cy = 2 * tileSize + tileSize / 2;
+    scene.chest = scene.physics.add.sprite(cx, cy, chestOpened ? "chest_open" : "chest_closed");
+    scene.chest.setImmovable(true);
+    scene.chest.setDepth(scene.chest.y);
+    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
+    cb.setSize(16, 12);
+    cb.setOffset(4, 10);
+    scene.physics.add.collider(scene.player, scene.chest);
+    scene.uiCam.ignore(scene.chest);
+    scene.chestContents = {
+      flag: "chest.woods.arrows.1",
+      loot: [{ itemId: "arrows", qty: 25 }],
+      openedDialog: "arrowsChest",
+      emptyDialog: "chestEmpty",
+    };
+    // Key in the middle of the forest (once)
+    if (!hasFlag("item.rusty_key.woods.1")) {
+      const kx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+      const ky = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
+      scene.keySprite = scene.physics.add.sprite(kx, ky, "item_key");
+      scene.keySprite.setDepth(scene.keySprite.y);
+      const kb = scene.keySprite.body as Phaser.Physics.Arcade.Body;
+      kb.setSize(14, 10).setOffset(5, 12);
+      scene.physics.add.collider(scene.keySprite, layer);
+      scene.uiCam.ignore(scene.keySprite);
+    } else {
+      scene.keySprite = undefined;
+    }
+
+    const monsters = scene.physics.add.group();
+    scene.monstersGroup = monsters;
+
+    const avoid = scene.getPlayerTilePos();
+    const monsterTiles = chooseEnemySpawnTiles({
+      area: scene.area,
+      count: 5,
+      rng: () => Math.random(),
+      avoid: [avoid],
+      minDistTiles: 4,
+    });
+    for (const p of monsterTiles) {
+      const mx = p.x * tileSize + tileSize / 2;
+      const my = p.y * tileSize + tileSize / 2;
+      const m = scene.physics.add.sprite(mx, my, "monster_slime");
+      m.setDepth(m.y);
+      (m.body as Phaser.Physics.Arcade.Body).setSize(14, 10).setOffset(5, 12);
+      monsters.add(m);
+      scene.uiCam.ignore(m);
+      // collide vs walls
+      scene.physics.add.collider(m, layer);
+    }
+
+    // Prevent monsters from crossing the player and each other.
+    scene.physics.add.collider(scene.player, monsters);
+    scene.physics.add.collider(monsters, monsters);
+    if (scene.playerArrowsGroup) {
+      scene.physics.add.overlap(scene.playerArrowsGroup, monsters, (_a: unknown, m: unknown) => {
+        const arrow = _a as Phaser.Physics.Arcade.Sprite;
+        const mon = m as Phaser.Physics.Arcade.Sprite;
+        arrow.destroy();
+        scene.spawnEnemyDrop(mon.x, mon.y);
+        mon.destroy();
+      });
+    }
+
+    // Roam + chase: update velocities every 500ms
+    scene.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => {
+        for (const obj of monsters.getChildren()) {
+          const m = obj as Phaser.Physics.Arcade.Sprite;
+          const dx = scene.player.x - m.x;
+          const dy = scene.player.y - m.y;
+          const d2 = dx * dx + dy * dy;
+          const chaseRadius = (32 * 6) ** 2;
+          if (d2 <= chaseRadius) {
+            const d = Math.max(1, Math.sqrt(d2));
+            const speed = 70;
+            m.setVelocity((dx / d) * speed, (dy / d) * speed);
+          } else {
+            const dir = Phaser.Math.Between(0, 3);
+            const speed = 45;
+            if (dir === 0) m.setVelocity(speed, 0);
+            if (dir === 1) m.setVelocity(-speed, 0);
+            if (dir === 2) m.setVelocity(0, speed);
+            if (dir === 3) m.setVelocity(0, -speed);
+          }
+          m.setDepth(m.y);
+        }
+      },
+    });
+
+    // Damage on contact with cooldown + enemy attack animation when damage lands.
+    scene.physics.add.collider(scene.player, monsters, (_p: unknown, m: unknown) => {
+      const mon = m as Phaser.Physics.Arcade.Sprite;
+      const now = scene.time.now;
+      const r = applyContactDamage({
+        hp: scene.hp,
+        nowMs: now,
+        lastHitAtMs: scene.lastHitAtMs,
+        cooldownMs: 450,
+        damage: 1,
+      });
+      scene.hp = r.hp;
+      scene.lastHitAtMs = r.lastHitAtMs;
+      if (r.tookHit) scene.playEnemyAttackAnim(mon);
+      if (r.tookHit) scene.writeProgress(true);
+    });
+  } else {
+    // no monsters outside woods
+    scene.monstersGroup?.destroy(true);
+    scene.monstersGroup = undefined;
+    scene.keySprite?.destroy();
+    scene.keySprite = undefined;
+  }
+
+  // Cave goblin archers + arrows
+  if (scene.area.id === "cave") {
+    ensureGoblinAndArrowTextures(scene);
+    const goblins = scene.physics.add.group();
+    const arrows = scene.physics.add.group();
+    scene.goblinsGroup = goblins;
+    scene.arrowsGroup = arrows;
+
+    // Spawn a few goblin archers near pillars.
+    const avoid = scene.getPlayerTilePos();
+    const goblinTiles = chooseEnemySpawnTiles({
+      area: scene.area,
+      count: 3,
+      rng: () => Math.random(),
+      avoid: [avoid],
+      minDistTiles: 5,
+    });
+    for (const p of goblinTiles) {
+      const gx = p.x * tileSize + tileSize / 2;
+      const gy = p.y * tileSize + tileSize / 2;
+      const g = scene.physics.add.sprite(gx, gy, "enemy_goblin");
+      g.setDepth(g.y);
+      // feet-ish body
+      const gb = g.body as Phaser.Physics.Arcade.Body;
+      gb.setSize(12, 10).setOffset(6, 13);
+      // Don't let the player "push" goblins around (looks like they run away).
+      gb.setImmovable(true);
+      (g as any).setPushable?.(false);
+      (g as any).__lastShotAtMs = -Infinity;
+      (g as any).__hp = 3;
+      (g as any).__strafeSign = Math.random() < 0.5 ? -1 : 1;
+      goblins.add(g);
+      scene.uiCam.ignore(g);
+      scene.physics.add.collider(g, layer);
+    }
+
+    // Goblins can't overlap the player or each other.
+    scene.physics.add.collider(scene.player, goblins);
+    scene.physics.add.collider(goblins, goblins);
+
+    // Arrow physics: no gravity, collide with walls, damage player.
+    scene.physics.add.collider(arrows, layer, (_a: unknown) => {
+      const a = _a as Phaser.Physics.Arcade.Sprite;
+      a.destroy();
+    });
+    scene.physics.add.overlap(scene.player, arrows, (_p: unknown, a: unknown) => {
+      const arrow = a as Phaser.Physics.Arcade.Sprite;
+      const now = scene.time.now;
+      const r = applyContactDamage({
+        hp: scene.hp,
+        nowMs: now,
+        lastHitAtMs: scene.lastRangedHitAtMs,
+        cooldownMs: 350,
+        damage: 1,
+      });
+      scene.hp = r.hp;
+      scene.lastRangedHitAtMs = r.lastHitAtMs;
+      arrow.destroy();
+      if (r.tookHit) {
+        scene.cameras.main.flash(60, 255, 107, 107);
+      }
+    });
+
+    if (scene.playerArrowsGroup) {
+      scene.physics.add.overlap(scene.playerArrowsGroup, goblins, (_a: unknown, g: unknown) => {
+        const arrow = _a as Phaser.Physics.Arcade.Sprite;
+        const gob = g as Phaser.Physics.Arcade.Sprite;
+        scene.damageGoblin(gob, 1);
+        arrow.destroy();
+      });
+    }
+
+    // Shooting loop: goblins fire when player is within range and cooldown allows.
+    scene.time.addEvent({
+      delay: 250,
+      loop: true,
+      callback: () => {
+        const now = scene.time.now;
+        for (const obj of goblins.getChildren()) {
+          const g = obj as Phaser.Physics.Arcade.Sprite;
+          if (!g.active) continue;
+          const dx = scene.player.x - g.x;
+          const dy = scene.player.y - g.y;
+          const d2 = dx * dx + dy * dy;
+          const range2 = (32 * 10) ** 2;
+          if (d2 > range2) continue;
+
+          const lastShotAtMs = (g as any).__lastShotAtMs as number;
+          const attempt = tryShoot({ nowMs: now, state: { lastShotAtMs }, cooldownMs: 900 });
+          if (!attempt.ok) continue;
+          (g as any).__lastShotAtMs = attempt.next.lastShotAtMs;
+
+          // Shoot arrow toward player.
+          const dir = normalize({ x: scene.player.x - g.x, y: scene.player.y - g.y });
+          if (dir.x === 0 && dir.y === 0) continue;
+          const speed = 190;
+          const spawnDist = 16; // spawn out of the goblin body to avoid instant wall/pillar collisions
+          const ax = g.x + dir.x * spawnDist;
+          const ay = g.y + dir.y * spawnDist;
+          // IMPORTANT: create via the physics group so the group doesn't re-enable/reset the body
+          // after we set velocity (which would make arrows appear "stuck").
+          const arrow = arrows.create(ax, ay, "proj_arrow") as Phaser.Physics.Arcade.Sprite;
+          arrow.setDepth(arrow.y);
+          const ab = arrow.body as Phaser.Physics.Arcade.Body;
+          ab.setAllowGravity(false);
+          ab.setSize(ARROW_HITBOX.w, ARROW_HITBOX.h).setOffset(ARROW_HITBOX.offsetX, ARROW_HITBOX.offsetY);
+          ab.setVelocity(dir.x * speed, dir.y * speed);
+          arrow.setRotation(Math.atan2(dir.y, dir.x));
+          scene.uiCam.ignore(arrow);
+
+          // Small shoot "twitch"
+          g.setTintFill(0xf5d76e);
+          scene.tweens.add({
+            targets: g,
+            scaleX: 1.08,
+            scaleY: 0.92,
+            duration: 70,
+            yoyo: true,
+            onComplete: () => {
+              if (!g.active) return;
+              g.setScale(1);
+              g.clearTint();
+            },
+          });
+
+          // Cleanup if arrow survives too long
+          scene.time.delayedCall(2200, () => {
+            if (arrow.active) arrow.destroy();
+          });
+        }
+      },
+    });
+
+    // Movement loop: keep distance and strafe a little so they feel alive.
+    scene.time.addEvent({
+      delay: 300,
+      loop: true,
+      callback: () => {
+        for (const obj of goblins.getChildren()) {
+          const g = obj as Phaser.Physics.Arcade.Sprite;
+          if (!g.active) continue;
+          const dx = scene.player.x - g.x;
+          const dy = scene.player.y - g.y;
+          const d = Math.hypot(dx, dy);
+          const dir = d > 0 ? { x: dx / d, y: dy / d } : { x: 0, y: 0 };
+
+          // Desired distance band.
+          const tooClose = d < 32 * 4.5;
+          const tooFar = d > 32 * 7.5 && d < 32 * 10;
+          const speed = tooClose ? 70 : tooFar ? 55 : 0;
+          const toward = tooFar ? 1 : -1; // if tooClose -> move away (negative), if tooFar -> move toward (positive)
+          const strafeSign = ((g as any).__strafeSign as number) ?? 1;
+          const strafe = { x: -dir.y * strafeSign, y: dir.x * strafeSign };
+
+          const vx = speed * (dir.x * toward + strafe.x * 0.35);
+          const vy = speed * (dir.y * toward + strafe.y * 0.35);
+          g.setVelocity(vx, vy);
+          g.setDepth(g.y);
+        }
+      },
+    });
+  } else {
+    // no goblins outside cave
+    scene.goblinsGroup?.destroy(true);
+    scene.goblinsGroup = undefined;
+    scene.arrowsGroup?.destroy(true);
+    scene.arrowsGroup = undefined;
+    if (scene.bowSprite) {
+      scene.bowSprite.destroy();
+      scene.bowSprite = undefined;
+    }
+  }
+
+  // Hallway props: torches + sword
+  if (scene.area.id === "hallway") {
+    ensureItemAndPropTextures(scene);
+    // Torches along walls
+    for (let y = 3; y < scene.area.height - 3; y += 4) {
+      const lx = 1 * tileSize + tileSize / 2;
+      const rx = (scene.area.width - 2) * tileSize + tileSize / 2;
+      const wy = y * tileSize + tileSize / 2;
+      const t1 = scene.add.sprite(lx, wy, "prop_torch").setDepth(wy);
+      const t2 = scene.add.sprite(rx, wy, "prop_torch").setDepth(wy);
+      scene.uiCam.ignore([t1, t2]);
+    }
+    // Sword at the end (once)
+    if (!hasFlag("item.sword.1")) {
+      const sx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+      const sy = 2 * tileSize + tileSize / 2;
+      scene.swordSprite = scene.physics.add.sprite(sx, sy, "item_sword");
+      scene.swordSprite.setDepth(scene.swordSprite.y);
+      const sb = scene.swordSprite.body as Phaser.Physics.Arcade.Body;
+      sb.setSize(14, 10).setOffset(5, 12);
+      scene.physics.add.collider(scene.swordSprite, layer);
+      scene.uiCam.ignore(scene.swordSprite);
+    } else {
+      scene.swordSprite = undefined;
+    }
+  } else {
+    scene.swordSprite?.destroy();
+    scene.swordSprite = undefined;
+  }
+}
+
