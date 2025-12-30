@@ -29,6 +29,7 @@ import { needsPouchUiRebuild } from "../../core/pouchUi";
 import { getArmorBonus, isMeleeWeapon } from "../../core/shopCatalog";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
+import { getEnemyDefinition, type EnemyId } from "../../core/enemies";
 import { getFeetDepth } from "./depthSort";
 import { pickNpcForDialog } from "./npcInteract";
 import { tryPickupSprite } from "./world/tryPickupSprite";
@@ -409,17 +410,19 @@ export class WorldScene extends Phaser.Scene {
     if (r.died) {
       const dropX = gob.x;
       const dropY = gob.y;
-      this.spawnEnemyDrop(dropX, dropY);
+      this.spawnEnemyDrop(dropX, dropY, "cave_goblin_archer");
       gob.destroy();
       if (wasLast) this.spawnBowDrop(dropX, dropY);
     }
   }
 
-  private spawnEnemyDrop(x: number, y: number) {
+  private spawnEnemyDrop(x: number, y: number, enemyId: EnemyId) {
     if (!this.dropsGroup) return;
     ensureItemAndPropTextures(this);
-    const drop: EnemyDrop = rollEnemyDrop(() => Math.random());
-    const key = drop.kind === "heart" ? "item_heart" : "item_coins";
+    const enemy = getEnemyDefinition(enemyId);
+    const drop: EnemyDrop = rollEnemyDrop({ rng: () => Math.random(), difficultyRank: enemy.difficultyRank });
+    const key =
+      drop.kind === "heart" ? "item_heart" : drop.kind === "coins" ? "item_coins" : drop.itemId === "stew" ? "item_stew" : "item_bread";
     const s = this.dropsGroup.create(x, y, key) as Phaser.Physics.Arcade.Sprite;
     s.setDepth(s.y);
     const b = s.body as Phaser.Physics.Arcade.Body;

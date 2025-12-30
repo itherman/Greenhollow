@@ -323,7 +323,7 @@ export function worldSceneUpdate(scene: any): void {
         if (monsters) {
           this.physics.add.overlap(zone, monsters, (_z: Phaser.GameObjects.GameObject, m: Phaser.GameObjects.GameObject) => {
             const mon = m as Phaser.Physics.Arcade.Sprite;
-            this.spawnEnemyDrop(mon.x, mon.y);
+            this.spawnEnemyDrop(mon.x, mon.y, "woods_slime");
             mon.destroy();
           });
         }

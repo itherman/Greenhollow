@@ -92,9 +92,12 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       drop.destroy();
       return;
     }
-    // coins
     const inv = loadInventory();
-    addItem(inv, ITEMS.coins, meta.qty);
+    if (meta.kind === "coins") {
+      addItem(inv, ITEMS.coins, meta.qty);
+    } else if (meta.kind === "food") {
+      addItem(inv, ITEMS[meta.itemId], meta.qty);
+    }
     saveInventory(inv);
     if (scene.inventoryOpen) scene.renderInventoryPanel();
     drop.destroy();
@@ -347,7 +350,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         const arrow = _a as Phaser.Physics.Arcade.Sprite;
         const mon = m as Phaser.Physics.Arcade.Sprite;
         arrow.destroy();
-        scene.spawnEnemyDrop(mon.x, mon.y);
+        scene.spawnEnemyDrop(mon.x, mon.y, "woods_slime");
         mon.destroy();
       });
     }
@@ -607,4 +610,3 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.swordSprite = undefined;
   }
 }
-
