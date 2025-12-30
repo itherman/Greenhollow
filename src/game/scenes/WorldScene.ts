@@ -967,6 +967,7 @@ export class WorldScene extends Phaser.Scene {
     this.renderInventoryPanel();
   }
 
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private handleBuyerChoice(choiceId: string, script: NonNullable<ReturnType<typeof getDialogScript>>): boolean {
     if (choiceId === "sell") {
       this.startBuyerSelection();
