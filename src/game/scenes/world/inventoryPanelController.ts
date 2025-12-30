@@ -226,7 +226,7 @@ export class InventoryPanelController {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
         let skipNextPrimary = false;
-        const handlePrimary = (pointer: any) => {
+        const handlePrimary = () => {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
           const invNow = loadInventory();
@@ -307,7 +307,7 @@ export class InventoryPanelController {
             return;
           }
 
-          handlePrimary(pointer);
+          handlePrimary();
         });
 
         r.on("pointerup", (pointer: any) => {
@@ -319,7 +319,7 @@ export class InventoryPanelController {
           this.deleteHoldTimer?.remove(false);
           this.deleteHoldTimer = undefined;
           if (this.deleteHoldTriggered) return;
-          handlePrimary(pointer);
+          handlePrimary();
         });
 
         r.on("pointerout", () => {
