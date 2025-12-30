@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { computeMovement, type Direction } from "../../core/movement";
-import { VILLAGE_HOUSE_TOP_LEFTS, getArea, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
+import { VILLAGE_HOUSE_TOP_LEFTS, getArea, getTile, isWalkable, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
 import {
   advanceLine,
   choose,
@@ -57,6 +57,15 @@ import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { chooseEnemySpawnTiles } from "../../core/enemySpawn";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 
+type NpcMovementState = {
+  target?: Phaser.Math.Vector2;
+  nextDecisionAt: number;
+  paused: boolean;
+  speed: number;
+  wanderBounds?: { minX: number; maxX: number; minY: number; maxY: number };
+  home: { x: number; y: number };
+};
+
 export class WorldScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -68,7 +77,9 @@ export class WorldScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
   private area!: AreaDef;
-  private npcsGroup?: Phaser.Physics.Arcade.StaticGroup;
+  private npcsGroup?: Phaser.Physics.Arcade.Group;
+  private npcMoveStates: Map<Phaser.GameObjects.Sprite, NpcMovementState> = new Map();
+  private interactingNpc?: Phaser.GameObjects.Sprite;
   private chest?: Phaser.Physics.Arcade.Sprite;
   private chestContents?: {
     flag: string;
@@ -168,6 +179,31 @@ export class WorldScene extends Phaser.Scene {
     return dx * dx + dy * dy;
   }
 
+  private setNpcPaused(npc: Phaser.GameObjects.Sprite, paused: boolean) {
+    const state = this.npcMoveStates.get(npc);
+    if (!state) return;
+    state.paused = paused;
+    state.target = undefined;
+    state.nextDecisionAt = paused ? this.time.now + 300 : this.time.now + Phaser.Math.Between(600, 1200);
+    const body = npc.body as Phaser.Physics.Arcade.Body | undefined;
+    if (body) body.setVelocity(0, 0);
+  }
+
+  private computeNpcWanderBounds(npc: { pos: { x: number; y: number } }): NpcMovementState["wanderBounds"] | undefined {
+    // Homeowners should stay near their house fronts.
+    const idx = VILLAGE_HOUSE_TOP_LEFTS.findIndex(
+      (h) => Math.abs(h.x + 3 - npc.pos.x) <= 1 && Math.abs(h.y + 4 - npc.pos.y) <= 1,
+    );
+    if (idx < 0) return undefined;
+    const tl = VILLAGE_HOUSE_TOP_LEFTS[idx]!;
+    return {
+      minX: Math.max(1, tl.x - 1),
+      maxX: Math.min(this.area.width - 2, tl.x + 7),
+      minY: Math.max(1, tl.y + 2),
+      maxY: Math.min(this.area.height - 2, tl.y + 6),
+    };
+  }
+
   private tryInteract(prefer: TapCandidateKind | "any", npcScriptId?: string): boolean {
     const playerPos = { x: this.player.x, y: this.player.y };
 
@@ -264,7 +300,9 @@ export class WorldScene extends Phaser.Scene {
       const npcDef = (nearest as any).npcDef as { dialogScriptId?: string } | undefined;
       const scriptId = npcScriptId ?? npcDef?.dialogScriptId;
       if (!scriptId) return false;
-      this.openNpcDialog(scriptId);
+      const script = getDialogScript(scriptId);
+      if (!script) return false;
+      this.openNpcDialog(scriptId, nearest);
       return true;
     };
 
@@ -810,6 +848,74 @@ export class WorldScene extends Phaser.Scene {
     return out;
   }
 
+  private pickNpcTarget(state: NpcMovementState, tileSize: number): Phaser.Math.Vector2 | undefined {
+    const homeTile = { x: Math.floor(state.home.x / tileSize), y: Math.floor(state.home.y / tileSize) };
+    const radius = 2;
+
+    for (let i = 0; i < 12; i++) {
+      const tx = homeTile.x + Phaser.Math.Between(-radius, radius);
+      const ty = homeTile.y + Phaser.Math.Between(-radius, radius);
+
+      if (state.wanderBounds) {
+        if (tx < state.wanderBounds.minX || tx > state.wanderBounds.maxX) continue;
+        if (ty < state.wanderBounds.minY || ty > state.wanderBounds.maxY) continue;
+      }
+
+      const t = getTile(this.area, { x: tx, y: ty });
+      if (t == null || !isWalkable(t)) continue;
+
+      return new Phaser.Math.Vector2(tx * tileSize + tileSize / 2, ty * tileSize + tileSize / 2);
+    }
+
+    return undefined;
+  }
+
+  private updateNpcMovement() {
+    if (!this.npcsGroup) return;
+    const now = this.time.now;
+    const tileSize = 32;
+
+    for (const obj of this.npcsGroup.getChildren()) {
+      const s = obj as Phaser.GameObjects.Sprite;
+      const state = this.npcMoveStates.get(s);
+      if (!state) continue;
+      const body = s.body as Phaser.Physics.Arcade.Body | undefined;
+      if (!body) continue;
+      if (!s.active) continue;
+
+      if (state.paused) {
+        body.setVelocity(0, 0);
+        s.setDepth(s.y);
+        continue;
+      }
+
+      // Acquire a new target occasionally or when none exists.
+      if (!state.target || now >= state.nextDecisionAt) {
+        state.target = this.pickNpcTarget(state, tileSize);
+        state.nextDecisionAt = now + Phaser.Math.Between(1200, 2200);
+      }
+
+      if (state.target) {
+        const dx = state.target.x - s.x;
+        const dy = state.target.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 4) {
+          body.setVelocity(0, 0);
+          state.target = undefined;
+          state.nextDecisionAt = now + Phaser.Math.Between(700, 1400);
+        } else {
+          const inv = 1 / dist;
+          body.setVelocity(dx * inv * state.speed, dy * inv * state.speed);
+        }
+      } else {
+        body.setVelocity(0, 0);
+      }
+
+      // Keep feet-based depth sorting for moving sprites.
+      s.setDepth(s.y);
+    }
+  }
+
   private renderInventoryPanel() {
     const inv = loadInventory();
     const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
@@ -1265,6 +1371,8 @@ export class WorldScene extends Phaser.Scene {
     // loadArea assumes a fresh scene state.
 
     this.area = getArea(areaId);
+    this.npcMoveStates.clear();
+    this.interactingNpc = undefined;
     // HUD removed (keep only HP).
     this.bowState = createRangedState();
 
@@ -1436,21 +1544,29 @@ export class WorldScene extends Phaser.Scene {
     });
 
     // NPCs
-    const npcs = this.physics.add.staticGroup();
+    const npcs = this.physics.add.group({ allowGravity: false, immovable: true });
     ensureNpcTextures(this);
     for (const npc of this.area.npcs) {
       const x = npc.pos.x * tileSize + tileSize / 2;
       const y = npc.pos.y * tileSize + tileSize / 2;
       const tex = npc.id === "elder" ? "npc_elder" : "npc_villager";
-      const s = this.add.sprite(x, y, tex);
-      s.setDepth(5);
+      const s = npcs.create(x, y, tex) as Phaser.Physics.Arcade.Sprite;
+      s.setDepth(s.y);
       (s as any).npcDef = npc;
-      this.physics.add.existing(s, true);
-      const nb = s.body as Phaser.Physics.Arcade.StaticBody;
+      const nb = s.body as Phaser.Physics.Arcade.Body;
       // Feet collision: 12x10 near bottom of 24x24.
       nb.setSize(12, 10);
       nb.setOffset(6, 13);
-      npcs.add(s);
+      nb.setAllowGravity(false);
+      nb.setImmovable(true);
+      this.npcMoveStates.set(s, {
+        home: { x, y },
+        target: undefined,
+        nextDecisionAt: this.time.now + Phaser.Math.Between(400, 900),
+        paused: tex !== "npc_villager",
+        speed: tex === "npc_villager" ? Phaser.Math.Between(18, 26) : 0,
+        wanderBounds: tex === "npc_villager" ? this.computeNpcWanderBounds(npc) : undefined,
+      });
       this.uiCam.ignore(s);
     }
     this.npcsGroup = npcs;
@@ -1833,9 +1949,13 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private openNpcDialog(scriptId: string) {
+  private openNpcDialog(scriptId: string, npcSprite?: Phaser.GameObjects.Sprite) {
     const script = getDialogScript(scriptId);
     if (!script) return;
+    if (npcSprite) {
+      this.interactingNpc = npcSprite;
+      this.setNpcPaused(npcSprite, true);
+    }
     // Ensure inventory doesn't "fight" with dialog input/movement freeze.
     if (this.inventoryOpen) {
       this.inventoryOpen = false;
@@ -2082,6 +2202,8 @@ export class WorldScene extends Phaser.Scene {
         this.writeProgress(true);
         this.scene.restart({ areaId: "village", entry: "start" });
       });
+      if (this.interactingNpc?.active) this.setNpcPaused(this.interactingNpc, false);
+      this.interactingNpc = undefined;
       return;
     }
 
@@ -2090,6 +2212,13 @@ export class WorldScene extends Phaser.Scene {
       this.player.setVelocity(0, 0);
       return;
     }
+
+    if (!this.dialog.open && this.interactingNpc) {
+      if (this.interactingNpc.active) this.setNpcPaused(this.interactingNpc, false);
+      this.interactingNpc = undefined;
+    }
+
+    this.updateNpcMovement();
 
     // If we have a tap intent (tap on item/NPC/chest), auto-trigger when in range.
     if (this.tapIntent && !this.dialog.open && !this.inventoryOpen) {
@@ -2540,5 +2669,3 @@ export class WorldScene extends Phaser.Scene {
     saveProgress(p);
   }
 }
-
-
