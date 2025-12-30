@@ -112,6 +112,17 @@ export function worldSceneUpdate(scene: any): void {
             this.tapIntent = undefined;
           }
         }
+      } else if (this.tapIntent.kind === "bow") {
+        if (!this.bowSprite?.active) {
+          this.tapTarget = undefined;
+          this.tapIntent = undefined;
+        } else {
+          const ok = this.tryInteract("bow");
+          if (ok) {
+            this.tapTarget = undefined;
+            this.tapIntent = undefined;
+          }
+        }
       } else if (this.tapIntent.kind === "chest") {
         const ok = this.tryInteract("chest");
         if (ok) {
