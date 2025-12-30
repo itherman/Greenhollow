@@ -50,6 +50,7 @@ import { isTapOnPlayer } from "../../core/tapOnPlayer";
 import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild, shouldAllowPlayerTapInventory } from "../../core/pouchUi";
 import { withLoadingOverlay } from "../../ui/loadingOverlay";
+import { getShopCoinsLabel } from "../../ui/shopCoinsLabel";
 import { attemptPurchase } from "../../core/shopLogic";
 import { getMeleeWeaponStats, getArmorBonus } from "../../core/shopCatalog";
 import { paginateDialogChoices } from "../../core/dialogPagination";
@@ -103,6 +104,7 @@ export class WorldScene extends Phaser.Scene {
   private dialogBox?: Phaser.GameObjects.Rectangle;
   private dialogText?: Phaser.GameObjects.Text;
   private dialogChoicesText?: Phaser.GameObjects.Text;
+  private shopCoinsText?: Phaser.GameObjects.Text;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
   private shopDialogPage = 0;
@@ -1983,6 +1985,7 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const layout = computeDialogLayout(this.scale.width, this.scale.height);
+    const isShop = script.id === "shopkeeper";
 
     if (!this.dialogBox) {
       this.dialogBox = this.add
@@ -2033,8 +2036,22 @@ export class WorldScene extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(2001);
 
+      // Shop HUD: coin count in the dialog header area.
+      if (isShop) {
+        this.shopCoinsText = this.add
+          .text(0, 0, "", {
+            fontFamily: "system-ui, sans-serif",
+            fontSize: "13px",
+            color: "#f5d76e",
+          })
+          .setOrigin(1, 0)
+          .setScrollFactor(0)
+          .setDepth(2003);
+      }
+
       // Render dialog via UI camera only (prevents zoom-based clipping).
       this.cameras.main.ignore([this.dialogBox, this.dialogText, this.dialogChoicesText]);
+      if (this.shopCoinsText) this.cameras.main.ignore(this.shopCoinsText);
     }
 
     // Always re-position + re-wrap in case the canvas size changed.
@@ -2048,6 +2065,29 @@ export class WorldScene extends Phaser.Scene {
       // Footer/instructions live at the bottom of the panel to avoid overlapping choices.
       .setPosition(layout.x - layout.w / 2 + layout.padding, layout.y + layout.h / 2 - 28)
       .setWordWrapWidth(layout.w - layout.padding * 2);
+
+    // Shop-only coin HUD.
+    if (isShop) {
+      if (!this.shopCoinsText) {
+        this.shopCoinsText = this.add
+          .text(0, 0, "", {
+            fontFamily: "system-ui, sans-serif",
+            fontSize: "13px",
+            color: "#f5d76e",
+          })
+          .setOrigin(1, 0)
+          .setScrollFactor(0)
+          .setDepth(2003);
+        this.cameras.main.ignore(this.shopCoinsText);
+      }
+      const inv = loadInventory();
+      this.shopCoinsText
+        .setText(getShopCoinsLabel(inv))
+        .setPosition(layout.x + layout.w / 2 - layout.padding, layout.y - layout.h / 2 + 10);
+    } else {
+      this.shopCoinsText?.destroy();
+      this.shopCoinsText = undefined;
+    }
 
     const header = node.kind === "end" ? (node.text ?? "") : node.text;
     this.dialogText!.setText(header);
@@ -2160,6 +2200,7 @@ export class WorldScene extends Phaser.Scene {
     this.dialogBox?.destroy();
     this.dialogText?.destroy();
     this.dialogChoicesText?.destroy();
+    this.shopCoinsText?.destroy();
     for (const t of this.dialogChoiceTexts) t.destroy();
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
@@ -2167,6 +2208,7 @@ export class WorldScene extends Phaser.Scene {
     this.dialogBox = undefined;
     this.dialogText = undefined;
     this.dialogChoicesText = undefined;
+    this.shopCoinsText = undefined;
     this.shopDialogPage = 0;
   }
 
