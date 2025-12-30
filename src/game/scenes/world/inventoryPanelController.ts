@@ -269,7 +269,6 @@ export class InventoryPanelController {
         r.on("pointerdown", (pointer: any) => {
           // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
           if (!this.inventoryPanel?.visible) return;
-          if (this.host.isDialogOpen()) return;
 
           const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
           if (handledByHost) {
@@ -280,6 +279,8 @@ export class InventoryPanelController {
             skipNextPrimary = true;
             return;
           }
+
+          if (this.host.isDialogOpen()) return;
 
           const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
           if (rightClick) {
