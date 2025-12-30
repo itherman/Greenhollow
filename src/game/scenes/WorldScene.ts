@@ -61,6 +61,8 @@ import { addNpcColliders } from "./physicsColliders";
 import { getFeetDepth } from "./depthSort";
 import { pickNpcForDialog } from "./npcInteract";
 import { tryPickupSprite } from "./world/tryPickupSprite";
+import { configureStaticPickupBody } from "./world/arcadeBody";
+import { addBobbingTween } from "./world/bobbingTween";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -374,19 +376,10 @@ export class WorldScene extends Phaser.Scene {
     this.bowSprite = this.physics.add.sprite(x, y, "item_bow");
     this.bowSprite.setDepth(this.bowSprite.y);
     const bb = this.bowSprite.body as Phaser.Physics.Arcade.Body;
-    bb.setAllowGravity(false);
-    bb.setImmovable(true);
-    bb.setSize(14, 10).setOffset(5, 12);
+    configureStaticPickupBody(bb, { w: 14, h: 10, offsetX: 5, offsetY: 12 });
     this.uiCam.ignore(this.bowSprite);
     // slight bob so it feels like a drop
-    this.tweens.add({
-      targets: this.bowSprite,
-      y: y - 3,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.InOut",
-    });
+    addBobbingTween(this.tweens, this.bowSprite, { baseY: y, durationMs: 700 });
   }
 
   private damageGoblin(gob: Phaser.Physics.Arcade.Sprite, damage: number) {
@@ -418,13 +411,11 @@ export class WorldScene extends Phaser.Scene {
     const s = this.dropsGroup.create(x, y, key) as Phaser.Physics.Arcade.Sprite;
     s.setDepth(s.y);
     const b = s.body as Phaser.Physics.Arcade.Body;
-    b.setAllowGravity(false);
-    b.setImmovable(true);
-    b.setSize(12, 12).setOffset(6, 6);
+    configureStaticPickupBody(b, { w: 12, h: 12, offsetX: 6, offsetY: 6 });
     (s as any).__drop = drop;
     this.uiCam.ignore(s);
     // subtle bob
-    this.tweens.add({ targets: s, y: y - 3, duration: 650, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+    addBobbingTween(this.tweens, s, { baseY: y, durationMs: 650 });
   }
 
   private shootPlayerArrow(dir: { x: number; y: number }) {
@@ -1471,12 +1462,10 @@ export class WorldScene extends Phaser.Scene {
       this.heartSprite = this.physics.add.sprite(hx, hy, "item_heart");
       this.heartSprite.setDepth(this.heartSprite.y);
       const hb = this.heartSprite.body as Phaser.Physics.Arcade.Body;
-      hb.setAllowGravity(false);
-      hb.setImmovable(true);
-      hb.setSize(12, 12).setOffset(6, 6);
+      configureStaticPickupBody(hb, { w: 12, h: 12, offsetX: 6, offsetY: 6 });
       this.uiCam.ignore(this.heartSprite);
       // little bob
-      this.tweens.add({ targets: this.heartSprite, y: hy - 3, duration: 650, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+      addBobbingTween(this.tweens, this.heartSprite, { baseY: hy, durationMs: 650 });
 
       this.physics.add.overlap(this.player, this.heartSprite, () => {
         if (!this.heartSprite?.active) return;
