@@ -578,7 +578,10 @@ export function makeStore(): AreaDef {
         toEntry: "fromStore",
       },
     ],
-    npcs: [{ id: "shopkeeper", name: "Shopkeeper", pos: { x: doorX, y: 2 }, dialogScriptId: "shopkeeper" }],
+    npcs: [
+      { id: "shopkeeper", name: "Shopkeeper", pos: { x: doorX, y: 2 }, dialogScriptId: "shopkeeper" },
+      { id: "buyer_npc", name: "Buyer", pos: { x: Math.max(1, doorX - 2), y: 2 }, dialogScriptId: "buyerNpc" },
+    ],
   };
 }
 
@@ -606,5 +609,4 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeHouse4();
   }
 }
-
 

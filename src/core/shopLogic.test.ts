@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ITEMS, addItem, createInventory, getItemCount } from "./inventory";
-import { attemptPurchase } from "./shopLogic";
+import { attemptPurchase, attemptSaleFromSlot, getSellOffer } from "./shopLogic";
 
 describe("shopLogic", () => {
   it("fails when insufficient coins", () => {
@@ -18,6 +18,19 @@ describe("shopLogic", () => {
     expect(getItemCount(inv, "coins")).toBeLessThan(beforeCoins);
     expect(getItemCount(inv, "bread")).toBeGreaterThan(0);
   });
+
+  it("offers half the catalog value rounded down", () => {
+    const offer = getSellOffer({ id: "bread", name: "Bread", qty: 2, maxStack: 20 });
+    expect(offer).toEqual({ ok: true, coins: 12 });
+  });
+
+  it("sells an item from a slot and grants coins", () => {
+    const inv = createInventory(5);
+    addItem(inv, ITEMS.bread, 1);
+    const coinsBefore = getItemCount(inv, "coins");
+    const res = attemptSaleFromSlot(inv, 0);
+    expect(res.ok).toBe(true);
+    expect(getItemCount(inv, "coins")).toBeGreaterThan(coinsBefore);
+    expect(inv.slots.some((s) => s?.id === "bread")).toBe(false);
+  });
 });
-
-

@@ -27,6 +27,8 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
 
     const layout = computeDialogLayout(this.scale.width, this.scale.height);
     const isShop = script.id === "shopkeeper";
+    const isBuyer = script.id === "buyerNpc";
+    const showShopHud = isShop || isBuyer;
 
     if (!this.dialogBox) {
       this.dialogBox = this.add
@@ -78,7 +80,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
         .setDepth(2001);
 
       // Shop HUD: coin count in the dialog header area.
-      if (isShop) {
+      if (showShopHud) {
         this.shopCoinsText = this.add
           .text(0, 0, "", {
             fontFamily: "system-ui, sans-serif",
@@ -128,7 +130,13 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       this.shopCoinsText = undefined;
     }
 
-    const header = node.kind === "end" ? (node.text ?? "") : node.text;
+    let header = node.kind === "end" ? (node.text ?? "") : node.text;
+    if (isBuyer && node.id === "offer" && this.buyerOffer) {
+      header = `I can pay ${this.buyerOffer.coins}c for ${this.buyerOffer.itemName} x${this.buyerOffer.qty}.`;
+    } else if (isBuyer && node.id === "waitPick") {
+      header = "Open your pouch and pick an item to sell.";
+      if (!this.buyerSelectionActive) this.startBuyerSelection(script);
+    }
     this.dialogText!.setText(header);
 
     // Rebuild tappable choice lines each render (keeps handlers consistent).
@@ -146,6 +154,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
 
       const MORE_ID = "__more_items__";
       const isShop = script.id === "shopkeeper";
+      const isBuyer = script.id === "buyerNpc";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
       if (isShop) {
@@ -198,6 +207,8 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
             this.renderDialog(script);
             return;
           }
+
+          if (isBuyer && this.handleBuyerChoice(ch.id, script)) return;
 
           // Shopkeeper purchases: apply side effects before re-render.
           if (isShop && ch.id.startsWith("buy_")) {
@@ -253,4 +264,3 @@ export function closeDialogUiInWorldScene(scene: any): void {
     this.shopDialogPage = 0;
   }).call(scene);
 }
-
