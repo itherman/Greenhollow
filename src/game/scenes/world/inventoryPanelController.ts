@@ -6,6 +6,7 @@ import { saveEquipment } from "../../../services/game/equipmentStore";
 import { loadSession } from "../../../services/auth/session";
 import { saveCloudPlayerState } from "../../../services/game/cloudPlayerState";
 import { withLoadingOverlay } from "../../../ui/loadingOverlay";
+import type { ItemId } from "../../../core/inventory";
 
 /**
  * Inventory / “Pouch” modal controller extracted from `WorldScene`.
@@ -58,6 +59,8 @@ export type InventoryPanelHost = {
 
   /** Optional handler for special slot interactions (e.g., selling). */
   handleInventorySlotClick?: (slotIndex: number, pointer: any) => boolean;
+  /** Optional hint override (e.g., for selling flow). */
+  getInventoryHint?: (inv: ReturnType<typeof loadInventory>) => string | null;
 };
 
 export class InventoryPanelController {
@@ -72,6 +75,7 @@ export class InventoryPanelController {
   private deleteConfirmUntilMs = 0;
   private deleteHoldTimer?: Phaser.Time.TimerEvent;
   private deleteHoldTriggered = false;
+  private equippedSlotPreference: Partial<Record<ItemId, number>> = {};
 
   private equipmentSlotRects: any[] = [];
   private equipmentSlotIcons: any[] = [];
@@ -97,6 +101,7 @@ export class InventoryPanelController {
     this.equipmentSlotRects = [];
     this.equipmentSlotIcons = [];
     this.equipmentSlotLabels = [];
+    this.equippedSlotPreference = {};
   }
 
   /**
@@ -113,7 +118,6 @@ export class InventoryPanelController {
       this.deleteConfirmSlot = null;
     }
     this.deleteHoldTriggered = false;
-    const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
     const itemIconKey = (id: string): string => (id === "rusty_key" ? "item_key" : `item_${id}`);
 
     // Lazily create modal elements
@@ -221,6 +225,7 @@ export class InventoryPanelController {
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
+        let skipNextPrimary = false;
         const handlePrimary = (pointer: any) => {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
@@ -228,8 +233,6 @@ export class InventoryPanelController {
           const slot = invNow.slots[i];
 
           this.deleteConfirmSlot = null;
-          const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
-          if (handledByHost) return;
           if (!slot) return;
 
           // Food: digest for HP.
@@ -249,6 +252,7 @@ export class InventoryPanelController {
           const res = toggleEquipFromInventorySlot(equipNow, invNow, i);
           if (!res.ok) return;
           this.host.setEquipment(res.next);
+          this.equippedSlotPreference[slot.id] = i;
           saveEquipment(res.next);
           this.host.updateMaxHpFromArmor();
           this.render(true);
@@ -266,6 +270,16 @@ export class InventoryPanelController {
           // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
+
+          const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
+          if (handledByHost) {
+            this.deleteConfirmSlot = null;
+            this.deleteHoldTimer?.remove(false);
+            this.deleteHoldTimer = undefined;
+            this.deleteHoldTriggered = false;
+            skipNextPrimary = true;
+            return;
+          }
 
           const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
           if (rightClick) {
@@ -298,6 +312,10 @@ export class InventoryPanelController {
 
         r.on("pointerup", (pointer: any) => {
           if (pointer?.pointerType !== "touch") return;
+          if (skipNextPrimary) {
+            skipNextPrimary = false;
+            return;
+          }
           this.deleteHoldTimer?.remove(false);
           this.deleteHoldTimer = undefined;
           if (this.deleteHoldTriggered) return;
@@ -307,6 +325,7 @@ export class InventoryPanelController {
         r.on("pointerout", () => {
           this.deleteHoldTimer?.remove(false);
           this.deleteHoldTimer = undefined;
+          skipNextPrimary = false;
         });
         const idx = scene.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -314,12 +333,14 @@ export class InventoryPanelController {
           color: "#9fb5c4",
         });
         idx.setVisible(false); // remove numeric labels from slots
-        const icon = scene.add.image(0, 0, "ui_pouch").setOrigin(0.5, 0.5).setVisible(false);
+        const icon = scene.add.image(0, 0, "ui_pouch").setOrigin(0.5, 0).setVisible(false);
         const name = scene.add.text(0, 0, "", {
           fontFamily: "system-ui, sans-serif",
           fontSize: "12px",
           color: "#e8f0e6",
-        });
+          align: "center",
+          wordWrap: { width: 120, useAdvancedWrap: true },
+        }).setOrigin(0.5, 0);
         const qty = scene.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: "12px",
@@ -447,7 +468,11 @@ export class InventoryPanelController {
     bg.setSize(panelW, panelH);
     header.setSize(panelW, topBarH).setPosition(-panelW / 2, -panelH / 2 + topBarH / 2);
     title.setPosition(-panelW / 2 + pad, -panelH / 2 + 8).setText("Pouch (20)");
-    hint.setText(this.computeHint(inv)).setPosition(panelW / 2 - pad - hint.width, -panelH / 2 + 10);
+    const hintMaxWidth = panelW - pad * 2 - title.width - 10;
+    hint.setWordWrapWidth?.(hintMaxWidth, true);
+    hint.setStyle({ wordWrap: { width: hintMaxWidth, useAdvancedWrap: true }, align: "right" });
+    hint.setOrigin(1, 0);
+    hint.setText(this.computeHint(inv)).setPosition(panelW / 2 - pad, -panelH / 2 + 6);
 
     // Equipment slots row
     const eqCols = 4;
@@ -525,6 +550,7 @@ export class InventoryPanelController {
     const slotH = Math.floor((gridH - gap * (rows - 1)) / rows);
     const gridStartX = -panelW / 2 + pad;
     const startY = -panelH / 2 + pad + topBarH + equipRowH;
+    const equippedSlotIndices = this.computeEquippedSlotIndices(inv, equipment);
 
     for (let i = 0; i < 20; i++) {
       const c = i % cols;
@@ -540,8 +566,10 @@ export class InventoryPanelController {
 
       rect.setPosition(x + slotW / 2, y + slotH / 2).setSize(slotW, slotH);
       idx.setPosition(x + 6, y + 4).setText("");
-      icon.setPosition(x + 14, y + 14).setDisplaySize(18, 18);
-      name.setPosition(x + 30, y + 10);
+      icon.setPosition(x + slotW / 2, y + 10).setDisplaySize(18, 18);
+      name.setPosition(x + slotW / 2, y + 32);
+      name.setWordWrapWidth?.(slotW - 12, true);
+      name.setStyle({ wordWrap: { width: slotW - 12, useAdvancedWrap: true }, align: "center" });
       qty.setPosition(x + slotW - 6, y + slotH - 18).setOrigin(1, 0);
 
       const s = inv.slots[i];
@@ -551,17 +579,13 @@ export class InventoryPanelController {
         name.setText("").setColor("#9fb5c4");
         qty.setText("");
       } else {
-        const equipped =
-          equipment.heldItemId === s.id ||
-          equipment.headArmorItemId === s.id ||
-          equipment.bodyArmorItemId === s.id ||
-          equipment.legArmorItemId === s.id;
+        const equipped = equippedSlotIndices.has(i);
         rect.setFillStyle(0x1c2c22, 1).setStrokeStyle(equipped ? 2 : 1, equipped ? 0xf5d76e : 0x4f7a6b, 1);
         const key = itemIconKey(s.id);
         const exists = scene.textures?.exists?.(key) ?? true;
         if (exists) icon.setTexture(key);
         icon.setVisible(exists);
-        name.setText(truncate(s.name, 10)).setColor("#e8f0e6");
+        name.setText(s.name).setColor("#e8f0e6");
         qty.setText(String(s.qty));
       }
     }
@@ -576,6 +600,33 @@ export class InventoryPanelController {
       if (s) return `Right-click again to delete ${s.name} x${s.qty} (click elsewhere to cancel)`;
       this.deleteConfirmSlot = null;
     }
-    return "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item • Hold (touch) or right-click item to delete";
+    const override = this.host.getInventoryHint?.(inv);
+    if (override) return override;
+    return "Tap pouch or Esc to close • Tap food to eat • 1-9 to hold • Hold or right-click to delete";
+  }
+
+  private computeEquippedSlotIndices(inv: ReturnType<typeof loadInventory>, equipment: EquipmentState): Set<number> {
+    const slots = new Set<number>();
+    const assignSlot = (itemId: ItemId | null) => {
+      if (!itemId) return;
+      const preferredIdx = this.equippedSlotPreference[itemId];
+      if (
+        typeof preferredIdx === "number" &&
+        preferredIdx >= 0 &&
+        preferredIdx < inv.slots.length &&
+        !slots.has(preferredIdx) &&
+        inv.slots[preferredIdx]?.id === itemId
+      ) {
+        slots.add(preferredIdx);
+        return;
+      }
+      const idx = inv.slots.findIndex((s, i) => !slots.has(i) && s?.id === itemId);
+      if (idx >= 0) slots.add(idx);
+    };
+    assignSlot(equipment.heldItemId);
+    assignSlot(equipment.headArmorItemId);
+    assignSlot(equipment.bodyArmorItemId);
+    assignSlot(equipment.legArmorItemId);
+    return slots;
   }
 }
