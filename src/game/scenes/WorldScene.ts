@@ -57,6 +57,7 @@ import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { chooseEnemySpawnTiles } from "../../core/enemySpawn";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { addNpcColliders } from "./physicsColliders";
+import { getFeetDepth } from "./depthSort";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -886,7 +887,7 @@ export class WorldScene extends Phaser.Scene {
 
       if (state.paused) {
         body.setVelocity(0, 0);
-        s.setDepth(s.y);
+        s.setDepth(getFeetDepth(s as any));
         continue;
       }
 
@@ -913,7 +914,7 @@ export class WorldScene extends Phaser.Scene {
       }
 
       // Keep feet-based depth sorting for moving sprites.
-      s.setDepth(s.y);
+      s.setDepth(getFeetDepth(s as any));
     }
   }
 
@@ -2555,12 +2556,12 @@ export class WorldScene extends Phaser.Scene {
     this.facing = facing;
     this.player.setVelocity(vx, vy);
     // Feet-based depth sorting: lower feet draw in front.
-    this.player.setDepth(this.player.y);
+    this.player.setDepth(getFeetDepth(this.player as any));
     if (this.chest) this.chest.setDepth(this.chest.y);
     if (this.npcsGroup) {
       for (const obj of this.npcsGroup.getChildren()) {
         const s = obj as Phaser.GameObjects.Sprite;
-        s.setDepth(s.y);
+        s.setDepth(getFeetDepth(s as any));
       }
     }
 
