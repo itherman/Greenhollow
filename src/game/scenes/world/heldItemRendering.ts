@@ -1,6 +1,7 @@
 import type { Direction } from "../../../core/movement";
 import { computeHeldSwordPose } from "../../../core/swordVisual";
 import { getMeleeWeaponStats } from "../../../core/shopCatalog";
+import type { ItemId } from "../../../core/inventory";
 
 /**
  * “Held item” rendering for `WorldScene`.
@@ -80,7 +81,7 @@ export function renderHeldItem(args: {
   const { scene, uiCam, player, facing, heldItemId, slashSwordSprite } = args;
   let { heldItemSprite } = args;
 
-  const meleeStats = heldItemId ? getMeleeWeaponStats(heldItemId) : null;
+  const meleeStats = heldItemId ? getMeleeWeaponStats(heldItemId as ItemId) : null;
   if (meleeStats) {
     if (!heldItemSprite) {
       heldItemSprite = scene.add.sprite(player.x, player.y, meleeStats.textureKey);

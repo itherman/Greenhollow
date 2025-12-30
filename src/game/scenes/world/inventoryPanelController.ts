@@ -55,8 +55,11 @@ export class InventoryPanelController {
   private inventorySlotIndexText: any[] = [];
   private inventorySlotNameText: any[] = [];
   private inventorySlotQtyText: any[] = [];
+  private host: InventoryPanelHost;
 
-  constructor(private host: InventoryPanelHost) {}
+  constructor(host: InventoryPanelHost) {
+    this.host = host;
+  }
 
   /**
    * Clears cached refs. Call this during scene restart (`WorldScene.init`) to avoid stale
