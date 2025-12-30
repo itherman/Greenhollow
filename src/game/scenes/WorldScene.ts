@@ -27,6 +27,7 @@ import { canToggleInventory } from "../../core/uiGating";
 import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild } from "../../core/pouchUi";
 import { getArmorBonus, isMeleeWeapon } from "../../core/shopCatalog";
+import { attemptSaleFromSlot, getSellOffer } from "../../core/shopLogic";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { getEnemyDefinition, type EnemyId } from "../../core/enemies";
@@ -101,6 +102,8 @@ export class WorldScene extends Phaser.Scene {
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private shopDialogPage = 0;
+  private buyerSelectionActive = false;
+  private buyerOffer: { slotIndex: number; coins: number; itemName: string; qty: number; itemId: ItemId } | null = null;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
   private startAreaId: AreaId = "village";
   private startEntry: EntryId = "start";
@@ -790,9 +793,43 @@ export class WorldScene extends Phaser.Scene {
         suppressExitForMs: (ms) => {
           this.suppressExitUntilTs = Date.now() + ms;
         },
+        handleInventorySlotClick: (slotIndex) => this.handleInventorySlotClick(slotIndex),
       });
     }
     this.inventoryUi.render(this.inventoryOpen);
+  }
+
+  private handleInventorySlotClick(slotIndex: number): boolean {
+    if (!this.buyerSelectionActive || !this.dialog.open || this.dialog.scriptId !== "buyerNpc") return false;
+
+    const inv = loadInventory();
+    const slot = inv.slots[slotIndex];
+    this.buyerSelectionActive = false;
+    this.inventoryOpen = false;
+    this.renderInventoryPanel();
+
+    const script = getDialogScript("buyerNpc");
+    if (!script) return false;
+
+    if (!slot) {
+      this.buyerOffer = null;
+      this.dialog = { open: true, scriptId: script.id, nodeId: "waitPick" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    const offer = getSellOffer(slot);
+    if (!offer.ok) {
+      this.buyerOffer = null;
+      this.dialog = { open: true, scriptId: script.id, nodeId: "noValue" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    this.buyerOffer = { slotIndex, coins: offer.coins, itemName: slot.name, qty: slot.qty, itemId: slot.id };
+    this.dialog = { open: true, scriptId: script.id, nodeId: "offer" };
+    this.renderDialog(script);
+    return true;
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
@@ -899,6 +936,7 @@ export class WorldScene extends Phaser.Scene {
     this.tapIntent = undefined;
     // Reset paging state whenever a dialog is opened (especially for shop menus).
     this.shopDialogPage = 0;
+    this.resetBuyerFlow();
     this.dialog = openDialog(script);
     this.renderDialog(script);
   }
@@ -910,6 +948,63 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private closeDialogUi() {
     closeDialogUiInWorldScene(this as any);
+    this.resetBuyerFlow();
+  }
+
+  private resetBuyerFlow() {
+    if (this.buyerSelectionActive && this.inventoryOpen) {
+      this.inventoryOpen = false;
+      this.renderInventoryPanel();
+    }
+    this.buyerSelectionActive = false;
+    this.buyerOffer = null;
+  }
+
+  private startBuyerSelection() {
+    this.buyerSelectionActive = true;
+    this.buyerOffer = null;
+    this.inventoryOpen = true;
+    this.renderInventoryPanel();
+  }
+
+  private handleBuyerChoice(choiceId: string, script: NonNullable<ReturnType<typeof getDialogScript>>): boolean {
+    if (choiceId === "sell") {
+      this.startBuyerSelection();
+      this.dialog = { open: true, scriptId: script.id, nodeId: "waitPick" };
+      this.renderDialog(script);
+      return true;
+    }
+    if (choiceId === "offer_pick") {
+      this.startBuyerSelection();
+      this.dialog = { open: true, scriptId: script.id, nodeId: "waitPick" };
+      this.renderDialog(script);
+      return true;
+    }
+    if (choiceId === "offer_accept") {
+      const offer = this.buyerOffer;
+      if (!offer) {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "menu" };
+        this.renderDialog(script);
+        return true;
+      }
+      const inv = loadInventory();
+      const res = attemptSaleFromSlot(inv, offer.slotIndex);
+      if (res.ok) {
+        saveInventory(inv);
+        this.resetBuyerFlow();
+        if (this.inventoryOpen) this.renderInventoryPanel();
+        this.dialog = { open: true, scriptId: script.id, nodeId: "sold" };
+      } else if (res.reason === "no_value") {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "noValue" };
+      } else if (res.reason === "empty_slot") {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "waitPick" };
+      } else {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "offer" };
+      }
+      this.renderDialog(script);
+      return true;
+    }
+    return false;
   }
 
   update() {
