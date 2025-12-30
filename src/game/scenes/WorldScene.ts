@@ -26,7 +26,7 @@ import { clearSession } from "../../services/auth/session";
 import { canToggleInventory } from "../../core/uiGating";
 import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild } from "../../core/pouchUi";
-import { getArmorBonus } from "../../core/shopCatalog";
+import { getArmorBonus, isMeleeWeapon } from "../../core/shopCatalog";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { getFeetDepth } from "./depthSort";
@@ -131,6 +131,8 @@ export class WorldScene extends Phaser.Scene {
   private heldItemSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private slashSwordSprite?: Phaser.GameObjects.Sprite;
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
+  private bodyArmorSprite?: Phaser.GameObjects.Sprite;
 
   private baseMaxHp = 20;
   private maxHp = 20;
@@ -474,6 +476,8 @@ export class WorldScene extends Phaser.Scene {
     this.chestContents = undefined;
     this.heldItemSprite = undefined;
     this.slashSwordSprite = undefined;
+    this.bodyArmorSprite?.destroy();
+    this.bodyArmorSprite = undefined;
     this.equipment = loadEquipment();
     this.updateMaxHpFromArmor();
     this.monstersGroup = undefined;
@@ -522,7 +526,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private updateMaxHpFromArmor() {
-    const armorBonus = getArmorBonus(this.equipment.armorItemId);
+    const armorBonus =
+      getArmorBonus(this.equipment.headArmorItemId) +
+      getArmorBonus(this.equipment.bodyArmorItemId) +
+      getArmorBonus(this.equipment.legArmorItemId);
     const newMaxHp = this.baseMaxHp + armorBonus;
     const oldMaxHp = this.maxHp;
     this.maxHp = newMaxHp;
@@ -605,7 +612,7 @@ export class WorldScene extends Phaser.Scene {
       screenH: this.scale.height,
       hasTouch,
       enemyNearby: this.isEnemyNearby(32 * 7),
-      hasWeapon: !!this.equipment.heldItemId,
+      hasWeapon: isMeleeWeapon(this.equipment.heldItemId) || this.equipment.heldItemId === "bow",
     });
     this.mobileControlsVisible = showAttack;
 
@@ -761,6 +768,11 @@ export class WorldScene extends Phaser.Scene {
         },
         isDialogOpen: () => this.dialog.open,
         updateMaxHpFromArmor: () => this.updateMaxHpFromArmor(),
+        getHp: () => this.hp,
+        getMaxHp: () => this.maxHp,
+        setHp: (nextHp) => {
+          this.hp = Math.max(0, Math.min(this.maxHp, Math.floor(nextHp)));
+        },
         writeProgress: (force) => this.writeProgress(force),
         exitToTitle: () => this.exitToTitle(),
         setInventoryOpen: (open) => {

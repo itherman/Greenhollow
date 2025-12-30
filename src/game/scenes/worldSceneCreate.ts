@@ -4,7 +4,13 @@ import { isTapOnPlayer } from "../../core/tapOnPlayer";
 import { pickTapCandidate } from "../../core/tapTargeting";
 import { normalizeScreenSize } from "../../core/screen";
 import { getDialogScript } from "../dialog/scripts";
-import { ensureItemAndPropTextures, ensureGoblinAndArrowTextures, ensurePeasantPlayerSpriteSheet, ensureUiPouchTexture } from "../art/sprites";
+import {
+  ensureItemAndPropTextures,
+  ensureGoblinAndArrowTextures,
+  ensurePeasantPlayerBodyArmorSpriteSheets,
+  ensurePeasantPlayerSpriteSheet,
+  ensureUiPouchTexture,
+} from "../art/sprites";
 
 /**
  * WorldScene create() extracted to keep WorldScene.ts smaller.
@@ -41,6 +47,7 @@ export function worldSceneCreate(scene: any): void {
     ensureGoblinAndArrowTextures(this);
 
     ensurePeasantPlayerSpriteSheet(this);
+    ensurePeasantPlayerBodyArmorSpriteSheets(this);
     this.ensurePlayerAnimations();
 
     this.player = this.physics.add.sprite(0, 0, "player");
@@ -66,6 +73,15 @@ export function worldSceneCreate(scene: any): void {
     this.uiCam.setZoom(1);
     // UI camera should not render world objects.
     this.uiCam.ignore(this.player);
+
+    // Armor overlay sprite (renders over default clothing).
+    this.bodyArmorSprite?.destroy();
+    this.bodyArmorSprite = this.add.sprite(this.player.x, this.player.y, "player_armor_body_leather");
+    this.bodyArmorSprite.setOrigin(0.5, 0.5);
+    this.bodyArmorSprite.setScale(1);
+    this.bodyArmorSprite.setVisible(false);
+    // UI camera should not render world objects.
+    this.uiCam.ignore(this.bodyArmorSprite);
 
     // Tap-to-move: set a world-space target on pointer down.
     // IMPORTANT: WorldScene is restarted between areas; avoid stacking listeners.
