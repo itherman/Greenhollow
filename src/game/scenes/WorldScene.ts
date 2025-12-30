@@ -58,6 +58,7 @@ import { chooseEnemySpawnTiles } from "../../core/enemySpawn";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { addNpcColliders } from "./physicsColliders";
 import { getFeetDepth } from "./depthSort";
+import { pickNpcForDialog } from "./npcInteract";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -285,26 +286,24 @@ export class WorldScene extends Phaser.Scene {
     };
 
     const tryNpc = () => {
-      const range2 = getTapInteractRangePx("npc") ** 2;
       if (!this.npcsGroup) return false;
-      const npcs = this.npcsGroup.getChildren() as Phaser.GameObjects.GameObject[];
-      let nearest: Phaser.GameObjects.Sprite | null = null;
-      let best = Number.POSITIVE_INFINITY;
-      for (const obj of npcs) {
-        const s = obj as Phaser.GameObjects.Sprite;
-        const d2 = this.dist2(playerPos, s);
-        if (d2 < best) {
-          best = d2;
-          nearest = s;
-        }
-      }
-      if (!nearest || best > range2) return false;
-      const npcDef = (nearest as any).npcDef as { dialogScriptId?: string } | undefined;
+      const rangePx = getTapInteractRangePx("npc");
+      const npcs = this.npcsGroup.getChildren() as Phaser.GameObjects.Sprite[];
+      const chosen = pickNpcForDialog({
+        player: playerPos,
+        npcs: npcs as any,
+        rangePx,
+        scriptId: npcScriptId,
+        tapTarget: this.tapTarget,
+      }) as Phaser.GameObjects.Sprite | null;
+
+      if (!chosen) return false;
+      const npcDef = (chosen as any).npcDef as { dialogScriptId?: string } | undefined;
       const scriptId = npcScriptId ?? npcDef?.dialogScriptId;
       if (!scriptId) return false;
       const script = getDialogScript(scriptId);
       if (!script) return false;
-      this.openNpcDialog(scriptId, nearest);
+      this.openNpcDialog(scriptId, chosen);
       return true;
     };
 
