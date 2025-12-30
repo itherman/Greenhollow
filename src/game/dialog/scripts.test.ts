@@ -5,6 +5,7 @@ import {
   chestMessage,
   doorLocked,
   elderIntro,
+  buyerNpc,
   homeowner1Advice,
   homeowner2Advice,
   homeowner3Advice,
@@ -43,6 +44,10 @@ describe("dialog scripts", () => {
     expect(validateScript(shopkeeper)).toEqual({ ok: true });
   });
 
+  it("buyerNpc validates", () => {
+    expect(validateScript(buyerNpc)).toEqual({ ok: true });
+  });
+
   it("keyFound validates", () => {
     expect(validateScript(keyFound)).toEqual({ ok: true });
   });
@@ -59,5 +64,4 @@ describe("dialog scripts", () => {
     expect(validateScript(swordTaken)).toEqual({ ok: true });
   });
 });
-
 

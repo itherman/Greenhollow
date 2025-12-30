@@ -159,6 +159,36 @@ export const shopkeeper: DialogScript = {
   },
 };
 
+export const buyerNpc: DialogScript = {
+  id: "buyerNpc",
+  start: "menu",
+  nodes: {
+    menu: {
+      id: "menu",
+      kind: "choice",
+      text: "Selling something?",
+      choices: [
+        { id: "sell", text: "Sell an item", next: "waitPick" },
+        { id: "bye", text: "Nothing right now.", next: "end" },
+      ],
+    },
+    waitPick: { id: "waitPick", kind: "line", text: "Open your pouch and pick an item to sell.", next: "menu" },
+    offer: {
+      id: "offer",
+      kind: "choice",
+      text: "I can make you an offer.",
+      choices: [
+        { id: "offer_accept", text: "Take the coins", next: "sold" },
+        { id: "offer_pick", text: "Show me another item", next: "waitPick" },
+        { id: "bye", text: "Maybe later.", next: "end" },
+      ],
+    },
+    noValue: { id: "noValue", kind: "line", text: "I can't offer anything for that.", next: "menu" },
+    sold: { id: "sold", kind: "line", text: "Pleasure doing business.", next: "menu" },
+    end: { id: "end", kind: "end", text: "I'll be here." },
+  },
+};
+
 export const chestMessage: DialogScript = {
   id: "chestMessage",
   start: "a",
@@ -242,6 +272,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return homeowner4Advice;
     case "shopkeeper":
       return shopkeeper;
+    case "buyerNpc":
+      return buyerNpc;
     case "chestMessage":
       return chestMessage;
     case "chestEmpty":
@@ -262,5 +294,4 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return null;
   }
 }
-
 

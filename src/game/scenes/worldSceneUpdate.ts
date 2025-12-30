@@ -189,12 +189,14 @@ export function worldSceneUpdate(scene: any): void {
       if (!script) {
         this.closeDialogUi();
         this.dialog = closeDialog();
+        this.resetBuyerFlow();
         return;
       }
 
       if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
         this.dialog = closeDialog();
         this.closeDialogUi();
+        this.resetBuyerFlow();
         return;
       }
 
@@ -227,6 +229,7 @@ export function worldSceneUpdate(scene: any): void {
                 : -1;
         if (pick >= 0 && node.kind === "choice") {
           const isShop = script.id === "shopkeeper";
+          const isBuyer = script.id === "buyerNpc";
           if (isShop) {
             const MORE_ID = "__more_items__";
             const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
@@ -243,6 +246,14 @@ export function worldSceneUpdate(scene: any): void {
               this.shopDialogPage = 0;
               this.dialog = choose(script, this.dialog, ch.id);
               this.renderDialog(script);
+            }
+            return;
+          }
+
+          if (isBuyer) {
+            if (pick < node.choices.length) {
+              const ch = node.choices[pick]!;
+              if (this.handleBuyerChoice(ch.id, script)) return;
             }
             return;
           }
