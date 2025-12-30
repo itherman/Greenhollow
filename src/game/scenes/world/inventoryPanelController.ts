@@ -59,6 +59,8 @@ export type InventoryPanelHost = {
 
   /** Optional handler for special slot interactions (e.g., selling). */
   handleInventorySlotClick?: (slotIndex: number, pointer: any) => boolean;
+  /** Optional hint override (e.g., for selling flow). */
+  getInventoryHint?: (inv: ReturnType<typeof loadInventory>) => string | null;
 };
 
 export class InventoryPanelController {
@@ -223,6 +225,7 @@ export class InventoryPanelController {
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
+        let skipNextPrimary = false;
         const handlePrimary = (pointer: any) => {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
@@ -230,8 +233,6 @@ export class InventoryPanelController {
           const slot = invNow.slots[i];
 
           this.deleteConfirmSlot = null;
-          const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
-          if (handledByHost) return;
           if (!slot) return;
 
           // Food: digest for HP.
@@ -270,6 +271,16 @@ export class InventoryPanelController {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
 
+          const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
+          if (handledByHost) {
+            this.deleteConfirmSlot = null;
+            this.deleteHoldTimer?.remove(false);
+            this.deleteHoldTimer = undefined;
+            this.deleteHoldTriggered = false;
+            skipNextPrimary = true;
+            return;
+          }
+
           const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
           if (rightClick) {
             if (this.deleteConfirmSlot === i) {
@@ -301,6 +312,10 @@ export class InventoryPanelController {
 
         r.on("pointerup", (pointer: any) => {
           if (pointer?.pointerType !== "touch") return;
+          if (skipNextPrimary) {
+            skipNextPrimary = false;
+            return;
+          }
           this.deleteHoldTimer?.remove(false);
           this.deleteHoldTimer = undefined;
           if (this.deleteHoldTriggered) return;
@@ -310,6 +325,7 @@ export class InventoryPanelController {
         r.on("pointerout", () => {
           this.deleteHoldTimer?.remove(false);
           this.deleteHoldTimer = undefined;
+          skipNextPrimary = false;
         });
         const idx = scene.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -584,6 +600,8 @@ export class InventoryPanelController {
       if (s) return `Right-click again to delete ${s.name} x${s.qty} (click elsewhere to cancel)`;
       this.deleteConfirmSlot = null;
     }
+    const override = this.host.getInventoryHint?.(inv);
+    if (override) return override;
     return "Tap pouch or Esc to close • Tap food to eat • 1-9 to hold • Hold or right-click to delete";
   }
 

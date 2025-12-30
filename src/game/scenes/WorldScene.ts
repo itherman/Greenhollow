@@ -794,6 +794,7 @@ export class WorldScene extends Phaser.Scene {
           this.suppressExitUntilTs = Date.now() + ms;
         },
         handleInventorySlotClick: (slotIndex) => this.handleInventorySlotClick(slotIndex),
+        getInventoryHint: (inv) => this.getInventoryHint(inv),
       });
     }
     this.inventoryUi.render(this.inventoryOpen);
@@ -830,6 +831,14 @@ export class WorldScene extends Phaser.Scene {
     this.dialog = { open: true, scriptId: script.id, nodeId: "offer" };
     this.renderDialog(script);
     return true;
+  }
+
+  private getInventoryHint(inv: ReturnType<typeof loadInventory>): string | null {
+    if (this.buyerSelectionActive && this.dialog.open && this.dialog.scriptId === "buyerNpc") {
+      const hasItem = inv.slots.some(Boolean);
+      return hasItem ? "Tap an item to offer for sale." : "Your pouch is empty.";
+    }
+    return null;
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
