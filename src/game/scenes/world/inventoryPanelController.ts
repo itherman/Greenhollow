@@ -70,6 +70,8 @@ export class InventoryPanelController {
   private inventorySlotQtyText: any[] = [];
   private deleteConfirmSlot: number | null = null;
   private deleteConfirmUntilMs = 0;
+  private deleteHoldTimer?: Phaser.Time.TimerEvent;
+  private deleteHoldTriggered = false;
 
   private equipmentSlotRects: any[] = [];
   private equipmentSlotIcons: any[] = [];
@@ -110,6 +112,7 @@ export class InventoryPanelController {
     if (this.deleteConfirmSlot != null && nowMs > this.deleteConfirmUntilMs) {
       this.deleteConfirmSlot = null;
     }
+    this.deleteHoldTriggered = false;
     const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
     const itemIconKey = (id: string): string => (id === "rusty_key" ? "item_key" : `item_${id}`);
 
@@ -218,30 +221,11 @@ export class InventoryPanelController {
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
-        r.on("pointerdown", (pointer: any) => {
-          // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
+        const handlePrimary = (pointer: any) => {
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
           const invNow = loadInventory();
           const slot = invNow.slots[i];
-
-          const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
-          const now = scene.time?.now ?? Date.now();
-          if (this.deleteConfirmSlot != null && now > this.deleteConfirmUntilMs) this.deleteConfirmSlot = null;
-          if (rightClick) {
-            if (this.deleteConfirmSlot === i) {
-              this.deleteConfirmSlot = null;
-              invNow.slots[i] = null;
-              saveInventory(invNow);
-              this.host.writeProgress(true);
-              this.render(true);
-              return;
-            }
-            this.deleteConfirmSlot = i;
-            this.deleteConfirmUntilMs = now + 4000;
-            this.render(true);
-            return;
-          }
 
           this.deleteConfirmSlot = null;
           const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
@@ -268,6 +252,61 @@ export class InventoryPanelController {
           saveEquipment(res.next);
           this.host.updateMaxHpFromArmor();
           this.render(true);
+        };
+
+        const startDeleteConfirm = () => {
+          const now = scene.time?.now ?? Date.now();
+          if (this.deleteConfirmSlot != null && now > this.deleteConfirmUntilMs) this.deleteConfirmSlot = null;
+          this.deleteConfirmSlot = i;
+          this.deleteConfirmUntilMs = now + 4000;
+          this.render(true);
+        };
+
+        r.on("pointerdown", (pointer: any) => {
+          // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
+          if (!this.inventoryPanel?.visible) return;
+          if (this.host.isDialogOpen()) return;
+
+          const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
+          if (rightClick) {
+            if (this.deleteConfirmSlot === i) {
+              const invNow = loadInventory();
+              this.deleteConfirmSlot = null;
+              invNow.slots[i] = null;
+              saveInventory(invNow);
+              this.host.writeProgress(true);
+              this.render(true);
+              return;
+            }
+            startDeleteConfirm();
+            return;
+          }
+
+          // Touch: long-press to trigger delete confirmation.
+          if (pointer?.pointerType === "touch") {
+            this.deleteHoldTriggered = false;
+            this.deleteHoldTimer?.remove(false);
+            this.deleteHoldTimer = scene.time.delayedCall(650, () => {
+              this.deleteHoldTriggered = true;
+              startDeleteConfirm();
+            });
+            return;
+          }
+
+          handlePrimary(pointer);
+        });
+
+        r.on("pointerup", (pointer: any) => {
+          if (pointer?.pointerType !== "touch") return;
+          this.deleteHoldTimer?.remove(false);
+          this.deleteHoldTimer = undefined;
+          if (this.deleteHoldTriggered) return;
+          handlePrimary(pointer);
+        });
+
+        r.on("pointerout", () => {
+          this.deleteHoldTimer?.remove(false);
+          this.deleteHoldTimer = undefined;
         });
         const idx = scene.add.text(0, 0, "", {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -537,6 +576,6 @@ export class InventoryPanelController {
       if (s) return `Right-click again to delete ${s.name} x${s.qty} (click elsewhere to cancel)`;
       this.deleteConfirmSlot = null;
     }
-    return "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item • Right-click item to delete";
+    return "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item • Hold (touch) or right-click item to delete";
   }
 }
