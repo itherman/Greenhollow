@@ -414,7 +414,29 @@ export function worldSceneUpdate(scene: any): void {
     this.facing = facing;
     this.player.setVelocity(vx, vy);
     // Feet-based depth sorting: lower feet draw in front.
-    depthSortManyByFeet([this.player as any], getFeetDepth);
+    const baseDepth = getFeetDepth(this.player as any);
+    this.player.setDepth(baseDepth);
+
+    // Armor overlay: keep it aligned and rendered above default clothing.
+    if (this.bodyArmorSprite) {
+      const bodyArmor = this.equipment.bodyArmorItemId;
+      if (!bodyArmor) {
+        this.bodyArmorSprite.setVisible(false);
+      } else {
+        const tex =
+          bodyArmor === "leather_armor"
+            ? "player_armor_body_leather"
+            : bodyArmor === "iron_armor"
+              ? "player_armor_body_iron"
+              : null;
+        if (tex) this.bodyArmorSprite.setTexture(tex);
+        this.bodyArmorSprite
+          .setPosition(this.player.x, this.player.y)
+          .setFrame((this.player.frame as any)?.name ?? (this.player.frame as any))
+          .setVisible(true)
+          .setDepth(baseDepth + 0.1);
+      }
+    }
     depthSortByY(this.chest as any);
     if (this.npcsGroup) depthSortManyByFeet(this.npcsGroup.getChildren() as any, getFeetDepth);
 
