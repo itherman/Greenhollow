@@ -10,7 +10,7 @@
  */
 
 export type TweenManagerLike = {
-  add: (config: Record<string, unknown>) => unknown;
+  add: (config: Record<string, unknown> | any) => unknown;
 };
 
 export type BobbingTweenTarget = {

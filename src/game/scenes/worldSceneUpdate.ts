@@ -1,7 +1,26 @@
 import Phaser from "phaser";
-import { computeMovement, type Direction } from "../../core/movement";
-import { VILLAGE_HOUSE_TOP_LEFTS, getArea, getTile, isWalkable, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
-import {
+import { computeMovement } from "../../core/movement";
+import { clearExitBlockIfLeft } from "../../core/exitGate";
+import { canToggleInventory } from "../../core/uiGating";
+import { toggleEquipFromInventorySlot } from "../../core/equipment";
+import { saveEquipment } from "../../services/game/equipmentStore";
+import { advanceLine, choose, closeDialog, getNode } from "../../core/dialog";
+import { paginateDialogChoices } from "../../core/dialogPagination";
+import { getDialogScript } from "../dialog/scripts";
+import { getMeleeWeaponStats } from "../../core/shopCatalog";
+import { tryStartAttack } from "../../core/playerAttack";
+import { computeHeldSwordPose, computeSwordSwing } from "../../core/swordVisual";
+import { computeSwordHitbox } from "../../core/playerAttack";
+import { tryShootWithAmmo } from "../../core/rangedAttack";
+import { getItemCount, removeItem } from "../../core/inventory";
+import { loadInventory, saveInventory } from "../../services/game/inventoryStore";
+import { getTapStopDistancePx } from "../../core/tapIntentMovement";
+import { computeTapToMoveInput } from "../../core/tapToMove";
+import { getPlayerAnim } from "../../core/playerAnimation";
+import { computeDeathTransition } from "../../core/death";
+import { depthSortByY, depthSortManyByFeet, depthSortManyByY } from "./world/depthSorting";
+import { getFeetDepth } from "./depthSort";
+import { anchorSlashSprite, renderHeldItem } from "./world/heldItemRendering";
 
 /**
  * WorldScene update loop extracted to keep WorldScene.ts smaller.
@@ -302,7 +321,7 @@ export function worldSceneUpdate(scene: any): void {
 
         const monsters = this.monstersGroup;
         if (monsters) {
-          this.physics.add.overlap(zone, monsters, (_z, m) => {
+          this.physics.add.overlap(zone, monsters, (_z: Phaser.GameObjects.GameObject, m: Phaser.GameObjects.GameObject) => {
             const mon = m as Phaser.Physics.Arcade.Sprite;
             this.spawnEnemyDrop(mon.x, mon.y);
             mon.destroy();
@@ -311,7 +330,7 @@ export function worldSceneUpdate(scene: any): void {
 
         const goblins = this.goblinsGroup;
         if (goblins) {
-          this.physics.add.overlap(zone, goblins, (_z, g) => {
+          this.physics.add.overlap(zone, goblins, (_z: Phaser.GameObjects.GameObject, g: Phaser.GameObjects.GameObject) => {
             const gob = g as Phaser.Physics.Arcade.Sprite;
             this.damageGoblin(gob, meleeStats.damage);
           });

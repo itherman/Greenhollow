@@ -1,7 +1,10 @@
 import Phaser from "phaser";
-import { computeMovement, type Direction } from "../../core/movement";
-import { VILLAGE_HOUSE_TOP_LEFTS, getArea, getTile, isWalkable, type AreaDef, type AreaId, type EntryId } from "../../core/areas";
-import {
+import { shouldAllowPlayerTapInventory } from "../../core/pouchUi";
+import { isTapOnPlayer } from "../../core/tapOnPlayer";
+import { pickTapCandidate } from "../../core/tapTargeting";
+import { normalizeScreenSize } from "../../core/screen";
+import { getDialogScript } from "../dialog/scripts";
+import { ensureItemAndPropTextures, ensureGoblinAndArrowTextures, ensurePeasantPlayerSpriteSheet, ensureUiPouchTexture } from "../art/sprites";
 
 /**
  * WorldScene create() extracted to keep WorldScene.ts smaller.
