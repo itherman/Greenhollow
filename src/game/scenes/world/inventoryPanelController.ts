@@ -55,6 +55,9 @@ export type InventoryPanelHost = {
   /** Suppresses world pointer + exit triggers for N milliseconds. */
   suppressWorldPointerForMs: (ms: number) => void;
   suppressExitForMs: (ms: number) => void;
+
+  /** Optional handler for special slot interactions (e.g., selling). */
+  handleInventorySlotClick?: (slotIndex: number, pointer: any) => boolean;
 };
 
 export class InventoryPanelController {
@@ -65,6 +68,8 @@ export class InventoryPanelController {
   private inventorySlotIcons: any[] = [];
   private inventorySlotNameText: any[] = [];
   private inventorySlotQtyText: any[] = [];
+  private deleteConfirmSlot: number | null = null;
+  private deleteConfirmUntilMs = 0;
 
   private equipmentSlotRects: any[] = [];
   private equipmentSlotIcons: any[] = [];
@@ -101,6 +106,10 @@ export class InventoryPanelController {
   render(open: boolean): void {
     const { scene } = this.host;
     const inv = loadInventory();
+    const nowMs = scene.time?.now ?? Date.now();
+    if (this.deleteConfirmSlot != null && nowMs > this.deleteConfirmUntilMs) {
+      this.deleteConfirmSlot = null;
+    }
     const truncate = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
     const itemIconKey = (id: string): string => (id === "rusty_key" ? "item_key" : `item_${id}`);
 
@@ -131,7 +140,7 @@ export class InventoryPanelController {
         fontSize: "16px",
         color: "#f5d76e",
       });
-      const hint = scene.add.text(0, 0, "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item", {
+      const hint = scene.add.text(0, 0, this.computeHint(loadInventory()), {
         fontFamily: "system-ui, sans-serif",
         fontSize: "12px",
         color: "#cbd5df",
@@ -209,12 +218,34 @@ export class InventoryPanelController {
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
         r.setInteractive({ useHandCursor: true });
-        r.on("pointerdown", () => {
+        r.on("pointerdown", (pointer: any) => {
           // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
           if (!this.inventoryPanel?.visible) return;
           if (this.host.isDialogOpen()) return;
           const invNow = loadInventory();
           const slot = invNow.slots[i];
+
+          const rightClick = !!(pointer?.rightButtonDown ? pointer.rightButtonDown() : pointer?.buttons === 2);
+          const now = scene.time?.now ?? Date.now();
+          if (this.deleteConfirmSlot != null && now > this.deleteConfirmUntilMs) this.deleteConfirmSlot = null;
+          if (rightClick) {
+            if (this.deleteConfirmSlot === i) {
+              this.deleteConfirmSlot = null;
+              invNow.slots[i] = null;
+              saveInventory(invNow);
+              this.host.writeProgress(true);
+              this.render(true);
+              return;
+            }
+            this.deleteConfirmSlot = i;
+            this.deleteConfirmUntilMs = now + 4000;
+            this.render(true);
+            return;
+          }
+
+          this.deleteConfirmSlot = null;
+          const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
+          if (handledByHost) return;
           if (!slot) return;
 
           // Food: digest for HP.
@@ -377,7 +408,7 @@ export class InventoryPanelController {
     bg.setSize(panelW, panelH);
     header.setSize(panelW, topBarH).setPosition(-panelW / 2, -panelH / 2 + topBarH / 2);
     title.setPosition(-panelW / 2 + pad, -panelH / 2 + 8).setText("Pouch (20)");
-    hint.setPosition(panelW / 2 - pad - hint.width, -panelH / 2 + 10);
+    hint.setText(this.computeHint(inv)).setPosition(panelW / 2 - pad - hint.width, -panelH / 2 + 10);
 
     // Equipment slots row
     const eqCols = 4;
@@ -499,5 +530,13 @@ export class InventoryPanelController {
     this.inventoryBackdrop.setVisible(open);
     this.inventoryPanel.setVisible(open);
   }
-}
 
+  private computeHint(inv: ReturnType<typeof loadInventory>): string {
+    if (this.deleteConfirmSlot != null) {
+      const s = inv.slots[this.deleteConfirmSlot];
+      if (s) return `Right-click again to delete ${s.name} x${s.qty} (click elsewhere to cancel)`;
+      this.deleteConfirmSlot = null;
+    }
+    return "Tap pouch / I / Esc to close • Tap food to eat • 1-9 to hold item • Right-click item to delete";
+  }
+}
