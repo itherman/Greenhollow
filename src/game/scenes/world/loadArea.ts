@@ -18,6 +18,7 @@ import {
   blockExit,
   isExitBlocked,
   type TilePos,
+  type TileRect,
 } from "../../../core/exitGate";
 import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureVillageHouseTexture } from "../../art/sprites";
 import { addNpcColliders } from "../physicsColliders";
@@ -33,6 +34,15 @@ import { addBobbingTween } from "./bobbingTween";
  * - Uses `scene: any` so we can call private fields/methods without TypeScript fighting us.
  * - Intentionally keeps behavior the same by preserving the original imperative structure.
  */
+function expandRect(rect: TileRect, margin: number): TileRect {
+  return {
+    x: rect.x - margin,
+    y: rect.y - margin,
+    w: rect.w + margin * 2,
+    h: rect.h + margin * 2,
+  };
+}
+
 export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryId): void {
   // WorldScene is designed to be restarted between areas.
   // loadArea assumes a fresh scene state.
@@ -191,7 +201,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         if (!ok) {
           scene.exitGate = blockExit(exitDef.id, exitDef.rect);
           // Suppress re-showing until the player leaves the doorway region.
-          scene.blockedExitSticky = { exitId: exitDef.id, clearRect: scene.expandRect(exitDef.rect, 1) };
+          scene.blockedExitSticky = { exitId: exitDef.id, clearRect: expandRect(exitDef.rect, 1) };
           // Give the player a moment to step away after dismissing the dialog.
           scene.suppressExitUntilTs = Date.now() + 700;
           scene.openNpcDialog("doorLocked");

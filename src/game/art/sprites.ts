@@ -483,23 +483,23 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
   mk("prop_door_locked", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     ctx.fillStyle = "#6b4f2a";
-    ctx.fillRect(7, 4, 10, 16);
+    ctx.fillRect(3, 1, 18, 22);
     ctx.fillStyle = "#5b4122";
-    ctx.fillRect(7, 18, 10, 2);
+    ctx.fillRect(3, 21, 18, 2);
     ctx.fillStyle = "#f5d76e";
-    ctx.fillRect(15, 12, 2, 2);
+    ctx.fillRect(18, 14, 2, 2);
     ctx.fillStyle = "#ef4444";
-    ctx.fillRect(11, 11, 2, 2);
+    ctx.fillRect(9, 12, 4, 4);
   });
 
   mk("prop_door_open", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     ctx.fillStyle = "#6b4f2a";
-    ctx.fillRect(7, 4, 10, 16);
+    ctx.fillRect(3, 1, 18, 22);
     ctx.fillStyle = "#5b4122";
-    ctx.fillRect(7, 18, 10, 2);
+    ctx.fillRect(3, 21, 18, 2);
     ctx.fillStyle = "#f5d76e";
-    ctx.fillRect(15, 12, 2, 2);
+    ctx.fillRect(18, 14, 2, 2);
   });
 
   mk("prop_torch", (ctx) => {
@@ -914,4 +914,3 @@ export function ensureKeyDoorSwordTorchTextures(scene: Phaser.Scene) {
     ctx.fillRect(11, 21, 2, 1); // pommel
   });
 }
-
