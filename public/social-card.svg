@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+<title>Greenhollow Social Card</title>
+<desc>Social sharing card with Greenhollow branding.</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#0f2b1f"/>
+<stop offset="100%" stop-color="#163e2d"/>
+</linearGradient>
+<linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#f7e8c4"/>
+<stop offset="100%" stop-color="#e0c07a"/>
+</linearGradient>
+<filter id="glow" x="-10%" y="-10%" width="120%" height="120%">
+<feGaussianBlur stdDeviation="18" result="blur"/>
+<feMerge>
+<feMergeNode in="blur"/>
+<feMergeNode in="SourceGraphic"/>
+</feMerge>
+</filter>
+</defs>
+<rect width="1200" height="630" fill="url(#bg)"/>
+<circle cx="960" cy="170" r="140" fill="url(#sun)" opacity="0.65" filter="url(#glow)"/>
+<g fill="none" stroke="#d8eedf" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+<path d="M200 320c60-90 140-160 240-210 80-40 140-50 200-30"/>
+<path d="M180 360c70-20 120-10 200 20s180 70 280 50c60-12 110-44 160-96"/>
+<path d="M250 430c90-20 160-10 230 16 72 26 146 32 218 16 64-14 128-50 190-108"/>
+</g>
+<g transform="translate(140 170)" fill="#f5fbf7">
+<text x="0" y="0" font-family="\"DM Sans\", \"Segoe UI\", system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" letter-spacing="2">Greenhollow</text>
+<text x="0" y="74" font-family="\"DM Sans\", \"Segoe UI\", system-ui, -apple-system, sans-serif" font-size="30" opacity="0.8">Cozy pixel adventure. Cloud saves. Guest play.</text>
+</g>
+<g transform="translate(140 320)" fill="#f5fbf7" font-family="\"DM Sans\", \"Segoe UI\", system-ui, -apple-system, sans-serif" font-size="24" opacity="0.92">
+<text x="0" y="0">• Tap “Continue as guest” to jump in instantly.</text>
+<text x="0" y="40">• Cloud login saves your camp, gear, and quests.</text>
+<text x="0" y="80">• Built for sharing—open directly from messages.</text>
+</g>
+<g transform="translate(140 490)" fill="#d8eedf" font-family="\"DM Sans\", \"Segoe UI\", system-ui, -apple-system, sans-serif" font-size="18" opacity="0.8">
+<text x="0" y="0">green-hollow.com • Works on desktop and mobile</text>
+</g>
+</svg>
