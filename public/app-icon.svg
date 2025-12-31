@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title>Greenhollow Leaf Crest</title>
+<desc>Minimal crest icon for Greenhollow with intertwined leaves.</desc>
+<defs>
+<linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#1f6f4d"/>
+<stop offset="100%" stop-color="#0e3726"/>
+</linearGradient>
+<filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+<feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0b2017" flood-opacity="0.55"/>
+</filter>
+</defs>
+<rect x="8" y="8" width="240" height="240" rx="48" fill="url(#g)" filter="url(#shadow)"/>
+<g fill="none" stroke="#f1f5f0" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+<path d="M128 52c-26 27-36 56-26 88 6 20 22 36 46 50-10 4-22 6-36 6-41 0-74-26-74-74 0-44 34-74 78-70 4 0 8 0 12 0z" opacity="0.9"/>
+<path d="M132 44c29 22 43 47 40 76-2 22-14 39-36 54 10 5 22 8 36 8 41 0 74-28 74-78 0-47-38-78-84-64-10 3-20 8-30 14z"/>
+<path d="M88 134c22-4 40-14 52-30"/>
+<path d="M108 170c20-6 36-18 46-36"/>
+</g>
+</svg>
