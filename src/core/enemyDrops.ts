@@ -4,7 +4,8 @@ import { clampEnemyDifficultyRank } from "./enemies";
 export type EnemyDrop =
   | { kind: "heart" }
   | { kind: "coins"; qty: number }
-  | { kind: "food"; itemId: ItemId; qty: number };
+  | { kind: "food"; itemId: ItemId; qty: number }
+  | { kind: "item"; itemId: ItemId; qty: number };
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -43,4 +44,3 @@ export function rollEnemyDrop(args: { rng: () => number; difficultyRank: number 
   const qty = rollIntInclusive(rng, minCoins, maxCoins);
   return { kind: "coins", qty };
 }
-

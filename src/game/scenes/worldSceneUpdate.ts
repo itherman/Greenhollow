@@ -357,6 +357,13 @@ export function worldSceneUpdate(scene: any): void {
             this.damageGoblin(gob, meleeStats.damage);
           });
         }
+        const trolls = this.trollGroup;
+        if (trolls) {
+          this.physics.add.overlap(zone, trolls, (_z: Phaser.GameObjects.GameObject, t: Phaser.GameObjects.GameObject) => {
+            const troll = t as Phaser.Physics.Arcade.Sprite;
+            this.damageTroll(troll, meleeStats.damage);
+          });
+        }
         this.time.delayedCall(90, () => zone.destroy());
       }
     } else if (wantAttack && this.equipment.heldItemId === "bow") {

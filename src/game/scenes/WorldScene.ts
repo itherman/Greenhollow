@@ -157,6 +157,7 @@ export class WorldScene extends Phaser.Scene {
   private houseDoorSprite?: Phaser.GameObjects.Sprite;
   private monstersGroup?: Phaser.Physics.Arcade.Group;
   private goblinsGroup?: Phaser.Physics.Arcade.Group;
+  private trollGroup?: Phaser.Physics.Arcade.Group;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
   private arrowsGroup?: Phaser.Physics.Arcade.Group;
   private playerArrowsGroup?: Phaser.Physics.Arcade.Group;
@@ -190,6 +191,7 @@ export class WorldScene extends Phaser.Scene {
   private mobileControlsVisible = false;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private lastMobileControlsEvalAtMs = 0;
+  private trollWarningZone?: Phaser.GameObjects.Zone;
 
   private setNpcPaused(npc: Phaser.GameObjects.Sprite, paused: boolean) {
     const state = this.npcMoveStates.get(npc);
@@ -419,13 +421,46 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private spawnEnemyDrop(x: number, y: number, enemyId: EnemyId) {
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
+  private damageTroll(troll: Phaser.Physics.Arcade.Sprite, damage: number) {
+    const trolls = this.trollGroup;
+    if (!trolls || !troll.active) return;
+    const anyT = troll as any;
+    const hp = (anyT.__hp as number | undefined) ?? 0;
+    const r = applyDamage({ hp, damage });
+    anyT.__hp = r.hp;
+    troll.setTintFill(0xffffff);
+    this.time.delayedCall(80, () => {
+      if (troll.active) troll.clearTint();
+    });
+    if (r.died) {
+      const dropX = troll.x;
+      const dropY = troll.y;
+      this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "leather_armor", qty: 1 });
+      this.spawnEnemyDrop(dropX + 6, dropY + 4, "bridge_troll");
+      troll.destroy();
+    }
+  }
+
+  private spawnEnemyDrop(x: number, y: number, enemyId: EnemyId, dropOverride?: EnemyDrop) {
     if (!this.dropsGroup) return;
     ensureItemAndPropTextures(this);
     const enemy = getEnemyDefinition(enemyId);
-    const drop: EnemyDrop = rollEnemyDrop({ rng: () => Math.random(), difficultyRank: enemy.difficultyRank });
+    const drop: EnemyDrop = dropOverride ?? rollEnemyDrop({ rng: () => Math.random(), difficultyRank: enemy.difficultyRank });
     const key =
-      drop.kind === "heart" ? "item_heart" : drop.kind === "coins" ? "item_coins" : drop.itemId === "stew" ? "item_stew" : "item_bread";
+      drop.kind === "heart"
+        ? "item_heart"
+        : drop.kind === "coins"
+          ? "item_coins"
+          : drop.kind === "item"
+            ? drop.itemId === "leather_armor"
+              ? "item_leather_armor"
+              : drop.itemId === "iron_armor"
+                ? "item_iron_armor"
+                : "item_bread"
+            : drop.itemId === "stew"
+              ? "item_stew"
+              : "item_bread";
     const s = this.dropsGroup.create(x, y, key) as Phaser.Physics.Arcade.Sprite;
     s.setDepth(s.y);
     const b = s.body as Phaser.Physics.Arcade.Body;
@@ -487,6 +522,7 @@ export class WorldScene extends Phaser.Scene {
     this.updateMaxHpFromArmor();
     this.monstersGroup = undefined;
     this.goblinsGroup = undefined;
+    this.trollGroup = undefined;
     this.arrowsGroup = undefined;
     this.playerArrowsGroup = undefined;
     this.dropsGroup = undefined;
@@ -510,6 +546,8 @@ export class WorldScene extends Phaser.Scene {
     this.suppressWorldPointerUntilTs = 0;
     this.suppressExitUntilTs = 0;
     this.blockedExitSticky = undefined;
+    this.trollWarningZone?.destroy();
+    this.trollWarningZone = undefined;
     for (const t of this.dialogChoiceTexts) t.destroy();
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
