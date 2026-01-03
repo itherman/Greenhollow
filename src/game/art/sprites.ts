@@ -812,6 +812,49 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     drawArrow(7, 16);
   });
 
+  if (!scene.textures.exists("prop_bridge_center")) {
+    const bw = 96;
+    const bh = 64;
+    const c = document.createElement("canvas");
+    c.width = bw;
+    c.height = bh;
+    const ctx = c.getContext("2d");
+    if (!ctx) throw new Error("Failed to get canvas context");
+    ctx.clearRect(0, 0, bw, bh);
+
+    // Deck shadow
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(0, Math.floor(bh / 2) - 12, bw, 32);
+
+    // Wooden planks
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(0, Math.floor(bh / 2) - 14, bw, 30);
+    ctx.fillStyle = "#a46a33";
+    ctx.fillRect(0, Math.floor(bh / 2) - 14, bw, 6);
+
+    // Plank seams + nails
+    ctx.fillStyle = "#6b4f2a";
+    for (let x = 10; x < bw; x += 12) ctx.fillRect(x, Math.floor(bh / 2) - 14, 2, 30);
+    ctx.fillStyle = "#3a2a1a";
+    for (let x = 8; x < bw; x += 12) {
+      ctx.fillRect(x, Math.floor(bh / 2) - 10, 2, 2);
+      ctx.fillRect(x + 4, Math.floor(bh / 2) + 6, 2, 2);
+    }
+
+    // Rope rails + posts
+    ctx.fillStyle = "#9c6a35";
+    ctx.fillRect(0, Math.floor(bh / 2) - 20, bw, 4);
+    ctx.fillRect(0, Math.floor(bh / 2) + 18, bw, 4);
+    ctx.fillStyle = "#6b4f2a";
+    for (let x = 6; x < bw; x += 18) {
+      ctx.fillRect(x, Math.floor(bh / 2) - 22, 4, 10);
+      ctx.fillRect(x, Math.floor(bh / 2) + 14, 4, 10);
+    }
+
+    scene.textures.addImage("prop_bridge_center", c as unknown as HTMLImageElement);
+    scene.textures.get("prop_bridge_center").setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+
   mk("item_heart", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     const pat = getHeartPattern();
