@@ -20,7 +20,7 @@ import {
   type TilePos,
   type TileRect,
 } from "../../../core/exitGate";
-import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureVillageHouseTexture } from "../../art/sprites";
+import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
 import { addNpcColliders } from "../physicsColliders";
 import { configureStaticPickupBody } from "./arcadeBody";
 import { addBobbingTween } from "./bobbingTween";
@@ -77,6 +77,10 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.chest?.destroy();
   scene.chest = undefined;
   scene.chestContents = undefined;
+  scene.trollWarningZone?.destroy();
+  scene.trollWarningZone = undefined;
+  scene.trollGroup?.destroy(true);
+  scene.trollGroup = undefined;
   scene.bowSprite?.destroy();
   scene.bowSprite = undefined;
   scene.playerArrowsGroup = scene.physics.add.group();
@@ -106,6 +110,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     if (meta.kind === "coins") {
       addItem(inv, ITEMS.coins, meta.qty);
     } else if (meta.kind === "food") {
+      addItem(inv, ITEMS[meta.itemId], meta.qty);
+    } else if (meta.kind === "item") {
       addItem(inv, ITEMS[meta.itemId], meta.qty);
     }
     saveInventory(inv);
@@ -417,6 +423,84 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.keySprite = undefined;
   }
 
+  // Troll bridge boss
+  if (scene.area.id === "troll_bridge") {
+    ensureTrollTexture(scene);
+    ensureItemAndPropTextures(scene);
+    const trolls = scene.physics.add.group();
+    scene.trollGroup = trolls;
+
+    const bridgeY = Math.floor(scene.area.height / 2);
+    const bridgeX = Math.floor(scene.area.width / 2);
+    const tx = (scene.area.width - 4) * tileSize + tileSize / 2;
+    const ty = bridgeY * tileSize + tileSize / 2;
+    const troll = scene.physics.add.sprite(tx, ty, "enemy_troll");
+    troll.setDepth(troll.y);
+    troll.setScale(1.4);
+    const tb = troll.body as Phaser.Physics.Arcade.Body;
+    tb.setSize(18, 14).setOffset(7, 16);
+    (troll as any).__hp = 16;
+    (troll as any).setPushable?.(false);
+    trolls.add(troll);
+    scene.uiCam.ignore(troll);
+
+    scene.physics.add.collider(trolls, layer);
+    scene.physics.add.collider(scene.player, trolls, (_p: unknown, t: unknown) => {
+      const mon = t as Phaser.Physics.Arcade.Sprite;
+      const now = scene.time.now;
+      const r = applyContactDamage({
+        hp: scene.hp,
+        nowMs: now,
+        lastHitAtMs: scene.lastHitAtMs,
+        cooldownMs: 600,
+        damage: 3,
+      });
+      scene.hp = r.hp;
+      scene.lastHitAtMs = r.lastHitAtMs;
+      if (r.tookHit) scene.playEnemyAttackAnim(mon);
+      if (r.tookHit) scene.writeProgress(true);
+    });
+
+    if (scene.playerArrowsGroup) {
+      scene.physics.add.overlap(scene.playerArrowsGroup, trolls, (_a: unknown, t: unknown) => {
+        const arrow = _a as Phaser.Physics.Arcade.Sprite;
+        const tr = t as Phaser.Physics.Arcade.Sprite;
+        arrow.destroy();
+        scene.damageTroll(tr, 1);
+      });
+    }
+
+    scene.time.addEvent({
+      delay: 450,
+      loop: true,
+      callback: () => {
+        for (const obj of trolls.getChildren()) {
+          const t = obj as Phaser.Physics.Arcade.Sprite;
+          const dx = scene.player.x - t.x;
+          const dy = scene.player.y - t.y;
+          const d = Math.max(1, Math.hypot(dx, dy));
+          const speed = 55;
+          t.setVelocity((dx / d) * speed, (dy / d) * speed);
+          t.setDepth(t.y);
+        }
+      },
+    });
+
+    const bridgeZone = scene.add.zone(bridgeX * tileSize + tileSize / 2, bridgeY * tileSize + tileSize / 2, tileSize * 3, tileSize * 3);
+    scene.physics.add.existing(bridgeZone);
+    const bzb = bridgeZone.body as Phaser.Physics.Arcade.Body;
+    bzb.setAllowGravity(false);
+    bzb.setImmovable(true);
+    scene.trollWarningZone = bridgeZone;
+    scene.physics.add.overlap(scene.player, bridgeZone, () => {
+      if (hasFlag("dialog.trollBridge.warned")) return;
+      setFlag("dialog.trollBridge.warned");
+      scene.openNpcDialog("trollWarning");
+      bridgeZone.destroy();
+      scene.trollWarningZone = undefined;
+    });
+  }
+
   // Cave goblin archers + arrows
   if (scene.area.id === "cave") {
     ensureGoblinAndArrowTextures(scene);
@@ -588,6 +672,29 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       scene.bowSprite.destroy();
       scene.bowSprite = undefined;
     }
+  }
+
+  if (scene.area.id === "troll_clearing") {
+    ensureChestTextures(scene);
+    ensureItemAndPropTextures(scene);
+    const opened = hasFlag("chest.troll.clearing.1");
+    const tx = opened ? "chest_open" : "chest_closed";
+    const cx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+    const cy = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
+    scene.chest = scene.physics.add.sprite(cx, cy, tx);
+    scene.chest.setImmovable(true);
+    scene.chest.setDepth(scene.chest.y);
+    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
+    cb.setSize(16, 12);
+    cb.setOffset(4, 10);
+    scene.physics.add.collider(scene.player, scene.chest);
+    scene.uiCam.ignore(scene.chest);
+    scene.chestContents = {
+      flag: "chest.troll.clearing.1",
+      loot: [{ itemId: "coins", qty: 60 }],
+      openedDialog: "chestMessage",
+      emptyDialog: "chestEmpty",
+    };
   }
 
   // Hallway props: torches + sword
