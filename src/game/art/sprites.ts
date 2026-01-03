@@ -387,6 +387,52 @@ export function ensureGoblinAndArrowTextures(scene: Phaser.Scene) {
   });
 }
 
+export function ensureTrollTexture(scene: Phaser.Scene) {
+  if (scene.textures.exists("enemy_troll")) return;
+  const c = document.createElement("canvas");
+  c.width = 32;
+  c.height = 32;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("Failed to get canvas context");
+  ctx.clearRect(0, 0, 32, 32);
+
+  // Body
+  ctx.fillStyle = "#14532d";
+  ctx.fillRect(8, 12, 16, 14);
+  ctx.fillStyle = "#166534";
+  ctx.fillRect(9, 13, 14, 12);
+  // Belly highlight
+  ctx.fillStyle = "#22c55e";
+  ctx.fillRect(12, 16, 8, 6);
+  // Shoulders
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(7, 10, 18, 3);
+  // Head
+  ctx.fillStyle = "#15803d";
+  ctx.fillRect(10, 4, 12, 8);
+  // Jaw tusks
+  ctx.fillStyle = "#e7e5e4";
+  ctx.fillRect(11, 11, 2, 2);
+  ctx.fillRect(19, 11, 2, 2);
+  // Eyes
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(13, 8, 2, 2);
+  ctx.fillRect(17, 8, 2, 2);
+  // Belt + bracers
+  ctx.fillStyle = "#3a2a1a";
+  ctx.fillRect(8, 22, 16, 2);
+  ctx.fillRect(6, 18, 3, 3);
+  ctx.fillRect(23, 18, 3, 3);
+  // Club hint
+  ctx.fillStyle = "#6b4f2a";
+  ctx.fillRect(23, 6, 4, 16);
+  ctx.fillStyle = "#8b5a2b";
+  ctx.fillRect(24, 5, 2, 4);
+
+  scene.textures.addImage("enemy_troll", c as unknown as HTMLImageElement);
+  scene.textures.get("enemy_troll").setFilter(Phaser.Textures.FilterMode.NEAREST);
+}
+
 export function ensureVillageHouseTexture(scene: Phaser.Scene) {
   if (scene.textures.exists("prop_house_village")) return;
 

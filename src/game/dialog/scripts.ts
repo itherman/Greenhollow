@@ -238,6 +238,20 @@ export const swordTaken: DialogScript = {
   },
 };
 
+export const trollWarning: DialogScript = {
+  id: "trollWarning",
+  start: "a",
+  nodes: {
+    a: {
+      id: "a",
+      kind: "line",
+      text: "The bridge trembles... a powerful troll is close!",
+      next: "b",
+    },
+    b: { id: "b", kind: "end", text: "Find cover and be ready." },
+  },
+};
+
 export const arrowsChest: DialogScript = {
   id: "arrowsChest",
   start: "a",
@@ -294,4 +308,3 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return null;
   }
 }
-
