@@ -199,9 +199,28 @@ export function makeVillage(): AreaDef {
   // Vertical spur from spawn to the main path.
   for (let y = 2; y <= gateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
 
-  // Eastward spur toward the troll bridge gate.
-  const trollGateY = Math.min(height - 3, Math.max(3, gateY + 2));
-  for (let x = 6; x < width; x++) if (tiles[trollGateY]![x] !== 1) tiles[trollGateY]![x] = 4;
+  // Eastward spur toward the troll bridge gate that branches northwest away from the lower houses.
+  const trollGateY = Math.min(height - 3, Math.max(3, gateY - 2));
+  const paintPath = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    if (tiles[y]![x] === 1) return;
+    tiles[y]![x] = 4;
+  };
+  const drawLine = (x0: number, y0: number, x1: number, y1: number) => {
+    if (x0 === x1) {
+      const ya = Math.min(y0, y1);
+      const yb = Math.max(y0, y1);
+      for (let y = ya; y <= yb; y++) paintPath(x0, y);
+    } else if (y0 === y1) {
+      const xa = Math.min(x0, x1);
+      const xb = Math.max(x0, x1);
+      for (let x = xa; x <= xb; x++) paintPath(x, y0);
+    }
+  };
+  const spurStartX = Math.max(6, Math.floor(width / 2));
+  drawLine(spurStartX, gateY, spurStartX - 2, gateY - 1);
+  drawLine(spurStartX - 2, gateY - 1, spurStartX - 4, trollGateY);
+  drawLine(spurStartX - 4, trollGateY, width - 1, trollGateY);
 
   // House spurs: connect each house-front tile to the main gate line, without cutting through footprints.
   for (let i = 0; i < houseFronts.length; i++) {
