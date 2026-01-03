@@ -432,6 +432,9 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
 
     const bridgeY = Math.floor(scene.area.height / 2);
     const bridgeX = Math.floor(scene.area.width / 2);
+    const bridgeSprite = scene.add.image(bridgeX * tileSize + tileSize / 2, bridgeY * tileSize + tileSize / 2, "prop_bridge_center");
+    bridgeSprite.setDepth(bridgeSprite.y + 1);
+    scene.uiCam.ignore(bridgeSprite);
     const tx = (scene.area.width - 4) * tileSize + tileSize / 2;
     const ty = bridgeY * tileSize + tileSize / 2;
     const troll = scene.physics.add.sprite(tx, ty, "enemy_troll");
