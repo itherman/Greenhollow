@@ -2,6 +2,8 @@ export type AreaId =
   | "village"
   | "woods"
   | "cave"
+  | "troll_bridge"
+  | "troll_clearing"
   | "house"
   | "hallway"
   | "store"
@@ -13,6 +15,8 @@ export type EntryId =
   | "fromVillage"
   | "fromWoods"
   | "fromCave"
+  | "fromTrollBridge"
+  | "fromTrollClearing"
   | "fromHouse"
   | "fromHallway"
   | "fromStore"
@@ -140,6 +144,8 @@ function fullSpawnMap(p: Point): Record<EntryId, Point> {
     fromVillage: p,
     fromWoods: p,
     fromCave: p,
+    fromTrollBridge: p,
+    fromTrollClearing: p,
     fromHouse: p,
     fromHallway: p,
     fromStore: p,
@@ -193,6 +199,10 @@ export function makeVillage(): AreaDef {
   // Vertical spur from spawn to the main path.
   for (let y = 2; y <= gateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
 
+  // Eastward spur toward the troll bridge gate.
+  const trollGateY = Math.min(height - 3, Math.max(3, gateY + 2));
+  for (let x = 6; x < width; x++) if (tiles[trollGateY]![x] !== 1) tiles[trollGateY]![x] = 4;
+
   // House spurs: connect each house-front tile to the main gate line, without cutting through footprints.
   for (let i = 0; i < houseFronts.length; i++) {
     const f = houseFronts[i]!;
@@ -217,6 +227,9 @@ export function makeVillage(): AreaDef {
   // Carve the woods gate opening through the border wall so the player can step onto the exit zone.
   tiles[gateY - 1]![width - 1] = 4;
   tiles[gateY]![width - 1] = 4;
+  // Carve the troll bridge opening.
+  tiles[trollGateY - 1]![width - 1] = 4;
+  tiles[trollGateY]![width - 1] = 4;
 
   return {
     id: "village",
@@ -228,6 +241,8 @@ export function makeVillage(): AreaDef {
       start: { x: 2, y: 2 },
       fromWoods: { x: width - 4, y: gateY },
       fromCave: { x: 2, y: height - 4 },
+      fromTrollBridge: { x: width - 3, y: trollGateY },
+      fromTrollClearing: { x: width - 3, y: trollGateY },
       fromStore: { x: width - 4, y: gateY },
       fromHouse: houseFronts[0]!,
       fromHallway: houseFronts[0]!,
@@ -242,6 +257,12 @@ export function makeVillage(): AreaDef {
         id: "toWoods",
         rect: { x: width - 1, y: gateY - 1, w: 1, h: 2 },
         toArea: "woods",
+        toEntry: "fromVillage",
+      },
+      {
+        id: "toTrollBridge",
+        rect: { x: width - 1, y: trollGateY - 1, w: 1, h: 2 },
+        toArea: "troll_bridge",
         toEntry: "fromVillage",
       },
       // Enter house triggers are on the DOOR tiles (so walking on the path doesn't auto-enter).
@@ -323,6 +344,8 @@ export function makeWoods(): AreaDef {
     spawns: {
       fromVillage: { x: 2, y: Math.floor(height / 2) },
       fromCave: { x: width - 4, y: height - 4 },
+      fromTrollBridge: { x: 2, y: Math.floor(height / 2) },
+      fromTrollClearing: { x: 2, y: Math.floor(height / 2) },
       fromHouse: { x: 2, y: Math.floor(height / 2) },
       fromHouse1: { x: 2, y: Math.floor(height / 2) },
       fromHouse2: { x: 2, y: Math.floor(height / 2) },
@@ -412,6 +435,8 @@ export function makeCave(): AreaDef {
     spawns: {
       fromWoods: { x: 2, y: height - 4 },
       fromVillage: { x: 2, y: height - 4 },
+      fromTrollBridge: { x: 2, y: height - 4 },
+      fromTrollClearing: { x: 2, y: height - 4 },
       fromHouse: { x: 2, y: height - 4 },
       fromHouse1: { x: 2, y: height - 4 },
       fromHouse2: { x: 2, y: height - 4 },
@@ -459,6 +484,8 @@ export function makeHouse(): AreaDef {
       fromVillage: spawnFromVillage,
       fromWoods: spawnFromVillage,
       fromCave: spawnFromVillage,
+      fromTrollBridge: spawnFromVillage,
+      fromTrollClearing: spawnFromVillage,
       fromStore: spawnFromVillage,
       fromHouse: spawnFromVillage,
       fromHouse1: spawnFromVillage,
@@ -523,6 +550,150 @@ export function makeHouse3(): AreaDef {
 }
 export function makeHouse4(): AreaDef {
   return makeSimpleHouseInterior({ id: "house4", backEntry: "fromHouse4", name: "House" });
+}
+
+export function makeTrollBridge(): AreaDef {
+  const width = 24;
+  const height = 16;
+  const tiles = borderWalls(width, height, 2);
+
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  // Barrier splitting the arena with a bridge opening.
+  const barrierX = Math.floor(width / 2);
+  for (let y = 1; y < height - 1; y++) tiles[y]![barrierX] = 5;
+  const bridgeY = Math.floor(height / 2);
+  for (let y = bridgeY - 1; y <= bridgeY + 1; y++) {
+    tiles[y]![barrierX - 1] = 4;
+    tiles[y]![barrierX] = 4;
+    tiles[y]![barrierX + 1] = 4;
+  }
+  for (let x = 1; x < width - 1; x++) tiles[bridgeY]![x] = 4;
+  for (let y = bridgeY - 1; y <= bridgeY + 1; y++) {
+    tiles[y]![0] = 4;
+    tiles[y]![width - 1] = 4;
+  }
+
+  // Cover clusters.
+  const cover = [
+    { x: 5, y: bridgeY - 3 },
+    { x: 4, y: bridgeY + 3 },
+    { x: barrierX + 3, y: bridgeY - 2 },
+    { x: barrierX + 6, y: bridgeY + 2 },
+    { x: barrierX + 8, y: bridgeY },
+  ];
+  for (const c of cover) {
+    tiles[c.y]![c.x] = 5;
+    tiles[c.y]![c.x + 1] = 5;
+  }
+
+  return {
+    id: "troll_bridge",
+    name: "Troll Bridge",
+    width,
+    height,
+    tiles,
+    spawns: {
+      fromVillage: { x: 2, y: bridgeY },
+      fromWoods: { x: 2, y: bridgeY },
+      fromCave: { x: 2, y: bridgeY },
+      fromTrollBridge: { x: 2, y: bridgeY },
+      fromTrollClearing: { x: 2, y: bridgeY },
+      fromHouse: { x: 2, y: bridgeY },
+      fromHouse1: { x: 2, y: bridgeY },
+      fromHouse2: { x: 2, y: bridgeY },
+      fromHouse3: { x: 2, y: bridgeY },
+      fromHouse4: { x: 2, y: bridgeY },
+      fromHallway: { x: 2, y: bridgeY },
+      fromStore: { x: 2, y: bridgeY },
+      start: { x: 2, y: bridgeY },
+    },
+    exits: [
+      {
+        id: "toVillage",
+        rect: { x: 0, y: bridgeY - 1, w: 1, h: 3 },
+        toArea: "village",
+        toEntry: "fromTrollBridge",
+      },
+      {
+        id: "toTrollClearing",
+        rect: { x: width - 1, y: bridgeY - 1, w: 1, h: 3 },
+        toArea: "troll_clearing",
+        toEntry: "fromTrollBridge",
+      },
+    ],
+    npcs: [],
+  };
+}
+
+export function makeTrollClearing(): AreaDef {
+  const width = 18;
+  const height = 14;
+  const tiles = borderWalls(width, height, 2);
+
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  const pathY = Math.floor(height / 2);
+  for (let x = 1; x < width - 1; x++) tiles[pathY]![x] = 4;
+  tiles[pathY - 1]![0] = 4;
+  tiles[pathY]![0] = 4;
+  tiles[pathY + 1]![0] = 4;
+
+  const lumps = [
+    { x: 4, y: 4 },
+    { x: 12, y: 5 },
+    { x: 9, y: 9 },
+  ];
+  for (const l of lumps) {
+    tiles[l.y]![l.x] = 5;
+    tiles[l.y + 1]![l.x] = 5;
+  }
+
+  return {
+    id: "troll_clearing",
+    name: "Clearing Beyond",
+    width,
+    height,
+    tiles,
+    spawns: {
+      fromTrollBridge: { x: 2, y: pathY },
+      fromVillage: { x: 2, y: pathY },
+      fromWoods: { x: 2, y: pathY },
+      fromCave: { x: 2, y: pathY },
+      fromTrollClearing: { x: 2, y: pathY },
+      fromHouse: { x: 2, y: pathY },
+      fromHouse1: { x: 2, y: pathY },
+      fromHouse2: { x: 2, y: pathY },
+      fromHouse3: { x: 2, y: pathY },
+      fromHouse4: { x: 2, y: pathY },
+      fromHallway: { x: 2, y: pathY },
+      fromStore: { x: 2, y: pathY },
+      start: { x: 2, y: pathY },
+    },
+    exits: [
+      {
+        id: "backToBridge",
+        rect: { x: 0, y: pathY - 1, w: 1, h: 3 },
+        toArea: "troll_bridge",
+        toEntry: "fromTrollClearing",
+      },
+    ],
+    npcs: [],
+  };
 }
 
 export function makeHallway(): AreaDef {
@@ -607,6 +778,9 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeHouse3();
     case "house4":
       return makeHouse4();
+    case "troll_bridge":
+      return makeTrollBridge();
+    case "troll_clearing":
+      return makeTrollClearing();
   }
 }
-

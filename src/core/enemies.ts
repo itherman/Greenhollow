@@ -1,6 +1,6 @@
 export type EnemyDifficultyRank = number;
 
-export type EnemyId = "woods_slime" | "cave_goblin_archer";
+export type EnemyId = "woods_slime" | "cave_goblin_archer" | "bridge_troll";
 
 export type EnemyDefinition = {
   id: EnemyId;
@@ -25,6 +25,11 @@ export const ENEMIES: Record<EnemyId, EnemyDefinition> = {
     id: "cave_goblin_archer",
     name: "Cave Goblin Archer",
     difficultyRank: 560,
+  },
+  bridge_troll: {
+    id: "bridge_troll",
+    name: "Bridge Troll",
+    difficultyRank: 900,
   },
 };
 
