@@ -76,6 +76,10 @@ export class InventoryPanelController {
   private deleteConfirmUntilMs = 0;
   private deleteHoldTimer?: Phaser.Time.TimerEvent;
   private deleteHoldTriggered = false;
+  private deleteDialog?: any;
+  private deleteDialogText?: any;
+  private deleteDialogVisible = false;
+  private deleteDialogSlotIndex: number | null = null;
   private equippedSlotPreference: Partial<Record<ItemId, number>> = {};
 
   private equipmentSlotRects: any[] = [];
@@ -103,6 +107,10 @@ export class InventoryPanelController {
     this.equipmentSlotIcons = [];
     this.equipmentSlotLabels = [];
     this.equippedSlotPreference = {};
+    this.deleteDialog = undefined;
+    this.deleteDialogText = undefined;
+    this.deleteDialogVisible = false;
+    this.deleteDialogSlotIndex = null;
   }
 
   /**
@@ -259,11 +267,21 @@ export class InventoryPanelController {
           this.render(true);
         };
 
-        const startDeleteConfirm = () => {
+        const startDeleteConfirm = (opts?: { viaLongPress?: boolean }) => {
           const now = scene.time?.now ?? Date.now();
           if (this.deleteConfirmSlot != null && now > this.deleteConfirmUntilMs) this.deleteConfirmSlot = null;
           this.deleteConfirmSlot = i;
           this.deleteConfirmUntilMs = now + 4000;
+          if (opts?.viaLongPress) {
+            const invNow = loadInventory();
+            const slot = invNow.slots[i];
+            if (slot) {
+              this.showDeleteDialog(i, slot.name);
+              return;
+            }
+          } else {
+            this.hideDeleteDialog();
+          }
           this.render(true);
         };
 
@@ -271,12 +289,17 @@ export class InventoryPanelController {
           // Allow tap-to-equip on mobile (and click on desktop) while inventory is open.
           if (!this.inventoryPanel?.visible) return;
 
+          if (this.deleteDialogVisible) {
+            this.cancelDeleteDialog();
+          }
+
           const handledByHost = this.host.handleInventorySlotClick?.(i, pointer) ?? false;
           if (handledByHost) {
             this.deleteConfirmSlot = null;
             this.deleteHoldTimer?.remove(false);
             this.deleteHoldTimer = undefined;
             this.deleteHoldTriggered = false;
+            this.hideDeleteDialog();
             skipNextPrimary = true;
             return;
           }
@@ -291,6 +314,7 @@ export class InventoryPanelController {
               invNow.slots[i] = null;
               saveInventory(invNow);
               this.host.writeProgress(true);
+              this.hideDeleteDialog();
               this.render(true);
               return;
             }
@@ -304,7 +328,7 @@ export class InventoryPanelController {
             this.deleteHoldTimer?.remove(false);
             this.deleteHoldTimer = scene.time.delayedCall(650, () => {
               this.deleteHoldTriggered = true;
-              startDeleteConfirm();
+              startDeleteConfirm({ viaLongPress: true });
             });
             return;
           }
@@ -596,6 +620,12 @@ export class InventoryPanelController {
 
     this.inventoryBackdrop.setVisible(open);
     this.inventoryPanel.setVisible(open);
+    if (!open) {
+      this.hideDeleteDialog();
+    } else if (this.deleteDialogVisible) {
+      this.layoutDeleteDialog();
+      this.deleteDialog?.setVisible(true);
+    }
   }
 
   private computeHint(inv: ReturnType<typeof loadInventory>): string {
@@ -606,6 +636,7 @@ export class InventoryPanelController {
     }
     const override = this.host.getInventoryHint?.(inv);
     if (override) return override;
+    if (this.deleteDialogVisible) return "Confirm deletion?";
     return "Tap pouch or Esc to close • Tap food to eat • 1-9 to hold • Hold or right-click to delete";
   }
 
@@ -632,5 +663,89 @@ export class InventoryPanelController {
     assignSlot(equipment.bodyArmorItemId);
     assignSlot(equipment.legArmorItemId);
     return slots;
+  }
+
+  private ensureDeleteDialog(scene: any): void {
+    if (this.deleteDialog) return;
+    const bg = scene.add.rectangle(0, 0, 240, 120, 0x0d1a12, 0.95).setStrokeStyle(2, 0x3a2a1a, 0.9);
+    const text = scene.add.text(0, 0, "", {
+      fontFamily: "system-ui, sans-serif",
+      fontSize: "14px",
+      color: "#e8f0e6",
+      align: "center",
+      wordWrap: { width: 200, useAdvancedWrap: true },
+    });
+    const confirmBtn = scene.add.rectangle(0, 0, 90, 28, 0x3a1c1c, 1).setStrokeStyle(1, 0x8b3a3a, 1).setInteractive({ useHandCursor: true });
+    const confirmText = scene.add
+      .text(0, 0, "Delete", { fontFamily: "system-ui, sans-serif", fontSize: "14px", color: "#ffffff" })
+      .setOrigin(0.5, 0.5);
+    const cancelBtn = scene.add.rectangle(0, 0, 90, 28, 0x1c2b1f, 1).setStrokeStyle(1, 0x4f7a6b, 1).setInteractive({ useHandCursor: true });
+    const cancelText = scene.add
+      .text(0, 0, "Cancel", { fontFamily: "system-ui, sans-serif", fontSize: "14px", color: "#ffffff" })
+      .setOrigin(0.5, 0.5);
+
+    confirmBtn.on("pointerdown", () => this.confirmDeleteDialog());
+    cancelBtn.on("pointerdown", () => this.cancelDeleteDialog());
+
+    this.deleteDialog = scene.add.container(0, 0, [bg, text, confirmBtn, cancelBtn, confirmText, cancelText]);
+    this.deleteDialog.setDepth(2600).setScrollFactor(0);
+    this.deleteDialogText = text;
+    scene.cameras.main.ignore(this.deleteDialog);
+    this.hideDeleteDialog();
+  }
+
+  private layoutDeleteDialog(): void {
+    if (!this.deleteDialog) return;
+    const { scene } = this.host;
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    this.deleteDialog.setPosition(centerX, centerY);
+    const [_bg, text, confirmBtn, cancelBtn, confirmText, cancelText] = this.deleteDialog.list;
+    text.setPosition(0, -22).setOrigin(0.5, 0.5);
+    confirmBtn.setPosition(-60, 28);
+    confirmText.setPosition(-60, 28);
+    cancelBtn.setPosition(60, 28);
+    cancelText.setPosition(60, 28);
+  }
+
+  private showDeleteDialog(slotIndex: number, itemName: string): void {
+    const { scene } = this.host;
+    this.ensureDeleteDialog(scene);
+    this.deleteDialogSlotIndex = slotIndex;
+    this.deleteDialogVisible = true;
+    this.deleteDialogText?.setText(`Delete ${itemName}?`);
+    this.layoutDeleteDialog();
+    this.deleteDialog?.setVisible(true);
+  }
+
+  private hideDeleteDialog(): void {
+    this.deleteDialogVisible = false;
+    this.deleteDialogSlotIndex = null;
+    this.deleteDialog?.setVisible(false);
+  }
+
+  private confirmDeleteDialog(): void {
+    const slotIndex = this.deleteDialogSlotIndex;
+    if (slotIndex == null) {
+      this.hideDeleteDialog();
+      return;
+    }
+    const invNow = loadInventory();
+    if (invNow.slots[slotIndex]) {
+      invNow.slots[slotIndex] = null;
+      saveInventory(invNow);
+      this.host.writeProgress(true);
+    }
+    this.deleteConfirmSlot = null;
+    this.deleteHoldTriggered = false;
+    this.hideDeleteDialog();
+    this.render(true);
+  }
+
+  private cancelDeleteDialog(): void {
+    this.deleteConfirmSlot = null;
+    this.deleteHoldTriggered = false;
+    this.hideDeleteDialog();
+    this.render(true);
   }
 }
