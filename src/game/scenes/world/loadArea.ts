@@ -454,8 +454,6 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     const guardX = bridgeX * tileSize;
     const guardZone = scene.add.zone(guardX, worldH / 2, guardWidth, worldH);
     scene.physics.add.existing(guardZone, true);
-    const guardBody = guardZone.body as Phaser.Physics.Arcade.Body;
-    guardBody.setAllowGravity(false);
     scene.physics.add.collider(trolls, guardZone);
     scene.uiCam.ignore(guardZone);
     scene.trollGuardRail = guardZone;
