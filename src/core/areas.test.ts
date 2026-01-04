@@ -3,10 +3,12 @@ import { getArea, validateArea } from "./areas";
 
 describe("areas", () => {
   it("all areas validate", () => {
-    for (const id of ["village", "woods", "cave", "house", "hallway", "store", "house1", "house2", "house3", "house4"] as const) {
+    for (const id of ["village", "woods", "cave", "house", "hallway", "store", "house1", "house2", "house3", "house4", "troll_bridge", "troll_clearing"] as const) {
       const area = getArea(id);
       const v = validateArea(area);
-      expect(v).toEqual({ ok: true });
+      if (v.ok !== true) {
+        throw new Error(`${id}: ${v.errors.join(",")}`);
+      }
     }
   });
 
