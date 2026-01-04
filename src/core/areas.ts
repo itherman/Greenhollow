@@ -614,7 +614,6 @@ export function makeTrollBridge(): AreaDef {
     { x: 4, y: bridgeY + 3 },
     { x: barrierX + 3, y: bridgeY - 2 },
     { x: barrierX + 6, y: bridgeY + 2 },
-    { x: barrierX + 8, y: bridgeY },
   ];
   for (const c of cover) {
     tiles[c.y]![c.x] = 5;

@@ -443,7 +443,11 @@ export class WorldScene extends Phaser.Scene {
     if (r.died) {
       const dropX = troll.x;
       const dropY = troll.y;
-      this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "troll_key", qty: 1 });
+      const trollAlreadyCleared = hasFlag("enemy.trollBridge.defeated");
+      if (!trollAlreadyCleared) {
+        this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "troll_key", qty: 1 });
+        setFlag("enemy.trollBridge.defeated");
+      }
       this.spawnEnemyDrop(dropX + 6, dropY + 4, "bridge_troll", { kind: "item", itemId: "leather_armor", qty: 1 });
       this.spawnEnemyDrop(dropX - 6, dropY - 4, "bridge_troll");
       troll.destroy();
