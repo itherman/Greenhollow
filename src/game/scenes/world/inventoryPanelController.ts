@@ -1,5 +1,5 @@
-import { toggleEquipFromInventorySlot, type EquipmentState } from "../../../core/equipment";
 import { digestFoodFromInventorySlot } from "../../../core/digestFood";
+import { toggleEquipFromInventorySlot, type EquipmentState } from "../../../core/equipment";
 import { loadInventory } from "../../../services/game/inventoryStore";
 import { saveInventory } from "../../../services/game/inventoryStore";
 import { saveEquipment } from "../../../services/game/equipmentStore";
@@ -7,6 +7,7 @@ import { loadSession } from "../../../services/auth/session";
 import { saveCloudPlayerState } from "../../../services/game/cloudPlayerState";
 import { withLoadingOverlay } from "../../../ui/loadingOverlay";
 import type { ItemId } from "../../../core/inventory";
+import { normalizeScreenSize } from "../../../core/screen";
 
 /**
  * Inventory / “Pouch” modal controller extracted from `WorldScene`.
@@ -439,12 +440,14 @@ export class InventoryPanelController {
     }
 
     // Layout (responsive)
-    const W = scene.scale.width;
-    const H = scene.scale.height;
+    const { w: W, h: H } = normalizeScreenSize(
+      scene.uiCam?.width ?? scene.scale.width,
+      scene.uiCam?.height ?? scene.scale.height,
+    );
     const panelW = Math.min(520, W - 40);
     const panelH = Math.min(420, H - 40);
-    const panelX = W / 2;
-    const panelY = H / 2;
+    const panelX = scene.uiCam?.centerX ?? W / 2;
+    const panelY = scene.uiCam?.centerY ?? H / 2;
     const pad = 14;
     const topBarH = 34;
     const equipRowH = 56;
