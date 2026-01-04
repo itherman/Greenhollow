@@ -196,9 +196,8 @@ export function ensurePeasantPlayerBodyArmorSpriteSheets(scene: Phaser.Scene) {
 }
 
 export function ensureNpcTextures(scene: Phaser.Scene) {
-  if (scene.textures.exists("npc_elder")) return;
-
   const mk = (key: string, draw: (ctx: CanvasRenderingContext2D) => void) => {
+    if (scene.textures.exists(key)) return;
     const c = document.createElement("canvas");
     c.width = 24;
     c.height = 24;
@@ -248,6 +247,59 @@ export function ensureNpcTextures(scene: Phaser.Scene) {
     ctx.fillStyle = "#241a12";
     ctx.fillRect(10, 16, 2, 2);
     ctx.fillRect(13, 16, 2, 2);
+  });
+
+  mk("npc_shopkeeper", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // apron
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(9, 8, 6, 9);
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(9, 8, 2, 9);
+    // undershirt sleeves
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(8, 9, 1, 4);
+    ctx.fillRect(15, 9, 1, 4);
+    // belt and pouch
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(9, 14, 6, 1);
+    ctx.fillRect(14, 13, 2, 2);
+    // head + hairband
+    ctx.fillStyle = "#f2c7a5";
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = "#c084fc";
+    ctx.fillRect(10, 3, 4, 1);
+    ctx.fillStyle = "#5a3a1f";
+    ctx.fillRect(10, 2, 4, 1);
+    // boots
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(10, 17, 2, 2);
+    ctx.fillRect(13, 17, 2, 2);
+  });
+
+  mk("npc_buyer", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // cloak
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(8, 7, 8, 10);
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(8, 10, 8, 2);
+    // scarf
+    ctx.fillStyle = "#f97316";
+    ctx.fillRect(9, 8, 6, 2);
+    ctx.fillRect(9, 10, 2, 2);
+    // head
+    ctx.fillStyle = "#f2c7a5";
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(9, 3, 6, 1);
+    // satchel strap
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(11, 8, 2, 8);
+    // boots
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(10, 17, 2, 2);
+    ctx.fillRect(13, 17, 2, 2);
   });
 }
 
@@ -501,6 +553,84 @@ export function ensureVillageHouseTexture(scene: Phaser.Scene) {
 
   scene.textures.addImage("prop_house_village", c as unknown as HTMLImageElement);
   scene.textures.get("prop_house_village").setFilter(Phaser.Textures.FilterMode.NEAREST);
+}
+
+export function ensureStoreExteriorTexture(scene: Phaser.Scene) {
+  if (scene.textures.exists("prop_store_exterior")) return;
+
+  const tileSize = 32;
+  const w = tileSize * 6;
+  const h = tileSize * 4;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("Failed to get canvas context");
+
+  const rect = (x: number, y: number, ww: number, hh: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, ww, hh);
+  };
+  const px = (x: number, y: number, color: string) => rect(x, y, 1, 1, color);
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Slate roof with subtle pattern
+  rect(0, 0, w, 36, "#1e293b");
+  rect(0, 0, w, 3, "#334155");
+  for (let i = 0; i < 220; i++) {
+    const x = 2 + ((i * 13) % (w - 4));
+    const y = 4 + ((i * 9) % 30);
+    px(x, y, i % 2 ? "#111827" : "#0f172a");
+  }
+  rect(0, 36, w, 4, "#0b1220");
+
+  // Walls with trimmed base
+  rect(8, 40, w - 16, h - 52, "#e5e7eb");
+  rect(8, 40, w - 16, 3, "#f8fafc");
+  rect(8, h - 12, w - 16, 4, "#cbd5e1");
+
+  // Vertical beams and trim
+  rect(8, 40, 5, h - 52, "#7c2d12");
+  rect(w - 13, 40, 5, h - 52, "#7c2d12");
+  rect(8, 58, w - 16, 4, "#7c2d12");
+
+  // Sign band
+  rect(Math.floor(w / 2) - 34, 48, 68, 10, "#0ea5e9");
+  rect(Math.floor(w / 2) - 34, 48, 68, 2, "#38bdf8");
+  rect(Math.floor(w / 2) - 32, 50, 64, 6, "#0b1220");
+  rect(Math.floor(w / 2) - 16, 51, 32, 4, "#f5d76e");
+
+  // Door (bottom center)
+  const doorW = 20;
+  const doorH = 28;
+  const doorX = Math.floor(w / 2 - doorW / 2);
+  const doorY = h - 12 - doorH;
+  rect(doorX, doorY, doorW, doorH, "#6b4f2a");
+  rect(doorX, doorY, doorW, 3, "#7a5a30");
+  rect(doorX + doorW - 5, doorY + Math.floor(doorH / 2), 2, 2, "#f5d76e");
+  // Door frame highlight
+  rect(doorX - 2, doorY, 2, doorH, "#c084fc");
+  rect(doorX + doorW, doorY, 2, doorH, "#c084fc");
+
+  // Windows with teal tint
+  const win = (x: number, y: number) => {
+    rect(x, y, 16, 12, "#0b1220");
+    rect(x + 1, y + 1, 14, 10, "#0ea5e9");
+    rect(x + 7, y + 1, 1, 10, "#cbd5e1");
+    rect(x + 1, y + 6, 14, 1, "#cbd5e1");
+    rect(x - 1, y - 1, 18, 2, "#7c2d12");
+    rect(x - 1, y + 11, 18, 2, "#7c2d12");
+  };
+  win(26, 60);
+  win(w - 42, 60);
+
+  // Small porch step under the door tile
+  rect(doorX - 6, h - 10, doorW + 12, 3, "#8b5a2b");
+  rect(doorX - 6, h - 10, doorW + 12, 1, "#9c6a35");
+
+  scene.textures.addImage("prop_store_exterior", c as unknown as HTMLImageElement);
+  scene.textures.get("prop_store_exterior").setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
 export function ensureItemAndPropTextures(scene: Phaser.Scene) {
