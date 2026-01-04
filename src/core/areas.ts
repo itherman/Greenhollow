@@ -391,16 +391,16 @@ export function makeWoods(): AreaDef {
         id: "toVillage",
         rect: { x: 0, y: Math.floor(height / 2) - 1, w: 1, h: 2 },
         toArea: "village",
-        toEntry: "fromWoods",
-      },
-      {
-        id: "toStore",
-        rect: { x: storeX, y: 1, w: 2, h: 1 },
-        toArea: "store",
-        toEntry: "fromWoods",
-      },
-      {
-        id: "toCave",
+      toEntry: "fromWoods",
+    },
+    {
+      id: "toStore",
+      rect: { x: storeX, y: 1, w: 2, h: 2 },
+      toArea: "store",
+      toEntry: "fromWoods",
+    },
+    {
+      id: "toCave",
         rect: { x: width - 1, y: height - 4, w: 1, h: 3 },
         toArea: "cave",
         toEntry: "fromWoods",
@@ -763,7 +763,9 @@ export function makeStore(): AreaDef {
   // Simple counter wall with an opening.
   const counterY = 3;
   for (let x = 2; x <= width - 3; x++) tiles[counterY]![x] = 1;
+  const buyerOpeningX = Math.min(width - 3, Math.max(2, doorX - 2));
   tiles[counterY]![doorX] = 3;
+  tiles[counterY]![buyerOpeningX] = 3;
 
   return {
     id: "store",
