@@ -1,9 +1,11 @@
 import { advanceLine, choose, closeDialog, getNode, type DialogState } from "../../../core/dialog";
 import { computeDialogLayout } from "../../../core/dialogLayout";
 import { computeDialogTapAction } from "../../../core/dialogTap";
+import { ITEMS, type ItemId } from "../../../core/inventory";
 import { loadInventory, saveInventory } from "../../../services/game/inventoryStore";
 import { getShopCoinsLabel } from "../../../ui/shopCoinsLabel";
 import { attemptPurchase } from "../../../core/shopLogic";
+import { getShopEntry } from "../../../core/shopCatalog";
 import { paginateDialogChoices } from "../../../core/dialogPagination";
 import type { getDialogScript } from "../../dialog/scripts";
 
@@ -136,6 +138,11 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     } else if (isBuyer && node.id === "waitPick") {
       header = "Open your pouch and pick an item to sell.";
       if (!this.buyerSelectionActive) this.startBuyerSelection(script);
+    } else if (isShop && node.id === "confirm" && this.pendingPurchaseItemId) {
+      const pendingItemId = this.pendingPurchaseItemId as ItemId | null;
+      const entry = pendingItemId ? getShopEntry(pendingItemId) : null;
+      const label = pendingItemId ? ITEMS[pendingItemId]?.name ?? pendingItemId : "that item";
+      header = entry ? `Buy ${label} for ${entry.priceCoins}c?` : `Buy ${label}?`;
     }
     this.dialogText!.setText(header);
 
@@ -157,7 +164,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const isBuyer = script.id === "buyerNpc";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
-      if (isShop) {
+      if (isShop && node.id === "menu") {
         const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
         choicesToRender = page.visible;
         nextPage = page.nextPage;
@@ -208,22 +215,44 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
             return;
           }
 
-          if (isBuyer && this.handleBuyerChoice(ch.id, script)) return;
-
-          // Shopkeeper purchases: apply side effects before re-render.
-          if (isShop && ch.id.startsWith("buy_")) {
-            const itemId = ch.id.slice("buy_".length) as any;
-            const inv = loadInventory();
-            const res = attemptPurchase(inv, itemId);
-            saveInventory(inv);
-            if (this.inventoryOpen) this.renderInventoryPanel();
-            const nodeId = res.ok ? "buyOk" : res.reason === "insufficient_coins" ? "buyNoCoins" : "buyNoSpace";
+          if (isShop && node.id === "menu" && ch.id.startsWith("buy_")) {
+            this.pendingPurchaseItemId = ch.id.slice("buy_".length) as ItemId;
             this.shopDialogPage = 0;
-            this.dialog = { open: true, scriptId: script.id, nodeId } as DialogState;
+            this.dialog = { open: true, scriptId: script.id, nodeId: "confirm" } as DialogState;
             this.renderDialog(script);
             return;
           }
 
+          if (isShop && node.id === "confirm") {
+            if (ch.id === "confirm_no") {
+              this.pendingPurchaseItemId = null;
+              this.shopDialogPage = 0;
+              this.dialog = { open: true, scriptId: script.id, nodeId: "menu" } as DialogState;
+              this.renderDialog(script);
+              return;
+            }
+            if (ch.id === "confirm_yes") {
+              const itemId = this.pendingPurchaseItemId;
+              this.pendingPurchaseItemId = null;
+              const inv = loadInventory();
+              const res = itemId ? attemptPurchase(inv, itemId) : { ok: false, reason: "unknown_item" as const };
+              saveInventory(inv);
+              if (this.inventoryOpen) this.renderInventoryPanel();
+              const nodeId =
+                res.ok === true
+                  ? "buyOk"
+                  : res.reason === "insufficient_coins"
+                    ? "buyNoCoins"
+                    : "buyNoSpace";
+              this.dialog = { open: true, scriptId: script.id, nodeId } as DialogState;
+              this.renderDialog(script);
+              return;
+            }
+          }
+
+          if (isBuyer && this.handleBuyerChoice(ch.id, script)) return;
+
+          // Shopkeeper purchases: apply side effects before re-render.
           this.dialog = choose(script, this.dialog, ch.id);
           if (isShop) this.shopDialogPage = 0;
           this.renderDialog(script);
