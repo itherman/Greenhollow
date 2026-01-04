@@ -552,10 +552,14 @@ export function ensureVillageHouseTexture(scene: Phaser.Scene) {
   const doorH = 30;
   const doorX = Math.floor(w / 2 - doorW / 2);
   const doorY = h - 14 - doorH;
+  rect(doorX - 1, doorY - 1, doorW + 2, doorH + 2, "#4b3522"); // frame
   rect(doorX, doorY, doorW, doorH, "#6b4f2a");
   rect(doorX, doorY, doorW, 2, "#7a5a30");
   rect(doorX, doorY + doorH - 2, doorW, 2, "#5b4122");
-  rect(doorX + doorW - 4, doorY + doorH / 2, 2, 2, "#f5d76e"); // knob
+  rect(doorX, doorY + 2, 2, doorH - 4, "#5b4122"); // left edge shadow
+  rect(doorX + doorW - 2, doorY + 2, 2, doorH - 4, "#5b4122"); // right edge shadow
+  rect(doorX + Math.floor(doorW / 2) - 1, doorY + 4, 2, doorH - 8, "#7a5a30"); // center seam
+  rect(doorX + doorW - 4, doorY + Math.floor(doorH / 2), 2, 2, "#f5d76e"); // knob
 
   // Windows
   const win = (x: number, y: number) => {
