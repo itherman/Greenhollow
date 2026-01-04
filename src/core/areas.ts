@@ -217,6 +217,8 @@ export function makeVillage(): AreaDef {
   for (let x = trollLaneStartX; x <= trollConnectorX; x++) paintPath(x, 2);
   for (let y = 2; y <= trollGateY; y++) paintPath(trollConnectorX, y);
   for (let x = trollConnectorX; x < width; x++) paintPath(x, trollGateY);
+  // Stitch the northwest bend so the top lane visually connects to the main spur.
+  paintPath(3, 2);
 
   // House spurs: connect each house-front tile to the main gate line, without cutting through footprints.
   for (let i = 0; i < houseFronts.length; i++) {
@@ -250,8 +252,9 @@ export function makeVillage(): AreaDef {
     for (let y = rerouteY; y <= gateY; y++) paintPath(rerouteX, y);
   }
 
-  // Carve the woods gate opening through the border wall so the player can step onto the exit zone.
-  tiles[gateY - 1]![width - 1] = 4;
+  // Carve the woods gate opening through the border wall so the player can step onto the exit zone,
+  // leaving a grass buffer between the woods and troll gate tiles.
+  tiles[gateY - 1]![width - 1] = 0;
   tiles[gateY]![width - 1] = 4;
   // Carve the troll bridge opening.
   tiles[trollGateY]![width - 1] = 4;
@@ -280,7 +283,7 @@ export function makeVillage(): AreaDef {
     exits: [
       {
         id: "toWoods",
-        rect: { x: width - 1, y: gateY - 1, w: 1, h: 2 },
+        rect: { x: width - 1, y: gateY, w: 1, h: 1 },
         toArea: "woods",
         toEntry: "fromVillage",
       },

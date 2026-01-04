@@ -79,6 +79,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.chestContents = undefined;
   scene.trollWarningZone?.destroy();
   scene.trollWarningZone = undefined;
+  scene.trollGuardRail?.destroy();
+  scene.trollGuardRail = undefined;
   scene.trollGroup?.destroy(true);
   scene.trollGroup = undefined;
   scene.bowSprite?.destroy();
@@ -448,6 +450,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.uiCam.ignore(troll);
 
     scene.physics.add.collider(trolls, layer);
+    const guardWidth = tileSize * 3;
+    const guardX = bridgeX * tileSize;
+    const guardZone = scene.add.zone(guardX, worldH / 2, guardWidth, worldH);
+    scene.physics.add.existing(guardZone, true);
+    const guardBody = guardZone.body as Phaser.Physics.Arcade.Body;
+    guardBody.setAllowGravity(false);
+    scene.physics.add.collider(trolls, guardZone);
+    scene.uiCam.ignore(guardZone);
+    scene.trollGuardRail = guardZone;
     scene.physics.add.collider(scene.player, trolls, (_p: unknown, t: unknown) => {
       const mon = t as Phaser.Physics.Arcade.Sprite;
       const now = scene.time.now;
