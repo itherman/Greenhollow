@@ -231,6 +231,14 @@ export const doorLocked: DialogScript = {
   },
 };
 
+export const trollDoorLocked: DialogScript = {
+  id: "trollDoorLocked",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "end", text: "Locked tight. The troll's key should open it." },
+  },
+};
+
 export const swordFound: DialogScript = {
   id: "swordFound",
   start: "a",
@@ -307,6 +315,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return keyFound;
     case "doorLocked":
       return doorLocked;
+    case "trollDoorLocked":
+      return trollDoorLocked;
     case "swordFound":
       return swordFound;
     case "swordTaken":

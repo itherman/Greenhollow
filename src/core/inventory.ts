@@ -1,6 +1,7 @@
 export type ItemId =
   | "coins"
   | "rusty_key"
+  | "troll_key"
   | "sword"
   | "bow"
   | "arrows"
@@ -112,6 +113,7 @@ export function inventoryFromJSON(raw: string, fallbackSize = 20): Inventory {
 export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
   coins: { id: "coins", name: "Coins", maxStack: 999 },
   rusty_key: { id: "rusty_key", name: "Rusty Key", maxStack: 1 },
+  troll_key: { id: "troll_key", name: "Troll's Key", maxStack: 1 },
   sword: { id: "sword", name: "Sword", maxStack: 1 },
   bow: { id: "bow", name: "Bow", maxStack: 1 },
   arrows: { id: "arrows", name: "Arrows", maxStack: 999 },
@@ -127,5 +129,4 @@ export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
 export function getItemCount(inv: Inventory, itemId: ItemId): number {
   return inv.slots.reduce((sum, s) => (s?.id === itemId ? sum + s.qty : sum), 0);
 }
-
 
