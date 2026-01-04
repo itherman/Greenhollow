@@ -67,6 +67,10 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.uiCam.ignore(layer);
 
   const storeColliders: Phaser.GameObjects.Zone[] = [];
+  const shouldProcessArrowTileCollision = (_obj: unknown, tile: Phaser.Tilemaps.Tile) => {
+    if (scene.area.id === "troll_bridge" && tile?.index === 6) return false;
+    return true;
+  };
 
   const worldW = scene.area.width * tileSize;
   const worldH = scene.area.height * tileSize;
@@ -90,10 +94,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.bowSprite?.destroy();
   scene.bowSprite = undefined;
   scene.playerArrowsGroup = scene.physics.add.group();
-  scene.physics.add.collider(scene.playerArrowsGroup, layer, (_arrow: unknown) => {
-    const a = _arrow as Phaser.Physics.Arcade.Sprite;
-    a.destroy();
-  });
+  scene.physics.add.collider(
+    scene.playerArrowsGroup,
+    layer,
+    (_arrow: unknown) => {
+      const a = _arrow as Phaser.Physics.Arcade.Sprite;
+      a.destroy();
+    },
+    shouldProcessArrowTileCollision,
+  );
 
   // Drop items (coins/hearts) created by enemy deaths.
   scene.dropsGroup = scene.physics.add.group();
@@ -251,17 +260,18 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   // Dynamic physics groups require explicit colliders.
   addNpcColliders({ physics: scene.physics as any, player: scene.player, npcs, worldLayer: layer });
   ensureNpcTextures(scene);
+  const npcTextureForId = (id: string) => {
+    if (id === "elder") return "npc_elder";
+    if (id === "shopkeeper") return "npc_shopkeeper";
+    if (id === "buyer_npc") return "npc_buyer_dark";
+    if (id === "homeowner2" || id === "homeowner4") return "npc_villager_dark";
+    return "npc_villager";
+  };
   for (const npc of scene.area.npcs) {
     const x = npc.pos.x * tileSize + tileSize / 2;
     const y = npc.pos.y * tileSize + tileSize / 2;
-    const tex =
-      npc.id === "elder"
-        ? "npc_elder"
-        : npc.id === "shopkeeper"
-          ? "npc_shopkeeper"
-          : npc.id === "buyer_npc"
-            ? "npc_buyer"
-            : "npc_villager";
+    const tex = npcTextureForId(npc.id);
+    const isVillagerTexture = tex === "npc_villager" || tex === "npc_villager_dark";
     const s = npcs.create(x, y, tex) as Phaser.Physics.Arcade.Sprite;
     s.setDepth(s.y);
     (s as any).npcDef = npc;
@@ -275,9 +285,9 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       home: { x, y },
       target: undefined,
       nextDecisionAt: scene.time.now + Phaser.Math.Between(400, 900),
-      paused: tex !== "npc_villager",
-      speed: tex === "npc_villager" ? Phaser.Math.Between(18, 26) : 0,
-      wanderBounds: tex === "npc_villager" ? scene.computeNpcWanderBounds(npc) : undefined,
+      paused: !isVillagerTexture,
+      speed: isVillagerTexture ? Phaser.Math.Between(18, 26) : 0,
+      wanderBounds: isVillagerTexture ? scene.computeNpcWanderBounds(npc) : undefined,
     });
     scene.uiCam.ignore(s);
   }
@@ -338,14 +348,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
     if (storeExit) {
       const storeFrontWidthTiles = 6;
+      const storeFrontHeightTiles = 4;
       const imgX =
         (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
-      const imgY = (4 * tileSize) / 2;
+      const imgY = (storeFrontHeightTiles * tileSize) / 2;
       const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
-      storeImg.setDepth(storeExit.rect.y * tileSize + 4 * tileSize - 2);
+      const storeImgDepth = (storeExit.rect.y + 0.5) * tileSize;
+      storeImg.setDepth(storeImgDepth);
       scene.uiCam.ignore(storeImg);
 
-      const storeFrontHeightTiles = 4;
       const storeLeftX = (storeExit.rect.x - 2) * tileSize;
       const storeTopY = 0;
       const storeHeightPx = storeFrontHeightTiles * tileSize;
@@ -593,23 +604,33 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     }
   }
 
-  // Cave goblin archers + arrows
-  if (scene.area.id === "cave") {
+  // Goblin archers + arrows
+  const goblinTiles: TilePos[] | null =
+    scene.area.id === "cave"
+      ? chooseEnemySpawnTiles({
+          area: scene.area,
+          count: 3,
+          rng: () => Math.random(),
+          avoid: [scene.getPlayerTilePos()],
+          minDistTiles: 5,
+        })
+      : scene.area.id === "troll_bridge"
+        ? [
+            { x: Math.floor(scene.area.width / 2) + 4, y: Math.floor(scene.area.height / 2) - 2 },
+            { x: Math.floor(scene.area.width / 2) + 7, y: Math.floor(scene.area.height / 2) + 2 },
+          ].filter((p) => {
+            const tileIndex = scene.area.tiles[p.y]?.[p.x];
+            return tileIndex != null && tileIndex !== 1 && tileIndex !== 5 && tileIndex !== 6;
+          })
+        : null;
+
+  if (goblinTiles && goblinTiles.length > 0) {
     ensureGoblinAndArrowTextures(scene);
     const goblins = scene.physics.add.group();
     const arrows = scene.physics.add.group();
     scene.goblinsGroup = goblins;
     scene.arrowsGroup = arrows;
 
-    // Spawn a few goblin archers near pillars.
-    const avoid = scene.getPlayerTilePos();
-    const goblinTiles = chooseEnemySpawnTiles({
-      area: scene.area,
-      count: 3,
-      rng: () => Math.random(),
-      avoid: [avoid],
-      minDistTiles: 5,
-    });
     for (const p of goblinTiles) {
       const gx = p.x * tileSize + tileSize / 2;
       const gy = p.y * tileSize + tileSize / 2;
@@ -634,10 +655,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.physics.add.collider(goblins, goblins);
 
     // Arrow physics: no gravity, collide with walls, damage player.
-    scene.physics.add.collider(arrows, layer, (_a: unknown) => {
-      const a = _a as Phaser.Physics.Arcade.Sprite;
-      a.destroy();
-    });
+    scene.physics.add.collider(
+      arrows,
+      layer,
+      (_a: unknown) => {
+        const a = _a as Phaser.Physics.Arcade.Sprite;
+        a.destroy();
+      },
+      shouldProcessArrowTileCollision,
+    );
     scene.physics.add.overlap(scene.player, arrows, (_p: unknown, a: unknown) => {
       const arrow = a as Phaser.Physics.Arcade.Sprite;
       const now = scene.time.now;
@@ -755,7 +781,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       },
     });
   } else {
-    // no goblins outside cave
+    // no goblins in this area
     scene.goblinsGroup?.destroy(true);
     scene.goblinsGroup = undefined;
     scene.arrowsGroup?.destroy(true);

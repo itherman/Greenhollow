@@ -208,6 +208,86 @@ export function ensureNpcTextures(scene: Phaser.Scene) {
     scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
   };
 
+  const drawVillager = (
+    ctx: CanvasRenderingContext2D,
+    palette: { skin: string; skinShadow: string; hair: string },
+  ) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // tunic
+    ctx.fillStyle = "#d97706";
+    ctx.fillRect(9, 8, 6, 8);
+    ctx.fillStyle = "#b45309";
+    ctx.fillRect(9, 8, 2, 8);
+    // head
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = palette.skinShadow;
+    ctx.fillRect(10, 7, 4, 1);
+    ctx.fillStyle = palette.hair;
+    ctx.fillRect(10, 3, 4, 1);
+    // boots
+    ctx.fillStyle = "#241a12";
+    ctx.fillRect(10, 16, 2, 2);
+    ctx.fillRect(13, 16, 2, 2);
+  };
+
+  const drawShopkeeper = (ctx: CanvasRenderingContext2D, palette: { skin: string; skinShadow: string }) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // apron
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(9, 8, 6, 9);
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(9, 8, 2, 9);
+    // undershirt sleeves
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(8, 9, 1, 4);
+    ctx.fillRect(15, 9, 1, 4);
+    // belt and pouch
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(9, 14, 6, 1);
+    ctx.fillRect(14, 13, 2, 2);
+    // head + hairband
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = palette.skinShadow;
+    ctx.fillRect(10, 7, 4, 1);
+    ctx.fillStyle = "#c084fc";
+    ctx.fillRect(10, 3, 4, 1);
+    ctx.fillStyle = "#5a3a1f";
+    ctx.fillRect(10, 2, 4, 1);
+    // boots
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(10, 17, 2, 2);
+    ctx.fillRect(13, 17, 2, 2);
+  };
+
+  const drawBuyer = (ctx: CanvasRenderingContext2D, palette: { skin: string; skinShadow: string }) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // cloak
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(8, 7, 8, 10);
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(8, 10, 8, 2);
+    // scarf
+    ctx.fillStyle = "#f97316";
+    ctx.fillRect(9, 8, 6, 2);
+    ctx.fillRect(9, 10, 2, 2);
+    // head
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = palette.skinShadow;
+    ctx.fillRect(10, 7, 4, 1);
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(9, 3, 6, 1);
+    // satchel strap
+    ctx.fillStyle = "#8b5a2b";
+    ctx.fillRect(11, 8, 2, 8);
+    // boots
+    ctx.fillStyle = "#334155";
+    ctx.fillRect(10, 17, 2, 2);
+    ctx.fillRect(13, 17, 2, 2);
+  };
+
   mk("npc_elder", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     // robe (shaded)
@@ -231,76 +311,18 @@ export function ensureNpcTextures(scene: Phaser.Scene) {
     ctx.fillRect(13, 18, 2, 2);
   });
 
-  mk("npc_villager", (ctx) => {
-    ctx.clearRect(0, 0, 24, 24);
-    // tunic
-    ctx.fillStyle = "#d97706";
-    ctx.fillRect(9, 8, 6, 8);
-    ctx.fillStyle = "#b45309";
-    ctx.fillRect(9, 8, 2, 8);
-    // head
-    ctx.fillStyle = "#f2c7a5";
-    ctx.fillRect(10, 4, 4, 4);
-    ctx.fillStyle = "#5a3a1f";
-    ctx.fillRect(10, 3, 4, 1);
-    // boots
-    ctx.fillStyle = "#241a12";
-    ctx.fillRect(10, 16, 2, 2);
-    ctx.fillRect(13, 16, 2, 2);
-  });
+  mk("npc_villager", (ctx) =>
+    drawVillager(ctx, { skin: "#f2c7a5", skinShadow: "#d8a787", hair: "#5a3a1f" }),
+  );
+  mk("npc_villager_dark", (ctx) =>
+    drawVillager(ctx, { skin: "#c48a64", skinShadow: "#9f6d45", hair: "#3f260f" }),
+  );
 
-  mk("npc_shopkeeper", (ctx) => {
-    ctx.clearRect(0, 0, 24, 24);
-    // apron
-    ctx.fillStyle = "#0ea5e9";
-    ctx.fillRect(9, 8, 6, 9);
-    ctx.fillStyle = "#0284c7";
-    ctx.fillRect(9, 8, 2, 9);
-    // undershirt sleeves
-    ctx.fillStyle = "#e5e7eb";
-    ctx.fillRect(8, 9, 1, 4);
-    ctx.fillRect(15, 9, 1, 4);
-    // belt and pouch
-    ctx.fillStyle = "#3a2a1a";
-    ctx.fillRect(9, 14, 6, 1);
-    ctx.fillRect(14, 13, 2, 2);
-    // head + hairband
-    ctx.fillStyle = "#f2c7a5";
-    ctx.fillRect(10, 4, 4, 4);
-    ctx.fillStyle = "#c084fc";
-    ctx.fillRect(10, 3, 4, 1);
-    ctx.fillStyle = "#5a3a1f";
-    ctx.fillRect(10, 2, 4, 1);
-    // boots
-    ctx.fillStyle = "#1f2937";
-    ctx.fillRect(10, 17, 2, 2);
-    ctx.fillRect(13, 17, 2, 2);
-  });
+  mk("npc_shopkeeper", (ctx) => drawShopkeeper(ctx, { skin: "#f2c7a5", skinShadow: "#d8a787" }));
+  mk("npc_shopkeeper_dark", (ctx) => drawShopkeeper(ctx, { skin: "#bf8456", skinShadow: "#9c6a3c" }));
 
-  mk("npc_buyer", (ctx) => {
-    ctx.clearRect(0, 0, 24, 24);
-    // cloak
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(8, 7, 8, 10);
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(8, 10, 8, 2);
-    // scarf
-    ctx.fillStyle = "#f97316";
-    ctx.fillRect(9, 8, 6, 2);
-    ctx.fillRect(9, 10, 2, 2);
-    // head
-    ctx.fillStyle = "#f2c7a5";
-    ctx.fillRect(10, 4, 4, 4);
-    ctx.fillStyle = "#374151";
-    ctx.fillRect(9, 3, 6, 1);
-    // satchel strap
-    ctx.fillStyle = "#8b5a2b";
-    ctx.fillRect(11, 8, 2, 8);
-    // boots
-    ctx.fillStyle = "#334155";
-    ctx.fillRect(10, 17, 2, 2);
-    ctx.fillRect(13, 17, 2, 2);
-  });
+  mk("npc_buyer", (ctx) => drawBuyer(ctx, { skin: "#f2c7a5", skinShadow: "#d8a787" }));
+  mk("npc_buyer_dark", (ctx) => drawBuyer(ctx, { skin: "#c48a64", skinShadow: "#9f6d45" }));
 }
 
 export function ensureChestTextures(scene: Phaser.Scene) {
