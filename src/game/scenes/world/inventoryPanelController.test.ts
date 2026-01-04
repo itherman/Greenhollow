@@ -127,4 +127,52 @@ describe("inventoryPanelController", () => {
     expect(handleSlot).toHaveBeenCalledWith(0, pointer);
     expect(isDialogOpen).not.toHaveBeenCalled();
   });
+
+  it("long-press opens delete dialog and confirms deletion", () => {
+    const inventory = createInventory();
+    inventory.slots[0] = { id: "bread", name: "Bread", qty: 1, maxStack: 10 };
+    vi.spyOn(inventoryStore, "loadInventory").mockReturnValue(inventory);
+    const saveSpy = vi.spyOn(inventoryStore, "saveInventory").mockReturnValue();
+    vi.spyOn(sessionModule, "loadSession").mockReturnValue(null);
+
+    const scene = createMockScene();
+
+    const controller = new InventoryPanelController({
+      scene,
+      getEquipment: () => emptyEquipment,
+      setEquipment: vi.fn(),
+      isDialogOpen: () => false,
+      updateMaxHpFromArmor: vi.fn(),
+      getHp: () => 10,
+      getMaxHp: () => 10,
+      setHp: vi.fn(),
+      writeProgress: vi.fn(),
+      exitToTitle: vi.fn(),
+      setInventoryOpen: vi.fn(),
+      clearTapIntent: vi.fn(),
+      suppressWorldPointerForMs: vi.fn(),
+      suppressExitForMs: vi.fn(),
+    });
+
+    controller.render(true);
+
+    const slotRect = (controller as any).inventorySlotRects[0];
+    const pointer = { pointerType: "touch" };
+    slotRect.emit("pointerdown", pointer);
+
+    // Fire the delayed long-press callback manually.
+    const holdTimer = (controller as any).deleteHoldTimer;
+    expect(holdTimer?.callback).toBeDefined();
+    holdTimer.callback();
+
+    expect((controller as any).deleteDialogVisible).toBe(true);
+    const deleteDialog = (controller as any).deleteDialog;
+    // Confirm button is the third element in the container list.
+    const confirmBtn = deleteDialog.list[2];
+    confirmBtn.emit("pointerdown");
+
+    expect(inventory.slots[0]).toBeNull();
+    expect(saveSpy).toHaveBeenCalled();
+    expect((controller as any).deleteDialogVisible).toBe(false);
+  });
 });
