@@ -14,6 +14,7 @@ import { computeSwordHitbox } from "../../core/playerAttack";
 import { tryShootWithAmmo } from "../../core/rangedAttack";
 import { getItemCount, removeItem } from "../../core/inventory";
 import { loadInventory, saveInventory } from "../../services/game/inventoryStore";
+import { attemptPurchase } from "../../core/shopLogic";
 import { getTapStopDistancePx } from "../../core/tapIntentMovement";
 import { computeTapToMoveInput } from "../../core/tapToMove";
 import { getPlayerAnim } from "../../core/playerAnimation";
@@ -242,23 +243,63 @@ export function worldSceneUpdate(scene: any): void {
           const isShop = script.id === "shopkeeper";
           const isBuyer = script.id === "buyerNpc";
           if (isShop) {
-            const MORE_ID = "__more_items__";
-            const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
-            const list = page.hasMore
-              ? [...page.visible, { id: MORE_ID, text: "More items...", next: node.id }]
-              : page.visible;
-            if (pick < list.length) {
-              const ch = list[pick]!;
-              if (ch.id === MORE_ID) {
-                this.shopDialogPage = page.nextPage ?? 0;
+            if (node.id === "menu") {
+              const MORE_ID = "__more_items__";
+              const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
+              const list = page.hasMore
+                ? [...page.visible, { id: MORE_ID, text: "More items...", next: node.id }]
+                : page.visible;
+              if (pick < list.length) {
+                const ch = list[pick]!;
+                if (ch.id === MORE_ID) {
+                  this.shopDialogPage = page.nextPage ?? 0;
+                  this.renderDialog(script);
+                  return;
+                }
+                if (ch.id.startsWith("buy_")) {
+                  this.pendingPurchaseItemId = ch.id.slice("buy_".length);
+                  this.shopDialogPage = 0;
+                  this.dialog = { open: true, scriptId: script.id, nodeId: "confirm" };
+                  this.renderDialog(script);
+                  return;
+                }
+                this.shopDialogPage = 0;
+                this.dialog = choose(script, this.dialog, ch.id);
                 this.renderDialog(script);
-                return;
               }
-              this.shopDialogPage = 0;
-              this.dialog = choose(script, this.dialog, ch.id);
-              this.renderDialog(script);
+              return;
             }
-            return;
+
+            if (node.id === "confirm") {
+              if (pick < node.choices.length) {
+                const ch = node.choices[pick]!;
+                if (ch.id === "confirm_no") {
+                  this.pendingPurchaseItemId = null;
+                  this.shopDialogPage = 0;
+                  this.dialog = { open: true, scriptId: script.id, nodeId: "menu" };
+                  this.renderDialog(script);
+                  return;
+                }
+                if (ch.id === "confirm_yes") {
+                  const itemId = this.pendingPurchaseItemId;
+                  this.pendingPurchaseItemId = null;
+                  const inv = loadInventory();
+                  const res = itemId ? attemptPurchase(inv, itemId) : { ok: false, reason: "unknown_item" as const };
+                  saveInventory(inv);
+                  if (this.inventoryOpen) this.renderInventoryPanel();
+                  const nodeId =
+                    res.ok === true
+                      ? "buyOk"
+                      : res.reason === "insufficient_coins"
+                        ? "buyNoCoins"
+                        : "buyNoSpace";
+                  this.dialog = { open: true, scriptId: script.id, nodeId };
+                  this.renderDialog(script);
+                  return;
+                }
+              }
+              return;
+            }
           }
 
           if (isBuyer) {
