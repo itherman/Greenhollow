@@ -20,7 +20,7 @@ import {
   type TilePos,
   type TileRect,
 } from "../../../core/exitGate";
-import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
+import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureStoreExteriorTexture, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
 import { addNpcColliders } from "../physicsColliders";
 import { configureStaticPickupBody } from "./arcadeBody";
 import { addBobbingTween } from "./bobbingTween";
@@ -233,7 +233,14 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   for (const npc of scene.area.npcs) {
     const x = npc.pos.x * tileSize + tileSize / 2;
     const y = npc.pos.y * tileSize + tileSize / 2;
-    const tex = npc.id === "elder" ? "npc_elder" : "npc_villager";
+    const tex =
+      npc.id === "elder"
+        ? "npc_elder"
+        : npc.id === "shopkeeper"
+          ? "npc_shopkeeper"
+          : npc.id === "buyer_npc"
+            ? "npc_buyer"
+            : "npc_villager";
     const s = npcs.create(x, y, tex) as Phaser.Physics.Arcade.Sprite;
     s.setDepth(s.y);
     (s as any).npcDef = npc;
@@ -306,6 +313,17 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     ensureMonsterTexture(scene);
     ensureItemAndPropTextures(scene);
     ensureChestTextures(scene);
+    ensureStoreExteriorTexture(scene);
+    const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
+    if (storeExit) {
+      const storeFrontWidthTiles = 6;
+      const imgX =
+        (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
+      const imgY = (4 * tileSize) / 2;
+      const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
+      storeImg.setDepth(storeExit.rect.y * tileSize + 4 * tileSize - 2);
+      scene.uiCam.ignore(storeImg);
+    }
     const chestOpened = hasFlag("chest.woods.arrows.1");
     const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
     const cy = 2 * tileSize + tileSize / 2;

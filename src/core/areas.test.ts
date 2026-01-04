@@ -25,6 +25,14 @@ describe("areas", () => {
   it("woods border is trees (tile 5) except at carved openings", () => {
     const a = getArea("woods");
     const openings = new Set<string>();
+    const storeExit = a.exits.find((e) => e.id === "toStore");
+    const storeX = storeExit ? storeExit.rect.x : null;
+    const storeFront = new Set<string>();
+    if (storeX != null) {
+      for (let x = Math.max(0, storeX - 2); x <= Math.min(a.width - 1, storeX + 3); x++) {
+        storeFront.add(`${x},0`);
+      }
+    }
     for (const ex of a.exits) {
       for (let yy = ex.rect.y; yy < ex.rect.y + ex.rect.h; yy++) {
         for (let xx = ex.rect.x; xx < ex.rect.x + ex.rect.w; xx++) {
@@ -35,7 +43,7 @@ describe("areas", () => {
     for (let x = 0; x < a.width; x++) {
       const topKey = `${x},0`;
       const botKey = `${x},${a.height - 1}`;
-      if (!openings.has(topKey)) expect(a.tiles[0]![x]).toBe(5);
+      if (!openings.has(topKey) && !storeFront.has(topKey)) expect(a.tiles[0]![x]).toBe(5);
       if (!openings.has(botKey)) expect(a.tiles[a.height - 1]![x]).toBe(5);
     }
     for (let y = 0; y < a.height; y++) {
@@ -154,4 +162,3 @@ describe("areas", () => {
     expect(turns).toBeGreaterThanOrEqual(2);
   });
 });
-

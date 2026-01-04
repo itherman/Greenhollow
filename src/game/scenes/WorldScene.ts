@@ -102,6 +102,8 @@ export class WorldScene extends Phaser.Scene {
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private shopDialogPage = 0;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
+  private pendingPurchaseItemId: ItemId | null = null;
   private buyerSelectionActive = false;
   private buyerOffer: { slotIndex: number; coins: number; itemName: string; qty: number; itemId: ItemId } | null = null;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
@@ -988,6 +990,7 @@ export class WorldScene extends Phaser.Scene {
     this.tapIntent = undefined;
     // Reset paging state whenever a dialog is opened (especially for shop menus).
     this.shopDialogPage = 0;
+    this.pendingPurchaseItemId = null;
     this.resetBuyerFlow();
     this.dialog = openDialog(script);
     this.renderDialog(script);

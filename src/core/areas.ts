@@ -363,6 +363,18 @@ export function makeWoods(): AreaDef {
     setPath(storeX + 1, y);
   }
 
+  // Storefront: add a small facade along the top border with a centered door.
+  const storeFrontX0 = Math.max(1, storeX - 2);
+  const storeFrontX1 = Math.min(width - 2, storeX + 3);
+  for (let x = storeFrontX0; x <= storeFrontX1; x++) tiles[0]![x] = 1;
+  tiles[0]![storeX] = 3;
+  tiles[0]![storeX + 1] = 3;
+  for (let x = storeFrontX0; x <= storeFrontX1; x++) {
+    if (tiles[1]![x] !== 1) tiles[1]![x] = 3;
+  }
+  tiles[1]![storeX] = 4;
+  tiles[1]![storeX + 1] = 4;
+
   return {
     id: "woods",
     name: "Woods",
@@ -747,15 +759,15 @@ export function makeHallway(): AreaDef {
 }
 
 export function makeStore(): AreaDef {
-  const width = 16;
-  const height = 10;
+  const width = 12;
+  const height = 8;
   const tiles = borderWalls(width, height, 3);
   const doorX = Math.floor(width / 2);
   tiles[height - 1]![doorX] = 3;
 
   // Simple counter wall with an opening.
   const counterY = 3;
-  for (let x = 3; x <= width - 4; x++) tiles[counterY]![x] = 1;
+  for (let x = 2; x <= width - 3; x++) tiles[counterY]![x] = 1;
   tiles[counterY]![doorX] = 3;
 
   return {
