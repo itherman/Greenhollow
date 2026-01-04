@@ -9,12 +9,12 @@ export function ensureTilesetTexture(scene: any): void {
   (function (this: any) {
     if (this.textures.exists("tileset_2x2")) return;
 
-    // Build a 3x2 tilesheet: 96x64, each tile is 32x32.
+    // Build a 3x3 tilesheet: 96x96, each tile is 32x32.
     // Indices are row-major (cols=3):
-    // 0 grass, 1 wall, 2 forest, 3 cave, 4 dirt, 5 trees (canopy wall)
+    // 0 grass, 1 wall, 2 forest, 3 cave, 4 dirt, 5 trees (canopy wall), 6 river
     const c = document.createElement("canvas");
     c.width = 96;
-    c.height = 64;
+    c.height = 96;
     const ctx = c.getContext("2d");
     if (!ctx) throw new Error("Failed to get canvas context");
 
@@ -96,6 +96,25 @@ export function ensureTilesetTexture(scene: any): void {
     for (let x = 64 + 2; x < 64 + 30; x += 2) {
       px(x, 32 + 29, "#071f0e");
     }
+
+    // 6 river (shaded water with light ripples)
+    rect(0, 64, 32, 32, "#1f639d");
+    rect(0, 64, 32, 2, "#2974b8");
+    rect(0, 94, 32, 2, "#174f81");
+    for (let i = 0; i < 90; i++) {
+      const x = 1 + ((i * 11 + 5) % 30);
+      const y = 65 + ((i * 7 + 3) % 30);
+      px(x, y, i % 4 ? "#2a78c4" : "#19558c");
+    }
+    for (let i = 0; i < 30; i++) {
+      const x = 2 + ((i * 13 + 9) % 28);
+      const y = 66 + ((i * 19 + 11) % 28);
+      px(x, y, i % 2 ? "#3a8bd9" : "#165078");
+    }
+
+    // Fill unused slots to avoid accidental transparency.
+    rect(32, 64, 32, 32, "#2b8a3e");
+    rect(64, 64, 32, 32, "#2b8a3e");
 
     this.textures.addSpriteSheet("tileset_2x2", c as unknown as HTMLImageElement, {
       frameWidth: 32,
