@@ -615,13 +615,28 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           minDistTiles: 5,
         })
       : scene.area.id === "troll_bridge"
-        ? [
-            { x: Math.floor(scene.area.width / 2) + 4, y: Math.floor(scene.area.height / 2) - 2 },
-            { x: Math.floor(scene.area.width / 2) + 7, y: Math.floor(scene.area.height / 2) + 2 },
-          ].filter((p) => {
-            const tileIndex = scene.area.tiles[p.y]?.[p.x];
-            return tileIndex != null && tileIndex !== 1 && tileIndex !== 5 && tileIndex !== 6;
-          })
+        ? (() => {
+            const riverX = Math.floor(scene.area.width / 2);
+            const baseline: TilePos[] = [
+              { x: riverX + 3, y: Math.floor(scene.area.height / 2) - 2 },
+              { x: riverX + 5, y: Math.floor(scene.area.height / 2) + 1 },
+              { x: riverX + 7, y: Math.floor(scene.area.height / 2) - 1 },
+            ];
+            const walkable = (p: TilePos) => {
+              const tileIndex = scene.area.tiles[p.y]?.[p.x];
+              return tileIndex != null && tileIndex !== 1 && tileIndex !== 5 && tileIndex !== 6;
+            };
+            const filtered = baseline.filter(walkable);
+            if (filtered.length > 0) return filtered;
+            // Fallback: look for any walkable tiles on the eastern bank.
+            const eastBank: TilePos[] = [];
+            for (let y = 1; y < scene.area.height - 1; y++) {
+              for (let x = riverX + 2; x < scene.area.width - 1; x++) {
+                eastBank.push({ x, y });
+              }
+            }
+            return eastBank.filter(walkable).slice(0, 2);
+          })()
         : null;
 
   if (goblinTiles && goblinTiles.length > 0) {

@@ -382,7 +382,7 @@ export function makeWoods(): AreaDef {
       fromHouse3: { x: 2, y: Math.floor(height / 2) },
       fromHouse4: { x: 2, y: Math.floor(height / 2) },
       fromHallway: { x: 2, y: Math.floor(height / 2) },
-      fromStore: { x: storeX, y: 2 },
+      fromStore: { x: storeX, y: 3 },
       start: { x: 2, y: Math.floor(height / 2) },
       fromWoods: { x: 2, y: Math.floor(height / 2) },
     },
@@ -624,6 +624,7 @@ export function makeTrollBridge(): AreaDef {
   }
 
   const entrySpawn = { x: entryX, y: height - 3 } as const;
+  const clearingReturnSpawn = { x: Math.max(width - 5, barrierX + 2), y: bridgeY } as const;
 
   return {
     id: "troll_bridge",
@@ -636,7 +637,7 @@ export function makeTrollBridge(): AreaDef {
       fromWoods: entrySpawn,
       fromCave: entrySpawn,
       fromTrollBridge: entrySpawn,
-      fromTrollClearing: { x: width - 3, y: bridgeY },
+      fromTrollClearing: clearingReturnSpawn,
       fromHouse: entrySpawn,
       fromHouse1: entrySpawn,
       fromHouse2: entrySpawn,
@@ -678,11 +679,11 @@ export function makeTrollClearing(): AreaDef {
     tiles[y]![width - 1] = 5;
   }
 
-  const pathY = Math.floor(height / 2);
-  for (let x = 1; x < width - 1; x++) tiles[pathY]![x] = 4;
-  tiles[pathY - 1]![0] = 4;
-  tiles[pathY]![0] = 4;
-  tiles[pathY + 1]![0] = 4;
+  // Entry path: start near the bottom-left, go up halfway, then turn east toward the bridge.
+  const spawn = { x: 2, y: height - 3 };
+  for (let y = spawn.y; y >= Math.floor(height / 2); y--) tiles[y]![spawn.x] = 4;
+  const turnY = Math.floor(height / 2);
+  for (let x = spawn.x; x <= width - 1; x++) tiles[turnY]![x] = 4;
 
   const lumps = [
     { x: 4, y: 4 },
@@ -701,24 +702,24 @@ export function makeTrollClearing(): AreaDef {
     height,
     tiles,
     spawns: {
-      fromTrollBridge: { x: 2, y: pathY },
-      fromVillage: { x: 2, y: pathY },
-      fromWoods: { x: 2, y: pathY },
-      fromCave: { x: 2, y: pathY },
-      fromTrollClearing: { x: 2, y: pathY },
-      fromHouse: { x: 2, y: pathY },
-      fromHouse1: { x: 2, y: pathY },
-      fromHouse2: { x: 2, y: pathY },
-      fromHouse3: { x: 2, y: pathY },
-      fromHouse4: { x: 2, y: pathY },
-      fromHallway: { x: 2, y: pathY },
-      fromStore: { x: 2, y: pathY },
-      start: { x: 2, y: pathY },
+      fromTrollBridge: spawn,
+      fromVillage: spawn,
+      fromWoods: spawn,
+      fromCave: spawn,
+      fromTrollClearing: spawn,
+      fromHouse: spawn,
+      fromHouse1: spawn,
+      fromHouse2: spawn,
+      fromHouse3: spawn,
+      fromHouse4: spawn,
+      fromHallway: spawn,
+      fromStore: spawn,
+      start: spawn,
     },
     exits: [
       {
         id: "backToBridge",
-        rect: { x: 0, y: pathY - 1, w: 1, h: 3 },
+        rect: { x: width - 1, y: turnY, w: 1, h: 1 },
         toArea: "troll_bridge",
         toEntry: "fromTrollClearing",
       },
