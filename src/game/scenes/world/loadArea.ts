@@ -81,6 +81,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.trollWarningZone = undefined;
   scene.trollGuardRail?.destroy();
   scene.trollGuardRail = undefined;
+  scene.trollDoorSprite?.destroy();
+  scene.trollDoorSprite = undefined;
   scene.trollGroup?.destroy(true);
   scene.trollGroup = undefined;
   scene.bowSprite?.destroy();
@@ -200,6 +202,23 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     }
 
     if (isExitBlocked(scene.exitGate, exitDef.id, playerTile)) return;
+
+    if (scene.area.id === "troll_bridge" && exitDef.id === "toTrollClearing") {
+      if (!hasFlag("door.trollBridge.east.unlocked")) {
+        const inv = loadInventory();
+        const ok = removeItem(inv, "troll_key", 1);
+        if (!ok) {
+          scene.exitGate = blockExit(exitDef.id, exitDef.rect);
+          scene.blockedExitSticky = { exitId: exitDef.id, clearRect: expandRect(exitDef.rect, 1) };
+          scene.suppressExitUntilTs = Date.now() + 700;
+          scene.openNpcDialog("trollDoorLocked");
+          return;
+        }
+        saveInventory(inv);
+        setFlag("door.trollBridge.east.unlocked");
+        scene.trollDoorSprite?.setTexture("prop_door_open");
+      }
+    }
 
     // Locked door logic (house -> hallway)
     if (scene.area.id === "house" && exitDef.id === "toHallway") {
@@ -475,6 +494,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.physics.add.collider(trolls, guardZone);
     scene.uiCam.ignore(guardZone);
     scene.trollGuardRail = guardZone;
+    const clearingExit = scene.area.exits.find((ex: any) => ex.id === "toTrollClearing");
+    if (clearingExit) {
+      const dx = clearingExit.rect.x * tileSize + (clearingExit.rect.w * tileSize) / 2;
+      const dy = clearingExit.rect.y * tileSize + (clearingExit.rect.h * tileSize) / 2;
+      const unlocked = hasFlag("door.trollBridge.east.unlocked");
+      scene.trollDoorSprite = scene.add.sprite(dx, dy, unlocked ? "prop_door_open" : "prop_door_locked");
+      scene.trollDoorSprite.setDepth(scene.trollDoorSprite.y);
+      scene.uiCam.ignore(scene.trollDoorSprite);
+    }
     scene.physics.add.collider(scene.player, trolls, (_p: unknown, t: unknown) => {
       const mon = t as Phaser.Physics.Arcade.Sprite;
       const now = scene.time.now;
