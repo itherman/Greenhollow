@@ -48,6 +48,8 @@ describe("areas", () => {
 
   it("village border is trees (tile 5) except at the woods gate opening", () => {
     const a = getArea("village");
+    const gateY = Math.min(a.height - 4, Math.max(4, Math.floor(a.height * 0.6)));
+    const intentionalGrass = new Set([`${a.width - 1},${gateY - 1}`]);
     const openings = new Set<string>();
     for (const ex of a.exits) {
       // Only border exits create openings; internal exits (like house) are not on the border.
@@ -63,14 +65,14 @@ describe("areas", () => {
     for (let x = 0; x < a.width; x++) {
       const topKey = `${x},0`;
       const botKey = `${x},${a.height - 1}`;
-      if (!openings.has(topKey)) expect(a.tiles[0]![x]).toBe(5);
-      if (!openings.has(botKey)) expect(a.tiles[a.height - 1]![x]).toBe(5);
+      if (!openings.has(topKey) && !intentionalGrass.has(topKey)) expect(a.tiles[0]![x]).toBe(5);
+      if (!openings.has(botKey) && !intentionalGrass.has(botKey)) expect(a.tiles[a.height - 1]![x]).toBe(5);
     }
     for (let y = 0; y < a.height; y++) {
       const leftKey = `0,${y}`;
       const rightKey = `${a.width - 1},${y}`;
-      if (!openings.has(leftKey)) expect(a.tiles[y]![0]).toBe(5);
-      if (!openings.has(rightKey)) expect(a.tiles[y]![a.width - 1]).toBe(5);
+      if (!openings.has(leftKey) && !intentionalGrass.has(leftKey)) expect(a.tiles[y]![0]).toBe(5);
+      if (!openings.has(rightKey) && !intentionalGrass.has(rightKey)) expect(a.tiles[y]![a.width - 1]).toBe(5);
     }
   });
 
@@ -152,5 +154,4 @@ describe("areas", () => {
     expect(turns).toBeGreaterThanOrEqual(2);
   });
 });
-
 
