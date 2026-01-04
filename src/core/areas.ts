@@ -200,24 +200,15 @@ export function makeVillage(): AreaDef {
   // Vertical spur from spawn to the main path.
   for (let y = 2; y <= gateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
 
-  // Eastward spur toward the troll bridge gate that stays visually separate from the woods road.
-  const trollGateY = Math.min(height - 3, Math.max(3, gateY - 2));
+  // Northward spur toward the troll bridge gate tucked above the houses.
+  const trollGateX = Math.max(4, Math.min(width - 5, Math.floor(width * 0.45)));
   const paintPath = (x: number, y: number) => {
     if (x < 0 || y < 0 || x >= width || y >= height) return;
     if (tiles[y]![x] === 1) return;
     tiles[y]![x] = 4;
   };
-  // Clear any legacy pathing on the troll lane before redrawing a separated route.
-  for (let x = 9; x < width; x++) {
-    if (tiles[trollGateY]![x] === 4) tiles[trollGateY]![x] = 0;
-  }
-  // Upper lane that leads to the troll bridge gate without intersecting the woods road.
-  const trollConnectorX = Math.max(6, width - 3);
-  const trollLaneStartX = 4;
-  for (let x = trollLaneStartX; x <= trollConnectorX; x++) paintPath(x, 2);
-  for (let y = 2; y <= trollGateY; y++) paintPath(trollConnectorX, y);
-  for (let x = trollConnectorX; x < width; x++) paintPath(x, trollGateY);
-  // Stitch the northwest bend so the top lane visually connects to the main spur.
+  for (let y = 0; y <= gateY; y++) paintPath(trollGateX, y);
+  // Small connector so the top-left spawn spur touches the troll lane near the top-left house.
   paintPath(3, 2);
 
   // House spurs: connect each house-front tile to the main gate line, without cutting through footprints.
@@ -241,7 +232,7 @@ export function makeVillage(): AreaDef {
     tiles[f.y]![f.x] = 4;
   }
 
-  // Reroute the top-right house spur so the troll lane remains visually distinct from the woods road.
+  // Reroute the top-right house spur so the northern lane keeps some breathing room.
   const topRightDoor = houseDoors[1];
   if (topRightDoor) {
     for (let y = topRightDoor.y + 1; y < gateY; y++) if (tiles[y]![topRightDoor.x] === 4) tiles[y]![topRightDoor.x] = 0;
@@ -252,12 +243,11 @@ export function makeVillage(): AreaDef {
     for (let y = rerouteY; y <= gateY; y++) paintPath(rerouteX, y);
   }
 
-  // Carve the woods gate opening through the border wall so the player can step onto the exit zone,
-  // leaving a grass buffer between the woods and troll gate tiles.
+  // Carve the woods gate opening through the border wall so the player can step onto the exit zone.
   tiles[gateY - 1]![width - 1] = 0;
   tiles[gateY]![width - 1] = 4;
-  // Carve the troll bridge opening.
-  tiles[trollGateY]![width - 1] = 4;
+  // Carve the troll bridge opening on the north border.
+  tiles[0]![trollGateX] = 4;
 
   return {
     id: "village",
@@ -269,8 +259,8 @@ export function makeVillage(): AreaDef {
       start: { x: 2, y: 2 },
       fromWoods: { x: width - 4, y: gateY },
       fromCave: { x: 2, y: height - 4 },
-      fromTrollBridge: { x: width - 3, y: trollGateY },
-      fromTrollClearing: { x: width - 3, y: trollGateY },
+      fromTrollBridge: { x: trollGateX, y: 1 },
+      fromTrollClearing: { x: trollGateX, y: 1 },
       fromStore: { x: width - 4, y: gateY },
       fromHouse: houseFronts[0]!,
       fromHallway: houseFronts[0]!,
@@ -289,7 +279,7 @@ export function makeVillage(): AreaDef {
       },
       {
         id: "toTrollBridge",
-        rect: { x: width - 1, y: trollGateY, w: 1, h: 1 },
+        rect: { x: trollGateX, y: 0, w: 1, h: 1 },
         toArea: "troll_bridge",
         toEntry: "fromVillage",
       },
@@ -608,6 +598,7 @@ export function makeTrollBridge(): AreaDef {
 
   // Barrier splitting the arena with a river and a single bridge crossing.
   const barrierX = Math.floor(width / 2);
+  const entryX = Math.max(2, barrierX - 5);
   const bridgeY = Math.floor(height / 2);
   const riverCols = [barrierX - 1, barrierX, barrierX + 1];
   for (const x of riverCols) {
@@ -616,6 +607,8 @@ export function makeTrollBridge(): AreaDef {
   for (let x = 1; x < width - 1; x++) tiles[bridgeY]![x] = 4;
   tiles[bridgeY]![0] = 4;
   tiles[bridgeY]![width - 1] = 4;
+  for (let y = 0; y <= bridgeY; y++) tiles[y]![entryX] = 4;
+  tiles[0]![entryX] = 4;
 
   // Cover clusters.
   const cover = [
@@ -637,24 +630,24 @@ export function makeTrollBridge(): AreaDef {
     height,
     tiles,
     spawns: {
-      fromVillage: { x: 2, y: bridgeY },
-      fromWoods: { x: 2, y: bridgeY },
-      fromCave: { x: 2, y: bridgeY },
-      fromTrollBridge: { x: 2, y: bridgeY },
-      fromTrollClearing: { x: 2, y: bridgeY },
-      fromHouse: { x: 2, y: bridgeY },
-      fromHouse1: { x: 2, y: bridgeY },
-      fromHouse2: { x: 2, y: bridgeY },
-      fromHouse3: { x: 2, y: bridgeY },
-      fromHouse4: { x: 2, y: bridgeY },
-      fromHallway: { x: 2, y: bridgeY },
-      fromStore: { x: 2, y: bridgeY },
-      start: { x: 2, y: bridgeY },
+      fromVillage: { x: entryX, y: 2 },
+      fromWoods: { x: entryX, y: 2 },
+      fromCave: { x: entryX, y: 2 },
+      fromTrollBridge: { x: entryX, y: 2 },
+      fromTrollClearing: { x: width - 3, y: bridgeY },
+      fromHouse: { x: entryX, y: 2 },
+      fromHouse1: { x: entryX, y: 2 },
+      fromHouse2: { x: entryX, y: 2 },
+      fromHouse3: { x: entryX, y: 2 },
+      fromHouse4: { x: entryX, y: 2 },
+      fromHallway: { x: entryX, y: 2 },
+      fromStore: { x: entryX, y: 2 },
+      start: { x: entryX, y: 2 },
     },
     exits: [
       {
         id: "toVillage",
-        rect: { x: 0, y: bridgeY, w: 1, h: 1 },
+        rect: { x: entryX, y: 0, w: 1, h: 1 },
         toArea: "village",
         toEntry: "fromTrollBridge",
       },

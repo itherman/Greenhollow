@@ -157,6 +157,8 @@ export class WorldScene extends Phaser.Scene {
   private bowSprite?: Phaser.Physics.Arcade.Sprite;
   // @ts-expect-error TS6133 - Used in loadArea.ts
   private houseDoorSprite?: Phaser.GameObjects.Sprite;
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private trollDoorSprite?: Phaser.GameObjects.Sprite;
   private monstersGroup?: Phaser.Physics.Arcade.Group;
   private goblinsGroup?: Phaser.Physics.Arcade.Group;
   private trollGroup?: Phaser.Physics.Arcade.Group;
@@ -441,8 +443,9 @@ export class WorldScene extends Phaser.Scene {
     if (r.died) {
       const dropX = troll.x;
       const dropY = troll.y;
-      this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "leather_armor", qty: 1 });
-      this.spawnEnemyDrop(dropX + 6, dropY + 4, "bridge_troll");
+      this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "troll_key", qty: 1 });
+      this.spawnEnemyDrop(dropX + 6, dropY + 4, "bridge_troll", { kind: "item", itemId: "leather_armor", qty: 1 });
+      this.spawnEnemyDrop(dropX - 6, dropY - 4, "bridge_troll");
       troll.destroy();
       this.trollGuardRail?.destroy();
       this.trollGuardRail = undefined;
@@ -464,7 +467,9 @@ export class WorldScene extends Phaser.Scene {
               ? "item_leather_armor"
               : drop.itemId === "iron_armor"
                 ? "item_iron_armor"
-                : "item_bread"
+                : drop.itemId === "rusty_key" || drop.itemId === "troll_key"
+                  ? "item_key"
+                  : "item_bread"
             : drop.itemId === "stew"
               ? "item_stew"
               : "item_bread";
@@ -661,7 +666,7 @@ export class WorldScene extends Phaser.Scene {
       screenW: this.scale.width,
       screenH: this.scale.height,
       hasTouch,
-      enemyNearby: this.isEnemyNearby(32 * 7),
+      enemyNearby: this.isEnemyNearby(32 * 7, { includeTrollsLongRange: true }),
       hasWeapon: isMeleeWeapon(this.equipment.heldItemId) || this.equipment.heldItemId === "bow",
     });
     this.mobileControlsVisible = showAttack;
@@ -700,22 +705,24 @@ export class WorldScene extends Phaser.Scene {
     return within(this.mobileUi.attackHit);
   }
 
-  private isEnemyNearby(maxDistPx: number): boolean {
+  private isEnemyNearby(maxDistPx: number, opts?: { includeTrollsLongRange?: boolean }): boolean {
     const max2 = maxDistPx * maxDistPx;
+    const trollMax2 = opts?.includeTrollsLongRange ? Math.pow(Math.max(maxDistPx, 32 * 12), 2) : max2;
     const px = this.player?.x ?? 0;
     const py = this.player?.y ?? 0;
-    const nearGroup = (g?: Phaser.Physics.Arcade.Group) => {
+    const nearGroup = (g?: Phaser.Physics.Arcade.Group, overrideMax2?: number) => {
       if (!g) return false;
       for (const obj of g.getChildren()) {
         const s = obj as Phaser.Physics.Arcade.Sprite;
         if (!s.active) continue;
         const dx = s.x - px;
         const dy = s.y - py;
-        if (dx * dx + dy * dy <= max2) return true;
+        const thresh = overrideMax2 ?? max2;
+        if (dx * dx + dy * dy <= thresh) return true;
       }
       return false;
     };
-    return nearGroup(this.monstersGroup) || nearGroup(this.goblinsGroup);
+    return nearGroup(this.monstersGroup) || nearGroup(this.goblinsGroup) || nearGroup(this.trollGroup, trollMax2);
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
