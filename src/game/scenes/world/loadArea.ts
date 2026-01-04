@@ -62,7 +62,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   const tileset = map.addTilesetImage("tileset_2x2");
   const layer = map.createLayer(0, tileset!, 0, 0);
   if (!layer) throw new Error("Failed to create tilemap layer");
-  layer.setCollision([1, 5]);
+  layer.setCollision([1, 5, 6]);
   layer.setDepth(-10000);
   scene.uiCam.ignore(layer);
 
