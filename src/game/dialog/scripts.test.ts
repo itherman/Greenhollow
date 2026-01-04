@@ -4,6 +4,7 @@ import {
   chestEmpty,
   chestMessage,
   doorLocked,
+  trollDoorLocked,
   elderIntro,
   buyerNpc,
   homeowner1Advice,
@@ -56,6 +57,10 @@ describe("dialog scripts", () => {
     expect(validateScript(doorLocked)).toEqual({ ok: true });
   });
 
+  it("trollDoorLocked validates", () => {
+    expect(validateScript(trollDoorLocked)).toEqual({ ok: true });
+  });
+
   it("swordFound validates", () => {
     expect(validateScript(swordFound)).toEqual({ ok: true });
   });
@@ -64,4 +69,3 @@ describe("dialog scripts", () => {
     expect(validateScript(swordTaken)).toEqual({ ok: true });
   });
 });
-

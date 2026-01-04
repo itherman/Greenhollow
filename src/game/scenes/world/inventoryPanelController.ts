@@ -118,7 +118,7 @@ export class InventoryPanelController {
       this.deleteConfirmSlot = null;
     }
     this.deleteHoldTriggered = false;
-    const itemIconKey = (id: string): string => (id === "rusty_key" ? "item_key" : `item_${id}`);
+    const itemIconKey = (id: string): string => (id === "rusty_key" || id === "troll_key" ? "item_key" : `item_${id}`);
 
     // Lazily create modal elements
     if (!this.inventoryBackdrop) {
