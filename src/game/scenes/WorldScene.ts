@@ -192,6 +192,7 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private lastMobileControlsEvalAtMs = 0;
   private trollWarningZone?: Phaser.GameObjects.Zone;
+  private trollGuardRail?: Phaser.GameObjects.Zone;
 
   private setNpcPaused(npc: Phaser.GameObjects.Sprite, paused: boolean) {
     const state = this.npcMoveStates.get(npc);
@@ -363,16 +364,18 @@ export class WorldScene extends Phaser.Scene {
     anyM.__attackAnimActive = true;
 
     // Flash + squash feels like a bite/lunge without fighting Arcade physics.
+    const baseScaleX = monster.scaleX;
+    const baseScaleY = monster.scaleY;
     monster.setTintFill(0xff6b6b);
     this.tweens.add({
       targets: monster,
-      scaleX: 1.15,
-      scaleY: 0.85,
+      scaleX: baseScaleX * 1.15,
+      scaleY: baseScaleY * 0.85,
       duration: 90,
       yoyo: true,
       ease: "Sine.InOut",
       onComplete: () => {
-        monster.setScale(1);
+        monster.setScale(baseScaleX, baseScaleY);
         monster.clearTint();
         anyM.__attackAnimActive = false;
       },
@@ -439,6 +442,8 @@ export class WorldScene extends Phaser.Scene {
       this.spawnEnemyDrop(dropX, dropY, "bridge_troll", { kind: "item", itemId: "leather_armor", qty: 1 });
       this.spawnEnemyDrop(dropX + 6, dropY + 4, "bridge_troll");
       troll.destroy();
+      this.trollGuardRail?.destroy();
+      this.trollGuardRail = undefined;
     }
   }
 
