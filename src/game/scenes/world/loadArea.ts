@@ -534,7 +534,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         hp: scene.hp,
         nowMs: now,
         lastHitAtMs: scene.lastHitAtMs,
-        cooldownMs: 600,
+        cooldownMs: 400,
         damage: 3,
       });
       scene.hp = r.hp;
@@ -553,7 +553,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     }
 
     scene.time.addEvent({
-      delay: 450,
+      delay: 320,
       loop: true,
       callback: () => {
         for (const obj of trolls.getChildren()) {
@@ -561,7 +561,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           const dx = scene.player.x - t.x;
           const dy = scene.player.y - t.y;
           const d = Math.max(1, Math.hypot(dx, dy));
-          const speed = 55;
+          const speed = 60;
           t.setVelocity((dx / d) * speed, (dy / d) * speed);
           t.setDepth(t.y);
         }
@@ -574,13 +574,23 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     bzb.setAllowGravity(false);
     bzb.setImmovable(true);
     scene.trollWarningZone = bridgeZone;
-    scene.physics.add.overlap(scene.player, bridgeZone, () => {
-      if (hasFlag("dialog.trollBridge.warned")) return;
-      setFlag("dialog.trollBridge.warned");
-      scene.openNpcDialog("trollWarning");
+    if (hasFlag("dialog.trollBridge.warned")) {
+      scene.trollGuardRail?.destroy();
+      scene.trollGuardRail = undefined;
       bridgeZone.destroy();
       scene.trollWarningZone = undefined;
-    });
+    }
+    if (bridgeZone.active) {
+      scene.physics.add.overlap(scene.player, bridgeZone, () => {
+        if (hasFlag("dialog.trollBridge.warned")) return;
+        setFlag("dialog.trollBridge.warned");
+        scene.openNpcDialog("trollWarning");
+        scene.trollGuardRail?.destroy();
+        scene.trollGuardRail = undefined;
+        bridgeZone.destroy();
+        scene.trollWarningZone = undefined;
+      });
+    }
   }
 
   // Cave goblin archers + arrows
