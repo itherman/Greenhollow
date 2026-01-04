@@ -66,6 +66,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   layer.setDepth(-10000);
   scene.uiCam.ignore(layer);
 
+  const storeColliders: Phaser.GameObjects.Zone[] = [];
+
   const worldW = scene.area.width * tileSize;
   const worldH = scene.area.height * tileSize;
   scene.physics.world.setBounds(0, 0, worldW, worldH);
@@ -342,6 +344,23 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
       storeImg.setDepth(storeExit.rect.y * tileSize + 4 * tileSize - 2);
       scene.uiCam.ignore(storeImg);
+
+      const storeFrontHeightTiles = 4;
+      const storeLeftX = (storeExit.rect.x - 2) * tileSize;
+      const storeTopY = 0;
+      const storeHeightPx = storeFrontHeightTiles * tileSize;
+      const storeCenterY = storeTopY + storeHeightPx / 2;
+
+      const leftBlock = scene.add.zone(storeLeftX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+      scene.physics.add.existing(leftBlock, true);
+      storeColliders.push(leftBlock);
+
+      const rightBlockX = storeLeftX + tileSize * 4;
+      const rightBlock = scene.add.zone(rightBlockX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+      scene.physics.add.existing(rightBlock, true);
+      storeColliders.push(rightBlock);
+
+      scene.uiCam.ignore([leftBlock, rightBlock]);
     }
     const chestOpened = hasFlag("chest.woods.arrows.1");
     const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
@@ -395,6 +414,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       scene.uiCam.ignore(m);
       // collide vs walls
       scene.physics.add.collider(m, layer);
+    }
+
+    for (const zone of storeColliders) {
+      scene.physics.add.collider(scene.player, zone);
+      scene.physics.add.collider(monsters, zone);
     }
 
     // Prevent monsters from crossing the player and each other.
