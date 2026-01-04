@@ -2,7 +2,7 @@
 
 ## 2025-12-27
 - Fix store exit spawn so leaving the shop no longer drops the player back into the entrance trigger.
-- Rework the troll clearing layout to enter from the bottom-left path that turns east toward the bridge.
+- Rework the troll clearing layout to enter from the bottom-left path that turns east toward the bridge, and reroute the troll bridge approach to match (no top/left exits).
 - Restore troll bridge goblin archers with deterministic spawns along the river’s right bank.
 
 ## 2025-12-26
@@ -14,4 +14,3 @@
 - Add guest mode (play without Firebase) + session persistence
 - Add multi-area exploration prototype (village/woods/cave) via generated tilemaps + collisions + exits
 - Add NPC interaction + dialog choices (E to talk, 1-3 to choose), with dialog logic unit-tested
-

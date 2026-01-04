@@ -598,17 +598,15 @@ export function makeTrollBridge(): AreaDef {
 
   // Barrier splitting the arena with a river and a single bridge crossing.
   const barrierX = Math.floor(width / 2);
-  const entryX = Math.max(2, barrierX - 5);
   const bridgeY = Math.floor(height / 2);
+  const entryX = Math.max(2, Math.floor(width * 0.18));
   const riverCols = [barrierX - 1, barrierX, barrierX + 1];
   for (const x of riverCols) {
     for (let y = 1; y < height - 1; y++) tiles[y]![x] = 6;
   }
-  for (let x = 1; x < width - 1; x++) tiles[bridgeY]![x] = 4;
-  tiles[bridgeY]![0] = 4;
+  for (let y = height - 1; y >= bridgeY; y--) tiles[y]![entryX] = 4;
+  for (let x = entryX; x < width - 1; x++) tiles[bridgeY]![x] = 4;
   tiles[bridgeY]![width - 1] = 4;
-  for (let y = 0; y <= bridgeY; y++) tiles[y]![entryX] = 4;
-  tiles[0]![entryX] = 4;
 
   // Cover clusters.
   const cover = [
@@ -650,7 +648,7 @@ export function makeTrollBridge(): AreaDef {
     exits: [
       {
         id: "toVillage",
-        rect: { x: entryX, y: 0, w: 1, h: 1 },
+        rect: { x: entryX, y: height - 1, w: 1, h: 1 },
         toArea: "village",
         toEntry: "fromTrollBridge",
       },
