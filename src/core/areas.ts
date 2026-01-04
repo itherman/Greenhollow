@@ -395,7 +395,7 @@ export function makeWoods(): AreaDef {
       },
       {
         id: "toStore",
-        rect: { x: storeX, y: 0, w: 2, h: 1 },
+        rect: { x: storeX, y: 1, w: 2, h: 1 },
         toArea: "store",
         toEntry: "fromWoods",
       },
@@ -623,6 +623,8 @@ export function makeTrollBridge(): AreaDef {
     tiles[c.y]![c.x + 1] = 5;
   }
 
+  const entrySpawn = { x: entryX, y: height - 3 } as const;
+
   return {
     id: "troll_bridge",
     name: "Troll Bridge",
@@ -630,19 +632,19 @@ export function makeTrollBridge(): AreaDef {
     height,
     tiles,
     spawns: {
-      fromVillage: { x: entryX, y: 2 },
-      fromWoods: { x: entryX, y: 2 },
-      fromCave: { x: entryX, y: 2 },
-      fromTrollBridge: { x: entryX, y: 2 },
+      fromVillage: entrySpawn,
+      fromWoods: entrySpawn,
+      fromCave: entrySpawn,
+      fromTrollBridge: entrySpawn,
       fromTrollClearing: { x: width - 3, y: bridgeY },
-      fromHouse: { x: entryX, y: 2 },
-      fromHouse1: { x: entryX, y: 2 },
-      fromHouse2: { x: entryX, y: 2 },
-      fromHouse3: { x: entryX, y: 2 },
-      fromHouse4: { x: entryX, y: 2 },
-      fromHallway: { x: entryX, y: 2 },
-      fromStore: { x: entryX, y: 2 },
-      start: { x: entryX, y: 2 },
+      fromHouse: entrySpawn,
+      fromHouse1: entrySpawn,
+      fromHouse2: entrySpawn,
+      fromHouse3: entrySpawn,
+      fromHouse4: entrySpawn,
+      fromHallway: entrySpawn,
+      fromStore: entrySpawn,
+      start: entrySpawn,
     },
     exits: [
       {
