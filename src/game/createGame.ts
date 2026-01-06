@@ -3,6 +3,7 @@ import { BootScene } from "./scenes/BootScene";
 import { WorldScene } from "./scenes/WorldScene";
 import { computeGameBaseSize } from "../core/gameViewportPolicy";
 import { ARCADE_TILE_BIAS } from "../core/physicsTuning";
+import { installTestHarness } from "../testing/testHarness";
 
 export function createGame(parent: string): Phaser.Game {
   const base =
@@ -36,7 +37,8 @@ export function createGame(parent: string): Phaser.Game {
     scene: [BootScene, WorldScene],
   };
 
-  return new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  installTestHarness(game);
+  return game;
 }
-
 
