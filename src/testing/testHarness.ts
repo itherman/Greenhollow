@@ -11,6 +11,7 @@ export type TestHarness = {
   getState: () => TestHarnessState | null;
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
+  teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
 };
 
 declare global {
@@ -28,7 +29,16 @@ function getWorldScene(game: Phaser.Game) {
       })
     | undefined;
   if (!scene) return null;
-  if (!(scene as any).scene?.isActive?.()) return null;
+  // IMPORTANT:
+  // In current Phaser, `scene.scene.isActive()` expects a scene key argument and can return `false`
+  // when called with no args. Prefer the SceneManager check.
+  const isActive =
+    typeof (game.scene as any)?.isActive === "function"
+      ? (game.scene as any).isActive("WorldScene")
+      : typeof (scene as any)?.sys?.isActive === "function"
+        ? (scene as any).sys.isActive()
+        : !!(scene as any)?.sys?.settings?.active;
+  if (!isActive) return null;
   return scene;
 }
 
@@ -54,9 +64,15 @@ export function installTestHarness(game: Phaser.Game): void {
       if (!cam || !canvas) return null;
 
       const rect = canvas.getBoundingClientRect();
+      // Phaser uses an internal canvas size that is often scaled via CSS (e.g. Scale.FIT).
+      // Convert internal "camera pixels" into CSS pixels so automation clicks hit the right spot.
+      const cw = canvas.width || 1;
+      const ch = canvas.height || 1;
+      const scaleX = rect.width / cw;
+      const scaleY = rect.height / ch;
       const viewX = (world.x - cam.worldView.x) * cam.zoom + (cam.x ?? 0);
       const viewY = (world.y - cam.worldView.y) * cam.zoom + (cam.y ?? 0);
-      return { x: rect.left + viewX, y: rect.top + viewY };
+      return { x: rect.left + viewX * scaleX, y: rect.top + viewY * scaleY };
     },
     tileCenterToScreen: (tile) => {
       const tileSize = 32;
@@ -64,6 +80,22 @@ export function installTestHarness(game: Phaser.Game): void {
         x: (tile.x + 0.5) * tileSize,
         y: (tile.y + 0.5) * tileSize,
       });
+    },
+    teleportToTileCenter: (tile) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.player) return false;
+      const tileSize = 32;
+      const x = (tile.x + 0.5) * tileSize;
+      const y = (tile.y + 0.5) * tileSize;
+      // Keep Arcade body in sync. Prefer body.reset if available.
+      const body = scene.player.body;
+      if (body && typeof body.reset === "function") {
+        body.reset(x, y);
+      } else {
+        scene.player.setPosition(x, y);
+      }
+      if (typeof scene.player.setVelocity === "function") scene.player.setVelocity(0, 0);
+      return true;
     },
   };
 

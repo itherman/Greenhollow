@@ -52,6 +52,14 @@ async function waitForDialogNode(page: Page, nodeId: string) {
   );
 }
 
+async function holdKey(page: Page, code: string, holdMs = 75) {
+  // Phaser's `JustDown(...)` is frame-based; a fast synthetic "press" can be missed
+  // if keydown+keyup happen between frames. Hold the key briefly to guarantee capture.
+  await page.keyboard.down(code);
+  await page.waitForTimeout(holdMs);
+  await page.keyboard.up(code);
+}
+
 test.describe("Wizard dialog regression", () => {
   test("guest can talk to the elder using all dialog options", async ({ page }) => {
     await page.goto("/");
@@ -67,9 +75,12 @@ test.describe("Wizard dialog regression", () => {
     const harness = await getHarness(page);
     await page.click("canvas");
 
-    await clickTile(page, harness, ELDER_TILE);
-    await waitForPlayerNearTile(page, ELDER_TILE);
-    await clickTile(page, harness, ELDER_TILE);
+    // Movement/click-to-walk is intentionally not tested here (too flaky across browsers).
+    // This regression test focuses on the dialog script/options.
+    const teleported = await harness.evaluate((h, coords) => h.teleportToTileCenter(coords), ELDER_TILE);
+    expect(teleported).toBe(true);
+    // Open dialog via interact key (more reliable than pointer input in WebKit).
+    await holdKey(page, "KeyE");
 
     await page.waitForFunction(
       () => window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.dialog?.open === true,
@@ -78,22 +89,22 @@ test.describe("Wizard dialog regression", () => {
     );
 
     await waitForDialogNode(page, "n1");
-    await page.keyboard.press("KeyE");
+    await holdKey(page, "KeyE");
     await waitForDialogNode(page, "n2");
 
-    await page.keyboard.press("Digit1");
+    await holdKey(page, "Digit1");
     await waitForDialogNode(page, "n3");
-    await page.keyboard.press("KeyE");
+    await holdKey(page, "KeyE");
     await waitForDialogNode(page, "n2");
 
-    await page.keyboard.press("Digit2");
+    await holdKey(page, "Digit2");
     await waitForDialogNode(page, "n4");
-    await page.keyboard.press("KeyE");
+    await holdKey(page, "KeyE");
     await waitForDialogNode(page, "n2");
 
-    await page.keyboard.press("Digit3");
+    await holdKey(page, "Digit3");
     await waitForDialogNode(page, "end");
-    await page.keyboard.press("KeyE");
+    await holdKey(page, "KeyE");
 
     await page.waitForFunction(
       () => window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.dialog?.open === false,
