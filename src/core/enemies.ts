@@ -1,6 +1,6 @@
 export type EnemyDifficultyRank = number;
 
-export type EnemyId = "woods_slime" | "cave_goblin_archer" | "bridge_troll" | "shadow_stalker";
+export type EnemyId = "woods_slime" | "cave_goblin_archer" | "bridge_troll" | "shadow_stalker" | "arcane_wizard" | "castle_guardian";
 
 export type EnemyDefinition = {
   id: EnemyId;
@@ -35,6 +35,16 @@ export const ENEMIES: Record<EnemyId, EnemyDefinition> = {
     id: "shadow_stalker",
     name: "Shadow Stalker",
     difficultyRank: 740,
+  },
+  arcane_wizard: {
+    id: "arcane_wizard",
+    name: "Arcane Wizard",
+    difficultyRank: 880,
+  },
+  castle_guardian: {
+    id: "castle_guardian",
+    name: "Castle Guardian",
+    difficultyRank: 640,
   },
 };
 

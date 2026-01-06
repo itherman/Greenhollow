@@ -11,7 +11,7 @@ export function ensureTilesetTexture(scene: any): void {
 
     // Build a 3x3 tilesheet: 96x96, each tile is 32x32.
     // Indices are row-major (cols=3):
-    // 0 grass, 1 wall, 2 forest, 3 cave, 4 dirt, 5 trees (canopy wall), 6 river
+    // 0 grass, 1 wall, 2 forest, 3 cave, 4 dirt, 5 trees (canopy wall), 6 river, 7 castle floor, 8 castle wall
     const c = document.createElement("canvas");
     c.width = 96;
     c.height = 96;
@@ -112,9 +112,34 @@ export function ensureTilesetTexture(scene: any): void {
       px(x, y, i % 2 ? "#3a8bd9" : "#165078");
     }
 
-    // Fill unused slots to avoid accidental transparency.
-    rect(32, 64, 32, 32, "#2b8a3e");
-    rect(64, 64, 32, 32, "#2b8a3e");
+    // 7 castle floor (polished stone with varied tiling)
+    rect(32, 64, 32, 32, "#3f4250");
+    rect(32, 64, 32, 2, "#505466");
+    rect(32, 94, 32, 2, "#2c2f3a");
+    for (let i = 0; i < 80; i++) {
+      const x = 33 + ((i * 7 + 5) % 30);
+      const y = 65 + ((i * 11 + 9) % 30);
+      px(x, y, i % 3 ? "#4a4e5f" : "#2f323c");
+    }
+    for (let i = 0; i < 25; i++) {
+      const x = 34 + ((i * 13 + 3) % 28);
+      const y = 66 + ((i * 17 + 7) % 28);
+      px(x, y, "#5e6476");
+    }
+
+    // 8 castle wall (thick stone blocks, collides)
+    rect(64, 64, 32, 32, "#2c2f3a");
+    rect(64, 64, 32, 3, "#3a3e4e");
+    rect(64, 93, 32, 3, "#1f222b");
+    // block seams
+    for (let x = 64; x < 96; x += 8) {
+      rect(x, 68, 4, 24, "#262934");
+      rect(x + 4, 68, 2, 24, "#1f222b");
+    }
+    for (let y = 74; y < 92; y += 6) {
+      rect(64, y, 32, 2, "#1f222b");
+      rect(64, y + 2, 32, 1, "#3a3e4e");
+    }
 
     this.textures.addSpriteSheet("tileset_2x2", c as unknown as HTMLImageElement, {
       frameWidth: 32,
