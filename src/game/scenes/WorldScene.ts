@@ -52,6 +52,14 @@ type NpcMovementState = {
   home: { x: number; y: number };
 };
 
+type ChestContents = {
+  flag?: string;
+  loot: Array<{ itemId: ItemId; qty: number }>;
+  openedDialog: string;
+  emptyDialog: string;
+  resetOnAreaLoad?: boolean;
+};
+
 export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -70,13 +78,7 @@ export class WorldScene extends Phaser.Scene {
   private npcMoveStates: Map<Phaser.GameObjects.Sprite, NpcMovementState> = new Map();
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
   private interactingNpc?: Phaser.GameObjects.Sprite;
-  private chest?: Phaser.Physics.Arcade.Sprite;
-  private chestContents?: {
-    flag: string;
-    loot: Array<{ itemId: ItemId; qty: number }>;
-    openedDialog: string;
-    emptyDialog: string;
-  };
+  private chests: Array<{ sprite: Phaser.Physics.Arcade.Sprite; contents: ChestContents }> = [];
   // @ts-expect-error TS6133 - Used in loadArea.ts
   private boatSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
@@ -165,6 +167,9 @@ export class WorldScene extends Phaser.Scene {
   private trollDoorSprite?: Phaser.GameObjects.Sprite;
   private monstersGroup?: Phaser.Physics.Arcade.Group;
   private goblinsGroup?: Phaser.Physics.Arcade.Group;
+  private arcaneWizardGroup?: Phaser.Physics.Arcade.Group;
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private arcaneSpellGroup?: Phaser.Physics.Arcade.Group;
   private trollGroup?: Phaser.Physics.Arcade.Group;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
   private arrowsGroup?: Phaser.Physics.Arcade.Group;
@@ -292,31 +297,39 @@ export class WorldScene extends Phaser.Scene {
     };
 
     const tryChest = () => {
-      const contents = this.chestContents;
-      if (!contents) return false;
-      return tryPickupSprite({
-        player: playerPos,
-        sprite: this.chest,
-        rangePx: getTapInteractRangePx("chest"),
-        onPickup: () => {
-          const opened = hasFlag(contents.flag);
-          if (!opened) {
-            setFlag(contents.flag);
-            this.chest?.setTexture("chest_open");
-            if (this.chest) this.chest.setDepth(this.chest.y);
-            const inv = loadInventory();
-            for (const loot of contents.loot) {
-              const def = ITEMS[loot.itemId];
-              addItem(inv, def, loot.qty);
-            }
-            saveInventory(inv);
-            if (this.inventoryOpen) this.renderInventoryPanel();
-            this.openNpcDialog(contents.openedDialog);
-          } else {
-            this.openNpcDialog(contents.emptyDialog);
-          }
-        },
-      });
+      if (!this.chests.length) return false;
+      const rangePx = getTapInteractRangePx("chest");
+      for (const chest of this.chests) {
+        if (
+          tryPickupSprite({
+            player: playerPos,
+            sprite: chest.sprite,
+            rangePx,
+            onPickup: () => {
+              const contents = chest.contents;
+              const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
+              if (!opened) {
+                if (contents.flag && !contents.resetOnAreaLoad) setFlag(contents.flag);
+                chest.sprite?.setTexture("chest_open");
+                chest.sprite?.setDepth(chest.sprite.y);
+                const inv = loadInventory();
+                for (const loot of contents.loot) {
+                  const def = ITEMS[loot.itemId];
+                  addItem(inv, def, loot.qty);
+                }
+                saveInventory(inv);
+                if (this.inventoryOpen) this.renderInventoryPanel();
+                this.openNpcDialog(contents.openedDialog);
+              } else {
+                this.openNpcDialog(contents.emptyDialog);
+              }
+            },
+          })
+        ) {
+          return true;
+        }
+      }
+      return false;
     };
 
     const tryNpc = () => {
@@ -455,6 +468,26 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
+  private damageArcaneWizard(wiz: Phaser.Physics.Arcade.Sprite, damage: number) {
+    const wizards = this.arcaneWizardGroup;
+    if (!wizards || !wiz.active) return;
+    const anyW = wiz as any;
+    const hp = (anyW.__hp as number | undefined) ?? 0;
+    const r = applyDamage({ hp, damage });
+    anyW.__hp = r.hp;
+    wiz.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => {
+      if (wiz.active) wiz.clearTint();
+    });
+    if (r.died) {
+      const dropX = wiz.x;
+      const dropY = wiz.y;
+      this.spawnEnemyDrop(dropX, dropY, "arcane_wizard", { kind: "coins", qty: 30 });
+      wiz.destroy();
+    }
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
   private damageTroll(troll: Phaser.Physics.Arcade.Sprite, damage: number) {
     const trolls = this.trollGroup;
     if (!trolls || !troll.active) return;
@@ -561,7 +594,8 @@ export class WorldScene extends Phaser.Scene {
     // calling methods on destroyed objects (which can crash the loop and look like a freeze).
     this.inventoryOpen = false;
     this.inventoryUi?.reset();
-    this.chestContents = undefined;
+    for (const c of this.chests) c.sprite.destroy();
+    this.chests = [];
     this.heldItemSprite = undefined;
     this.slashSwordSprite = undefined;
     this.headArmorSprite?.destroy();
@@ -574,6 +608,8 @@ export class WorldScene extends Phaser.Scene {
     this.updateMaxHpFromArmor();
     this.monstersGroup = undefined;
     this.goblinsGroup = undefined;
+    this.arcaneWizardGroup = undefined;
+    this.arcaneSpellGroup = undefined;
     this.trollGroup = undefined;
     this.arrowsGroup = undefined;
     this.playerArrowsGroup = undefined;
@@ -762,7 +798,12 @@ export class WorldScene extends Phaser.Scene {
       }
       return false;
     };
-    return nearGroup(this.monstersGroup) || nearGroup(this.goblinsGroup) || nearGroup(this.trollGroup, trollMax2);
+    return (
+      nearGroup(this.monstersGroup) ||
+      nearGroup(this.goblinsGroup) ||
+      nearGroup(this.arcaneWizardGroup) ||
+      nearGroup(this.trollGroup, trollMax2)
+    );
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
@@ -772,7 +813,9 @@ export class WorldScene extends Phaser.Scene {
     if (this.keySprite?.active) out.push({ kind: "key", x: this.keySprite.x, y: this.keySprite.y });
     if (this.swordSprite?.active) out.push({ kind: "sword", x: this.swordSprite.x, y: this.swordSprite.y });
     if (this.bowSprite?.active) out.push({ kind: "bow", x: this.bowSprite.x, y: this.bowSprite.y });
-    if (this.chest?.active) out.push({ kind: "chest", x: this.chest.x, y: this.chest.y });
+    for (const chest of this.chests) {
+      if (chest.sprite?.active) out.push({ kind: "chest", x: chest.sprite.x, y: chest.sprite.y });
+    }
     if (this.npcsGroup) {
       for (const obj of this.npcsGroup.getChildren()) {
         const s = obj as Phaser.GameObjects.Sprite;

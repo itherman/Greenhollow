@@ -3,7 +3,7 @@ import { getArea } from "./areas";
 
 describe("area exits", () => {
   it("all exits point to a valid area + entry spawn", () => {
-    for (const id of ["village", "woods", "cave", "troll_bridge", "troll_clearing", "house", "hallway", "river_village", "shadow_forest", "river_store"] as const) {
+    for (const id of ["village", "woods", "cave", "troll_bridge", "troll_clearing", "house", "hallway", "river_village", "shadow_forest", "river_store", "arcane_keep"] as const) {
       const a = getArea(id);
       for (const ex of a.exits) {
         const to = getArea(ex.toArea);

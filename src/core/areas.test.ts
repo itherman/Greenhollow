@@ -3,7 +3,7 @@ import { getArea, validateArea } from "./areas";
 
 describe("areas", () => {
   it("all areas validate", () => {
-    for (const id of ["village", "woods", "cave", "house", "hallway", "store", "river_store", "house1", "house2", "house3", "house4", "troll_bridge", "troll_clearing", "river_village", "shadow_forest"] as const) {
+    for (const id of ["village", "woods", "cave", "house", "hallway", "store", "river_store", "house1", "house2", "house3", "house4", "troll_bridge", "troll_clearing", "river_village", "shadow_forest", "arcane_keep"] as const) {
       const area = getArea(id);
       const v = validateArea(area);
       if (v.ok !== true) {

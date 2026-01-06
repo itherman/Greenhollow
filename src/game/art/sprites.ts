@@ -689,6 +689,87 @@ export function ensureTrollTexture(scene: Phaser.Scene) {
   scene.textures.get("enemy_troll").setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
+export function ensureArcaneWizardTextures(scene: Phaser.Scene) {
+  if (scene.textures.exists("enemy_arcane_wizard")) return;
+
+  const mk = (key: string, w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void) => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) throw new Error("Failed to get canvas context");
+    draw(ctx);
+    scene.textures.addImage(key, c as unknown as HTMLImageElement);
+    scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  };
+
+  // Wizard (24x24): hooded mage with glowing staff
+  mk("enemy_arcane_wizard", 24, 24, (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // robes
+    ctx.fillStyle = "#312e81";
+    ctx.fillRect(7, 8, 10, 12);
+    ctx.fillStyle = "#4338ca";
+    ctx.fillRect(8, 9, 8, 10);
+    // hood
+    ctx.fillStyle = "#1e1b4b";
+    ctx.fillRect(7, 4, 10, 6);
+    ctx.fillStyle = "#c084fc";
+    ctx.fillRect(10, 6, 4, 2);
+    // face
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(10, 10, 4, 3);
+    ctx.fillStyle = "#0b1220";
+    ctx.fillRect(11, 11, 1, 1);
+    ctx.fillRect(12, 11, 1, 1);
+    // staff
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(16, 6, 2, 12);
+    ctx.fillStyle = "#fcd34d";
+    ctx.fillRect(16, 4, 3, 3);
+    ctx.fillStyle = "#fbbf24";
+    ctx.fillRect(17, 3, 1, 1);
+  });
+
+  mk("proj_arcane_bolt", 14, 10, (ctx) => {
+    ctx.clearRect(0, 0, 14, 10);
+    ctx.fillStyle = "#7c3aed";
+    ctx.fillRect(2, 3, 9, 4);
+    ctx.fillStyle = "#c084fc";
+    ctx.fillRect(1, 4, 11, 2);
+    ctx.fillStyle = "#f5d0fe";
+    ctx.fillRect(10, 2, 3, 6);
+  });
+
+  mk("enemy_castle_guard", 24, 24, (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // armor
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillRect(7, 9, 10, 10);
+    ctx.fillStyle = "#6b7280";
+    ctx.fillRect(7, 17, 10, 2);
+    // pauldrons
+    ctx.fillStyle = "#4b5563";
+    ctx.fillRect(6, 8, 3, 3);
+    ctx.fillRect(15, 8, 3, 3);
+    // visor
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(9, 6, 6, 3);
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(10, 7, 4, 1);
+    // belt
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillRect(8, 16, 8, 1);
+    // boots
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(8, 19, 3, 3);
+    ctx.fillRect(13, 19, 3, 3);
+    // sword hint
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(4, 11, 2, 10);
+  });
+}
+
 export function ensureVillageHouseTexture(scene: Phaser.Scene) {
   if (scene.textures.exists("prop_house_village")) return;
 
