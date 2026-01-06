@@ -9,6 +9,7 @@ export type AreaId =
   | "house"
   | "hallway"
   | "store"
+  | "river_store"
   | "house1"
   | "house2"
   | "house3"
@@ -791,6 +792,17 @@ export function makeRiverVillage(): AreaDef {
     for (let x = shopX - 1; x <= shopX + 1; x++) tiles[y]![x] = 4;
   }
   tiles[plazaY - 1]![shopX] = 4;
+  // Storefront facade along the top wall with a centered doorway.
+  const storeFrontX0 = Math.max(1, shopX - 2);
+  const storeFrontX1 = Math.min(width - 2, shopX + 3);
+  for (let x = storeFrontX0; x <= storeFrontX1; x++) tiles[0]![x] = 1;
+  tiles[0]![shopX] = 3;
+  tiles[0]![shopX + 1] = 3;
+  for (let x = storeFrontX0; x <= storeFrontX1; x++) {
+    if (tiles[1]![x] !== 1) tiles[1]![x] = 3;
+  }
+  tiles[1]![shopX] = 4;
+  tiles[1]![shopX + 1] = 4;
 
   // Scatter trees for texture.
   const copses = [
@@ -804,6 +816,7 @@ export function makeRiverVillage(): AreaDef {
   }
 
   const spawn = dock;
+  const storeFront = { x: shopX, y: 3 };
 
   return {
     id: "river_village",
@@ -827,13 +840,17 @@ export function makeRiverVillage(): AreaDef {
       fromHouse3: spawn,
       fromHouse4: spawn,
       fromHallway: spawn,
-      fromStore: spawn,
+      fromStore: storeFront,
     },
-    exits: [],
-    npcs: [
-      { id: "rare_shopkeeper", name: "Rare Trader", pos: { x: shopX, y: 2 }, dialogScriptId: "rareShopkeeper" },
-      { id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" },
+    exits: [
+      {
+        id: "toRiverStore",
+        rect: { x: shopX, y: 1, w: 2, h: 2 },
+        toArea: "river_store",
+        toEntry: "fromRiverVillage",
+      },
     ],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -967,6 +984,42 @@ export function makeStore(): AreaDef {
   };
 }
 
+export function makeRiverStore(): AreaDef {
+  const width = 13;
+  const height = 8;
+  const tiles = borderWalls(width, height, 3);
+  const doorX = Math.floor(width / 2);
+  tiles[height - 1]![doorX] = 3;
+
+  // Counter with two openings (shop and buyer).
+  const counterY = 3;
+  for (let x = 2; x <= width - 3; x++) tiles[counterY]![x] = 1;
+  const buyerOpeningX = Math.min(width - 3, Math.max(2, doorX - 2));
+  tiles[counterY]![doorX] = 3;
+  tiles[counterY]![buyerOpeningX] = 3;
+
+  return {
+    id: "river_store",
+    name: "Rare Market",
+    width,
+    height,
+    tiles,
+    spawns: fullSpawnMap({ x: doorX, y: height - 2 }),
+    exits: [
+      {
+        id: "toRiverVillage",
+        rect: { x: doorX, y: height - 1, w: 1, h: 1 },
+        toArea: "river_village",
+        toEntry: "fromStore",
+      },
+    ],
+    npcs: [
+      { id: "rare_shopkeeper", name: "Rare Trader", pos: { x: doorX, y: 2 }, dialogScriptId: "rareShopkeeper" },
+      { id: "buyer_npc", name: "Buyer", pos: { x: buyerOpeningX, y: 2 }, dialogScriptId: "buyerNpc" },
+    ],
+  };
+}
+
 export const BOAT_ANCHOR_TILES: Partial<Record<AreaId, Point>> = {
   troll_bridge: { x: 10, y: 4 },
   river_village: { x: 5, y: 10 },
@@ -987,6 +1040,8 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeHallway();
     case "store":
       return makeStore();
+    case "river_store":
+      return makeRiverStore();
     case "house1":
       return makeHouse1();
     case "house2":

@@ -28,7 +28,7 @@ function getArmorSlotForItemId(id: ItemId): Exclude<EquipmentSlot, "held"> | nul
   // Keep this mapping explicit so new armor types can be added without relying on naming conventions.
   if (id === "leather_armor" || id === "iron_armor" || id === "mythril_armor") return "body";
   if (id === "mythril_helm") return "head";
-  if (id === "mythril_leggings") return "legs";
+  if (id === "scout_boots" || id === "mythril_leggings") return "legs";
   return null;
 }
 
@@ -74,4 +74,3 @@ export function toggleEquipFromInventorySlot(
   const heldItemId = equipment.heldItemId === s.id ? null : s.id;
   return { ok: true, next: { ...equipment, heldItemId } };
 }
-
