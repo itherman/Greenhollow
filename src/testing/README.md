@@ -18,6 +18,8 @@ type TestHarness = {
   tileCenterToScreen(tile: { x: number; y: number }): { x: number; y: number } | null;
   // Useful for stabilizing E2E tests that don't need to validate movement/pathing.
   teleportToTileCenter(tile: { x: number; y: number }): boolean;
+  // Quickly reload the WorldScene into a specific area/entry (e.g., regression setups).
+  restartInArea(opts: { areaId: AreaId; entry?: EntryId }): boolean;
 };
 ```
 
