@@ -323,6 +323,31 @@ export function ensureNpcTextures(scene: Phaser.Scene) {
 
   mk("npc_buyer", (ctx) => drawBuyer(ctx, { skin: "#f2c7a5", skinShadow: "#d8a787" }));
   mk("npc_buyer_dark", (ctx) => drawBuyer(ctx, { skin: "#c48a64", skinShadow: "#9f6d45" }));
+  mk("npc_sailor", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // shirt with stripes
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(9, 8, 6, 9);
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(9, 14, 6, 3);
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(9, 9, 6, 2);
+    ctx.fillRect(9, 12, 6, 1);
+    // head + beard
+    ctx.fillStyle = "#f2c7a5";
+    ctx.fillRect(10, 4, 4, 4);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(10, 7, 4, 1);
+    // cap
+    ctx.fillStyle = "#e5e7eb";
+    ctx.fillRect(9, 2, 6, 1);
+    ctx.fillStyle = "#0b1220";
+    ctx.fillRect(9, 3, 6, 1);
+    // boots
+    ctx.fillStyle = "#1f2937";
+    ctx.fillRect(10, 17, 2, 2);
+    ctx.fillRect(13, 17, 2, 2);
+  });
 }
 
 export function ensureChestTextures(scene: Phaser.Scene) {
@@ -401,6 +426,37 @@ export function ensureMonsterTexture(scene: Phaser.Scene) {
 
   scene.textures.addImage("monster_slime", c as unknown as HTMLImageElement);
   scene.textures.get("monster_slime").setFilter(Phaser.Textures.FilterMode.NEAREST);
+}
+
+export function ensureShadowStalkerTexture(scene: Phaser.Scene) {
+  if (scene.textures.exists("enemy_shadow_stalker")) return;
+  const c = document.createElement("canvas");
+  c.width = 24;
+  c.height = 24;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("Failed to get canvas context");
+  ctx.clearRect(0, 0, 24, 24);
+
+  // Body silhouette
+  ctx.fillStyle = "#0f172a";
+  ctx.fillRect(6, 9, 12, 10);
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(7, 11, 10, 6);
+  // Back spikes
+  ctx.fillStyle = "#1f2937";
+  ctx.fillRect(8, 7, 2, 3);
+  ctx.fillRect(13, 6, 2, 4);
+  // Eyes
+  ctx.fillStyle = "#fbbf24";
+  ctx.fillRect(10, 12, 1, 1);
+  ctx.fillRect(13, 12, 1, 1);
+  // Claws
+  ctx.fillStyle = "#c084fc";
+  ctx.fillRect(7, 17, 3, 2);
+  ctx.fillRect(14, 17, 3, 2);
+
+  scene.textures.addImage("enemy_shadow_stalker", c as unknown as HTMLImageElement);
+  scene.textures.get("enemy_shadow_stalker").setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
 export function ensureGoblinAndArrowTextures(scene: Phaser.Scene) {
@@ -659,6 +715,49 @@ export function ensureStoreExteriorTexture(scene: Phaser.Scene) {
   scene.textures.get("prop_store_exterior").setFilter(Phaser.Textures.FilterMode.NEAREST);
 }
 
+export function ensureBoatTexture(scene: Phaser.Scene) {
+  if (scene.textures.exists("prop_boat")) return;
+  const bw = 96;
+  const bh = 48;
+  const c = document.createElement("canvas");
+  c.width = bw;
+  c.height = bh;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("Failed to get canvas context");
+  ctx.clearRect(0, 0, bw, bh);
+
+  // Hull
+  ctx.fillStyle = "#7c2d12";
+  ctx.fillRect(6, 18, bw - 12, 16);
+  ctx.fillStyle = "#5b210c";
+  ctx.fillRect(6, 28, bw - 12, 6);
+  // Keel shadow
+  ctx.fillStyle = "#3a1a0a";
+  ctx.fillRect(8, 32, bw - 16, 4);
+
+  // Trim + planks
+  ctx.fillStyle = "#9a3412";
+  ctx.fillRect(6, 16, bw - 12, 4);
+  for (let x = 10; x < bw - 10; x += 12) {
+    ctx.fillRect(x, 18, 2, 16);
+  }
+
+  // Deck boards
+  ctx.fillStyle = "#a16207";
+  ctx.fillRect(14, 14, bw - 28, 10);
+  ctx.fillStyle = "#facc15";
+  for (let x = 14; x < bw - 14; x += 10) ctx.fillRect(x, 15, 1, 8);
+
+  // Small mast + rope
+  ctx.fillStyle = "#facc15";
+  ctx.fillRect(Math.floor(bw / 2) - 2, 8, 4, 12);
+  ctx.fillStyle = "#e5e7eb";
+  ctx.fillRect(Math.floor(bw / 2) - 2, 6, 4, 2);
+
+  scene.textures.addImage("prop_boat", c as unknown as HTMLImageElement);
+  scene.textures.get("prop_boat").setFilter(Phaser.Textures.FilterMode.NEAREST);
+}
+
 export function ensureItemAndPropTextures(scene: Phaser.Scene) {
   const mk = (key: string, draw: (ctx: CanvasRenderingContext2D) => void) => {
     if (scene.textures.exists(key)) return;
@@ -850,6 +949,49 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     ctx.fillStyle = "#0b1220";
     ctx.fillRect(9, 10, 1, 1);
     ctx.fillRect(14, 10, 1, 1);
+    // buckle
+    ctx.fillStyle = "#f5d76e";
+    ctx.fillRect(11, 15, 2, 2);
+  });
+
+  mk("item_mythril_helm", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillRect(9, 6, 6, 5);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(9, 10, 6, 2);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(10, 7, 4, 1);
+    ctx.fillStyle = "#0b1220";
+    ctx.fillRect(10, 9, 1, 1);
+    ctx.fillRect(13, 9, 1, 1);
+  });
+
+  mk("item_mythril_leggings", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(9, 10, 3, 9);
+    ctx.fillRect(12, 10, 3, 9);
+    ctx.fillStyle = "#0284c7";
+    ctx.fillRect(9, 17, 3, 2);
+    ctx.fillRect(12, 17, 3, 2);
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(10, 11, 1, 5);
+    ctx.fillRect(13, 11, 1, 5);
+  });
+
+  mk("item_mythril_armor", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // chest plate
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillRect(8, 7, 8, 12);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(8, 15, 8, 4);
+    // highlights
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(9, 8, 2, 9);
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(13, 9, 1, 3);
     // buckle
     ctx.fillStyle = "#f5d76e";
     ctx.fillRect(11, 15, 2, 2);

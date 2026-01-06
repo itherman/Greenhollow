@@ -11,7 +11,10 @@ export type ItemId =
   | "bread"
   | "stew"
   | "leather_armor"
-  | "iron_armor";
+  | "iron_armor"
+  | "mythril_helm"
+  | "mythril_leggings"
+  | "mythril_armor";
 
 export type ItemStack = {
   id: ItemId;
@@ -124,9 +127,11 @@ export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
   stew: { id: "stew", name: "Stew", maxStack: 10 },
   leather_armor: { id: "leather_armor", name: "Leather Armor", maxStack: 1 },
   iron_armor: { id: "iron_armor", name: "Iron Armor", maxStack: 1 },
+  mythril_helm: { id: "mythril_helm", name: "Mythril Helm", maxStack: 1 },
+  mythril_leggings: { id: "mythril_leggings", name: "Mythril Leggings", maxStack: 1 },
+  mythril_armor: { id: "mythril_armor", name: "Mythril Armor", maxStack: 1 },
 };
 
 export function getItemCount(inv: Inventory, itemId: ItemId): number {
   return inv.slots.reduce((sum, s) => (s?.id === itemId ? sum + s.qty : sum), 0);
 }
-
