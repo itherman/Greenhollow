@@ -4,6 +4,8 @@ export type AreaId =
   | "cave"
   | "troll_bridge"
   | "troll_clearing"
+  | "river_village"
+  | "shadow_forest"
   | "house"
   | "hallway"
   | "store"
@@ -17,6 +19,9 @@ export type EntryId =
   | "fromCave"
   | "fromTrollBridge"
   | "fromTrollClearing"
+  | "fromBoat"
+  | "fromRiverVillage"
+  | "fromShadowForest"
   | "fromHouse"
   | "fromHallway"
   | "fromStore"
@@ -147,6 +152,9 @@ function fullSpawnMap(p: Point): Record<EntryId, Point> {
     fromCave: p,
     fromTrollBridge: p,
     fromTrollClearing: p,
+    fromBoat: p,
+    fromRiverVillage: p,
+    fromShadowForest: p,
     fromHouse: p,
     fromHallway: p,
     fromStore: p,
@@ -261,6 +269,9 @@ export function makeVillage(): AreaDef {
       fromCave: { x: 2, y: height - 4 },
       fromTrollBridge: { x: trollGateX, y: 1 },
       fromTrollClearing: { x: trollGateX, y: 1 },
+      fromBoat: { x: trollGateX, y: 1 },
+      fromRiverVillage: { x: 2, y: 2 },
+      fromShadowForest: { x: 2, y: 2 },
       fromStore: { x: width - 4, y: gateY },
       fromHouse: houseFronts[0]!,
       fromHallway: houseFronts[0]!,
@@ -376,6 +387,9 @@ export function makeWoods(): AreaDef {
       fromCave: { x: width - 4, y: height - 4 },
       fromTrollBridge: { x: 2, y: Math.floor(height / 2) },
       fromTrollClearing: { x: 2, y: Math.floor(height / 2) },
+      fromBoat: { x: 2, y: Math.floor(height / 2) },
+      fromRiverVillage: { x: 2, y: Math.floor(height / 2) },
+      fromShadowForest: { x: 2, y: Math.floor(height / 2) },
       fromHouse: { x: 2, y: Math.floor(height / 2) },
       fromHouse1: { x: 2, y: Math.floor(height / 2) },
       fromHouse2: { x: 2, y: Math.floor(height / 2) },
@@ -391,16 +405,16 @@ export function makeWoods(): AreaDef {
         id: "toVillage",
         rect: { x: 0, y: Math.floor(height / 2) - 1, w: 1, h: 2 },
         toArea: "village",
-      toEntry: "fromWoods",
-    },
-    {
-      id: "toStore",
-      rect: { x: storeX, y: 1, w: 2, h: 2 },
-      toArea: "store",
-      toEntry: "fromWoods",
-    },
-    {
-      id: "toCave",
+        toEntry: "fromWoods",
+      },
+      {
+        id: "toStore",
+        rect: { x: storeX, y: 1, w: 2, h: 2 },
+        toArea: "store",
+        toEntry: "fromWoods",
+      },
+      {
+        id: "toCave",
         rect: { x: width - 1, y: height - 4, w: 1, h: 3 },
         toArea: "cave",
         toEntry: "fromWoods",
@@ -467,6 +481,9 @@ export function makeCave(): AreaDef {
       fromVillage: { x: 2, y: height - 4 },
       fromTrollBridge: { x: 2, y: height - 4 },
       fromTrollClearing: { x: 2, y: height - 4 },
+      fromBoat: { x: 2, y: height - 4 },
+      fromRiverVillage: { x: 2, y: height - 4 },
+      fromShadowForest: { x: 2, y: height - 4 },
       fromHouse: { x: 2, y: height - 4 },
       fromHouse1: { x: 2, y: height - 4 },
       fromHouse2: { x: 2, y: height - 4 },
@@ -516,6 +533,9 @@ export function makeHouse(): AreaDef {
       fromCave: spawnFromVillage,
       fromTrollBridge: spawnFromVillage,
       fromTrollClearing: spawnFromVillage,
+      fromBoat: spawnFromVillage,
+      fromRiverVillage: spawnFromVillage,
+      fromShadowForest: spawnFromVillage,
       fromStore: spawnFromVillage,
       fromHouse: spawnFromVillage,
       fromHouse1: spawnFromVillage,
@@ -602,7 +622,7 @@ export function makeTrollBridge(): AreaDef {
   const entryX = Math.max(2, Math.floor(width * 0.18));
   const riverCols = [barrierX - 1, barrierX, barrierX + 1];
   for (const x of riverCols) {
-    for (let y = 1; y < height - 1; y++) tiles[y]![x] = 6;
+    for (let y = 0; y < height - 1; y++) tiles[y]![x] = 6;
   }
   for (let y = height - 1; y >= bridgeY; y--) tiles[y]![entryX] = 4;
   for (let x = entryX; x < width - 1; x++) tiles[bridgeY]![x] = 4;
@@ -620,7 +640,15 @@ export function makeTrollBridge(): AreaDef {
     tiles[c.y]![c.x + 1] = 5;
   }
 
+  // Boat dock path on the western bank.
+  const boatDock = { x: Math.max(2, barrierX - 2), y: Math.max(2, bridgeY - 4) };
+  for (let y = Math.min(boatDock.y, bridgeY); y <= Math.max(boatDock.y, bridgeY); y++) {
+    if (tiles[y]![boatDock.x] !== 6) tiles[y]![boatDock.x] = 4;
+  }
+  if (boatDock.x + 1 < width - 1) tiles[boatDock.y]![boatDock.x + 1] = 4;
+
   const entrySpawn = { x: entryX, y: height - 3 } as const;
+  const boatSpawn = { x: boatDock.x, y: boatDock.y } as const;
   const clearingReturnSpawn = { x: Math.max(width - 5, barrierX + 2), y: bridgeY } as const;
 
   return {
@@ -635,6 +663,9 @@ export function makeTrollBridge(): AreaDef {
       fromCave: entrySpawn,
       fromTrollBridge: entrySpawn,
       fromTrollClearing: clearingReturnSpawn,
+      fromBoat: boatSpawn,
+      fromRiverVillage: boatSpawn,
+      fromShadowForest: boatSpawn,
       fromHouse: entrySpawn,
       fromHouse1: entrySpawn,
       fromHouse2: entrySpawn,
@@ -658,7 +689,7 @@ export function makeTrollBridge(): AreaDef {
         toEntry: "fromTrollBridge",
       },
     ],
-    npcs: [],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: boatSpawn, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -704,6 +735,9 @@ export function makeTrollClearing(): AreaDef {
       fromWoods: spawn,
       fromCave: spawn,
       fromTrollClearing: spawn,
+      fromBoat: spawn,
+      fromRiverVillage: spawn,
+      fromShadowForest: spawn,
       fromHouse: spawn,
       fromHouse1: spawn,
       fromHouse2: spawn,
@@ -722,6 +756,152 @@ export function makeTrollClearing(): AreaDef {
       },
     ],
     npcs: [],
+  };
+}
+
+export function makeRiverVillage(): AreaDef {
+  const width = 22;
+  const height = 14;
+  const tiles = borderWalls(width, height, 0);
+
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  // River inlet on the west side.
+  const riverCols = [2, 3, 4];
+  for (const x of riverCols) {
+    for (let y = 1; y < height - 1; y++) tiles[y]![x] = 6;
+  }
+
+  const dock = { x: 5, y: height - 4 };
+  // Dock path toward the plaza.
+  for (let y = dock.y; y >= 2; y--) tiles[y]![dock.x] = 4;
+  const plazaY = Math.floor(height / 2);
+  for (let x = dock.x; x < width - 2; x++) tiles[plazaY]![x] = 4;
+  const shopX = Math.min(width - 4, Math.floor(width * 0.72));
+  for (let y = 2; y <= plazaY; y++) tiles[y]![shopX] = 4;
+  // Small market pad.
+  for (let y = 1; y <= 3; y++) {
+    for (let x = shopX - 1; x <= shopX + 1; x++) tiles[y]![x] = 4;
+  }
+  tiles[plazaY - 1]![shopX] = 4;
+
+  // Scatter trees for texture.
+  const copses = [
+    { x: 9, y: 5 },
+    { x: 13, y: 9 },
+    { x: 7, y: 11 },
+  ];
+  for (const c of copses) {
+    tiles[c.y]![c.x] = 5;
+    tiles[c.y]![c.x + 1] = 5;
+  }
+
+  const spawn = dock;
+
+  return {
+    id: "river_village",
+    name: "River Village",
+    width,
+    height,
+    tiles,
+    spawns: {
+      start: spawn,
+      fromBoat: spawn,
+      fromRiverVillage: spawn,
+      fromShadowForest: spawn,
+      fromVillage: spawn,
+      fromWoods: spawn,
+      fromCave: spawn,
+      fromTrollBridge: spawn,
+      fromTrollClearing: spawn,
+      fromHouse: spawn,
+      fromHouse1: spawn,
+      fromHouse2: spawn,
+      fromHouse3: spawn,
+      fromHouse4: spawn,
+      fromHallway: spawn,
+      fromStore: spawn,
+    },
+    exits: [],
+    npcs: [
+      { id: "rare_shopkeeper", name: "Rare Trader", pos: { x: shopX, y: 2 }, dialogScriptId: "rareShopkeeper" },
+      { id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" },
+    ],
+  };
+}
+
+export function makeShadowForest(): AreaDef {
+  const width = 20;
+  const height = 16;
+  const tiles = borderWalls(width, height, 2);
+
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  // Murky river on the west to meet the ferry.
+  for (let y = 1; y < height - 1; y++) {
+    tiles[y]![2] = 6;
+    tiles[y]![3] = 6;
+  }
+
+  const dock = { x: 4, y: height - 3 };
+  for (let y = dock.y; y >= 2; y--) tiles[y]![dock.x] = 4;
+  const trailY = Math.floor(height * 0.62);
+  for (let x = dock.x; x < width - 2; x++) tiles[trailY]![x] = 4;
+  const northSpurX = Math.floor(width / 2);
+  for (let y = trailY; y >= 3; y--) tiles[y]![northSpurX] = 4;
+
+  const thickets = [
+    { x: 8, y: 5 },
+    { x: 14, y: 9 },
+    { x: 11, y: 12 },
+  ];
+  for (const t of thickets) {
+    tiles[t.y]![t.x] = 5;
+    tiles[t.y]![t.x + 1] = 5;
+  }
+
+  const spawn = dock;
+
+  return {
+    id: "shadow_forest",
+    name: "Shadowed Wilds",
+    width,
+    height,
+    tiles,
+    spawns: {
+      start: spawn,
+      fromBoat: spawn,
+      fromRiverVillage: spawn,
+      fromShadowForest: spawn,
+      fromVillage: spawn,
+      fromWoods: spawn,
+      fromCave: spawn,
+      fromTrollBridge: spawn,
+      fromTrollClearing: spawn,
+      fromHouse: spawn,
+      fromHouse1: spawn,
+      fromHouse2: spawn,
+      fromHouse3: spawn,
+      fromHouse4: spawn,
+      fromHallway: spawn,
+      fromStore: spawn,
+    },
+    exits: [],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -787,6 +967,12 @@ export function makeStore(): AreaDef {
   };
 }
 
+export const BOAT_ANCHOR_TILES: Partial<Record<AreaId, Point>> = {
+  troll_bridge: { x: 10, y: 4 },
+  river_village: { x: 5, y: 10 },
+  shadow_forest: { x: 4, y: 13 },
+};
+
 export function getArea(areaId: AreaId): AreaDef {
   switch (areaId) {
     case "village":
@@ -813,5 +999,9 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeTrollBridge();
     case "troll_clearing":
       return makeTrollClearing();
+    case "river_village":
+      return makeRiverVillage();
+    case "shadow_forest":
+      return makeShadowForest();
   }
 }

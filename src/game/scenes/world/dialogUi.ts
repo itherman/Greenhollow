@@ -28,8 +28,9 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     }
 
     const layout = computeDialogLayout(this.scale.width, this.scale.height);
-    const isShop = script.id === "shopkeeper";
-    const isBuyer = script.id === "buyerNpc";
+          const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
+          const isBuyer = script.id === "buyerNpc";
+          const isTravel = script.id === "riverSailor";
     const showShopHud = isShop || isBuyer;
 
     if (!this.dialogBox) {
@@ -160,8 +161,8 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const lineH = 22;
 
       const MORE_ID = "__more_items__";
-      const isShop = script.id === "shopkeeper";
-      const isBuyer = script.id === "buyerNpc";
+    const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
+    const isBuyer = script.id === "buyerNpc";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
       if (isShop && node.id === "menu") {
@@ -251,6 +252,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           }
 
           if (isBuyer && this.handleBuyerChoice(ch.id, script)) return;
+          if (isTravel && this.handleTravelChoice(ch.id)) return;
 
           // Shopkeeper purchases: apply side effects before re-render.
           this.dialog = choose(script, this.dialog, ch.id);

@@ -72,6 +72,9 @@ export const SHOP_CATALOG: ShopCatalogEntry[] = [
   { kind: "food", itemId: "stew", priceCoins: 30, grantQty: 1, healHp: 16 },
   { kind: "armor", itemId: "leather_armor", priceCoins: 80, grantQty: 1, maxHpBonus: 6 },
   { kind: "armor", itemId: "iron_armor", priceCoins: 160, grantQty: 1, maxHpBonus: 12 },
+  { kind: "armor", itemId: "mythril_helm", priceCoins: 260, grantQty: 1, maxHpBonus: 10 },
+  { kind: "armor", itemId: "mythril_leggings", priceCoins: 320, grantQty: 1, maxHpBonus: 14 },
+  { kind: "armor", itemId: "mythril_armor", priceCoins: 420, grantQty: 1, maxHpBonus: 18 },
 ];
 
 export function getShopEntry(itemId: ItemId): ShopCatalogEntry | null {
@@ -112,5 +115,4 @@ export function getArmorBonus(itemId: ItemId | null): number {
   const e = itemId ? getShopEntry(itemId) : null;
   return e && e.kind === "armor" ? e.maxHpBonus : 0;
 }
-
 

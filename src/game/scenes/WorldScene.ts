@@ -77,6 +77,8 @@ export class WorldScene extends Phaser.Scene {
     openedDialog: string;
     emptyDialog: string;
   };
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private boatSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private interactKey!: Phaser.Input.Keyboard.Key;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
@@ -406,6 +408,28 @@ export class WorldScene extends Phaser.Scene {
     addBobbingTween(this.tweens, this.bowSprite, { baseY: y, durationMs: 700 });
   }
 
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
+  private damageMonster(mon: Phaser.Physics.Arcade.Sprite, damage: number) {
+    const enemyId = ((mon as any).__enemyId as EnemyId | undefined) ?? "woods_slime";
+    const hp = (mon as any).__hp ?? 1;
+    const remaining = hp - damage;
+    (mon as any).__hp = remaining;
+    mon.setTintFill(0xffffff);
+    this.time.delayedCall(60, () => {
+      if (mon.active) mon.clearTint();
+    });
+
+    if (remaining <= 0) {
+      const dropOverride = (mon as any).__dropOverride as EnemyDrop | undefined;
+      const onDeath = (mon as any).__onDeath as ((x: number, y: number) => void) | undefined;
+      const dropX = mon.x;
+      const dropY = mon.y;
+      this.spawnEnemyDrop(dropX, dropY, enemyId, dropOverride);
+      mon.destroy();
+      onDeath?.(dropX, dropY);
+    }
+  }
+
   // @ts-expect-error TS6133 - Used in loadArea.ts
   private damageGoblin(gob: Phaser.Physics.Arcade.Sprite, damage: number) {
     const goblins = this.goblinsGroup;
@@ -471,6 +495,12 @@ export class WorldScene extends Phaser.Scene {
               ? "item_leather_armor"
               : drop.itemId === "iron_armor"
                 ? "item_iron_armor"
+                : drop.itemId === "mythril_helm"
+                  ? "item_mythril_helm"
+                  : drop.itemId === "mythril_leggings"
+                    ? "item_mythril_leggings"
+                    : drop.itemId === "mythril_armor"
+                      ? "item_mythril_armor"
                 : drop.itemId === "rusty_key" || drop.itemId === "troll_key"
                   ? "item_key"
                   : "item_bread"
@@ -1011,7 +1041,6 @@ export class WorldScene extends Phaser.Scene {
     renderDialogInWorldScene(this as any, script);
   }
 
-  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private closeDialogUi() {
     closeDialogUiInWorldScene(this as any);
     this.resetBuyerFlow();
@@ -1072,6 +1101,29 @@ export class WorldScene extends Phaser.Scene {
       return true;
     }
     return false;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and dialogUi.ts
+  private handleTravelChoice(choiceId: string): boolean {
+    if (choiceId === "stay") {
+      this.dialog = { open: false };
+      this.closeDialogUi();
+      return true;
+    }
+
+    const dest =
+      choiceId === "sail_river_village"
+        ? ({ areaId: "river_village", entry: "fromBoat" } as const)
+        : choiceId === "sail_shadow_forest"
+          ? ({ areaId: "shadow_forest", entry: "fromBoat" } as const)
+          : choiceId === "sail_troll_bridge"
+            ? ({ areaId: "troll_bridge", entry: "fromBoat" } as const)
+            : null;
+
+    if (!dest) return false;
+    this.closeDialogUi();
+    this.scene.restart({ areaId: dest.areaId, entry: dest.entry });
+    return true;
   }
 
   update() {

@@ -26,7 +26,9 @@ function isHeldToolOrWeapon(id: ItemId): boolean {
 function getArmorSlotForItemId(id: ItemId): Exclude<EquipmentSlot, "held"> | null {
   // Currently the game only has chest/body armor items.
   // Keep this mapping explicit so new armor types can be added without relying on naming conventions.
-  if (id === "leather_armor" || id === "iron_armor") return "body";
+  if (id === "leather_armor" || id === "iron_armor" || id === "mythril_armor") return "body";
+  if (id === "mythril_helm") return "head";
+  if (id === "mythril_leggings") return "legs";
   return null;
 }
 
@@ -72,5 +74,4 @@ export function toggleEquipFromInventorySlot(
   const heldItemId = equipment.heldItemId === s.id ? null : s.id;
   return { ok: true, next: { ...equipment, heldItemId } };
 }
-
 
