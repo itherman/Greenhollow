@@ -8,10 +8,13 @@ export type ItemId =
   | "dagger"
   | "longsword"
   | "spear"
+  | "warhammer"
   | "bread"
   | "stew"
+  | "herbal_tonic"
   | "leather_armor"
   | "iron_armor"
+  | "scout_boots"
   | "mythril_helm"
   | "mythril_leggings"
   | "mythril_armor";
@@ -123,10 +126,13 @@ export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
   dagger: { id: "dagger", name: "Dagger", maxStack: 1 },
   longsword: { id: "longsword", name: "Longsword", maxStack: 1 },
   spear: { id: "spear", name: "Spear", maxStack: 1 },
+  warhammer: { id: "warhammer", name: "Warhammer", maxStack: 1 },
   bread: { id: "bread", name: "Bread", maxStack: 20 },
   stew: { id: "stew", name: "Stew", maxStack: 10 },
+  herbal_tonic: { id: "herbal_tonic", name: "Herbal Tonic", maxStack: 8 },
   leather_armor: { id: "leather_armor", name: "Leather Armor", maxStack: 1 },
   iron_armor: { id: "iron_armor", name: "Iron Armor", maxStack: 1 },
+  scout_boots: { id: "scout_boots", name: "Scout Boots", maxStack: 1 },
   mythril_helm: { id: "mythril_helm", name: "Mythril Helm", maxStack: 1 },
   mythril_leggings: { id: "mythril_leggings", name: "Mythril Leggings", maxStack: 1 },
   mythril_armor: { id: "mythril_armor", name: "Mythril Armor", maxStack: 1 },

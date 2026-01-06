@@ -147,8 +147,10 @@ export const shopkeeper: DialogScript = {
         { id: "buy_arrows", text: "Arrows x25 (15c)", next: "confirm" },
         { id: "buy_bread", text: "Bread (12c)", next: "confirm" },
         { id: "buy_stew", text: "Stew (30c)", next: "confirm" },
+        { id: "buy_herbal_tonic", text: "Herbal Tonic (55c)", next: "confirm" },
         { id: "buy_leather_armor", text: "Leather Armor (80c)", next: "confirm" },
         { id: "buy_iron_armor", text: "Iron Armor (160c)", next: "confirm" },
+        { id: "buy_scout_boots", text: "Scout Boots (110c)", next: "confirm" },
         { id: "bye", text: "Nothing. Bye.", next: "end" },
       ],
     },
@@ -207,6 +209,7 @@ export const rareShopkeeper: DialogScript = {
       kind: "choice",
       text: "Only the finest wares. What calls to you?",
       choices: [
+        { id: "buy_warhammer", text: "Warhammer (310c)", next: "confirm" },
         { id: "buy_mythril_helm", text: "Mythril Helm (260c)", next: "confirm" },
         { id: "buy_mythril_leggings", text: "Mythril Leggings (320c)", next: "confirm" },
         { id: "buy_mythril_armor", text: "Mythril Armor (420c)", next: "confirm" },
