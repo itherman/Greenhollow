@@ -22,6 +22,7 @@ import { computeDeathTransition } from "../../core/death";
 import { depthSortByY, depthSortManyByFeet, depthSortManyByY } from "./world/depthSorting";
 import { getFeetDepth } from "./depthSort";
 import { anchorSlashSprite, renderHeldItem } from "./world/heldItemRendering";
+import { applyArmorVisuals } from "./world/equipmentVisuals";
 
 /**
  * WorldScene update loop extracted to keep WorldScene.ts smaller.
@@ -495,26 +496,18 @@ export function worldSceneUpdate(scene: any): void {
     const baseDepth = getFeetDepth(this.player as any);
     this.player.setDepth(baseDepth);
 
-    // Armor overlay: keep it aligned and rendered above default clothing.
-    if (this.bodyArmorSprite) {
-      const bodyArmor = this.equipment.bodyArmorItemId;
-      if (!bodyArmor) {
-        this.bodyArmorSprite.setVisible(false);
-      } else {
-        const tex =
-          bodyArmor === "leather_armor"
-            ? "player_armor_body_leather"
-            : bodyArmor === "iron_armor"
-              ? "player_armor_body_iron"
-              : null;
-        if (tex) this.bodyArmorSprite.setTexture(tex);
-        this.bodyArmorSprite
-          .setPosition(this.player.x, this.player.y)
-          .setFrame((this.player.frame as any)?.name ?? (this.player.frame as any))
-          .setVisible(true)
-          .setDepth(baseDepth + 0.1);
-      }
-    }
+    const armorFrame = (this.player.frame as any)?.name ?? (this.player.frame as any);
+    const armorSprites = applyArmorVisuals({
+      sprites: { head: this.headArmorSprite, body: this.bodyArmorSprite, legs: this.legArmorSprite },
+      equipment: this.equipment,
+      frame: armorFrame,
+      player: this.player,
+      baseDepth,
+      textureExists: (key) => this.textures?.exists?.(key) ?? true,
+    });
+    this.headArmorSprite = armorSprites.head as any;
+    this.bodyArmorSprite = armorSprites.body as any;
+    this.legArmorSprite = armorSprites.legs as any;
     depthSortByY(this.chest as any);
     if (this.npcsGroup) depthSortManyByFeet(this.npcsGroup.getChildren() as any, getFeetDepth);
 

@@ -139,7 +139,9 @@ export class WorldScene extends Phaser.Scene {
   private heldItemSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private slashSwordSprite?: Phaser.GameObjects.Sprite;
+  private headArmorSprite?: Phaser.GameObjects.Sprite;
   private bodyArmorSprite?: Phaser.GameObjects.Sprite;
+  private legArmorSprite?: Phaser.GameObjects.Sprite;
 
   private baseMaxHp = 20;
   private maxHp = 20;
@@ -562,8 +564,12 @@ export class WorldScene extends Phaser.Scene {
     this.chestContents = undefined;
     this.heldItemSprite = undefined;
     this.slashSwordSprite = undefined;
+    this.headArmorSprite?.destroy();
+    this.headArmorSprite = undefined;
     this.bodyArmorSprite?.destroy();
     this.bodyArmorSprite = undefined;
+    this.legArmorSprite?.destroy();
+    this.legArmorSprite = undefined;
     this.equipment = loadEquipment();
     this.updateMaxHpFromArmor();
     this.monstersGroup = undefined;

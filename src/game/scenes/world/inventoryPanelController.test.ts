@@ -28,7 +28,10 @@ function createMockDisplayObject() {
     setOrigin: () => obj,
     setScrollFactor: () => obj,
     setDepth: () => obj,
-    setInteractive: () => obj,
+    setInteractive: (options?: any) => {
+      obj.dropZone = !!options?.dropZone;
+      return obj;
+    },
     setStrokeStyle: () => obj,
     setSize: () => obj,
     setPosition: (x?: number, y?: number) => {
@@ -58,6 +61,18 @@ function createMockDisplayObject() {
 }
 
 function createMockScene() {
+  const inputHandlers: Record<string, Array<(...args: any[]) => void>> = {};
+  const input = {
+    setDraggable: vi.fn(),
+    on: (event: string, cb: (...args: any[]) => void) => {
+      inputHandlers[event] ??= [];
+      inputHandlers[event]!.push(cb);
+      return input;
+    },
+    emit: (event: string, ...args: any[]) => {
+      inputHandlers[event]?.forEach((cb) => cb(...args));
+    },
+  };
   return {
     scale: { width: 800, height: 600 },
     time: {
@@ -78,6 +93,8 @@ function createMockScene() {
         return obj;
       },
     },
+    input,
+    inputHandlers,
   };
 }
 
@@ -174,5 +191,84 @@ describe("inventoryPanelController", () => {
     expect(inventory.slots[0]).toBeNull();
     expect(saveSpy).toHaveBeenCalled();
     expect((controller as any).deleteDialogVisible).toBe(false);
+  });
+
+  it("drags and swaps items between slots", () => {
+    const inventory = createInventory();
+    inventory.slots[0] = { id: "bread", name: "Bread", qty: 1, maxStack: 10 };
+    inventory.slots[1] = { id: "stew", name: "Stew", qty: 2, maxStack: 10 };
+    vi.spyOn(inventoryStore, "loadInventory").mockReturnValue(inventory);
+    const saveSpy = vi.spyOn(inventoryStore, "saveInventory").mockReturnValue();
+    vi.spyOn(sessionModule, "loadSession").mockReturnValue(null);
+
+    const scene = createMockScene();
+
+    const controller = new InventoryPanelController({
+      scene,
+      getEquipment: () => emptyEquipment,
+      setEquipment: vi.fn(),
+      isDialogOpen: () => false,
+      updateMaxHpFromArmor: vi.fn(),
+      getHp: () => 10,
+      getMaxHp: () => 10,
+      setHp: vi.fn(),
+      writeProgress: vi.fn(),
+      exitToTitle: vi.fn(),
+      setInventoryOpen: vi.fn(),
+      clearTapIntent: vi.fn(),
+      suppressWorldPointerForMs: vi.fn(),
+      suppressExitForMs: vi.fn(),
+    });
+
+    controller.render(true);
+
+    const slot0 = (controller as any).inventorySlotRects[0];
+    const slot1 = (controller as any).inventorySlotRects[1];
+    expect(slot0.invSlotIndex).toBe(0);
+    expect(slot1.invSlotIndex).toBe(1);
+
+    // Simulate dropping slot0 onto slot1
+    scene.input.emit("drop", null, slot0, slot1);
+
+    expect(inventory.slots[0]?.id).toBe("stew");
+    expect(inventory.slots[1]?.id).toBe("bread");
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
+  it("drops items onto the trash zone to delete them", () => {
+    const inventory = createInventory();
+    inventory.slots[0] = { id: "bread", name: "Bread", qty: 1, maxStack: 10 };
+    vi.spyOn(inventoryStore, "loadInventory").mockReturnValue(inventory);
+    const saveSpy = vi.spyOn(inventoryStore, "saveInventory").mockReturnValue();
+    vi.spyOn(sessionModule, "loadSession").mockReturnValue(null);
+
+    const scene = createMockScene();
+
+    const controller = new InventoryPanelController({
+      scene,
+      getEquipment: () => emptyEquipment,
+      setEquipment: vi.fn(),
+      isDialogOpen: () => false,
+      updateMaxHpFromArmor: vi.fn(),
+      getHp: () => 10,
+      getMaxHp: () => 10,
+      setHp: vi.fn(),
+      writeProgress: vi.fn(),
+      exitToTitle: vi.fn(),
+      setInventoryOpen: vi.fn(),
+      clearTapIntent: vi.fn(),
+      suppressWorldPointerForMs: vi.fn(),
+      suppressExitForMs: vi.fn(),
+    });
+
+    controller.render(true);
+
+    const slot0 = (controller as any).inventorySlotRects[0];
+    const trash = (controller as any).inventoryPanel.list.find((o: any) => (o as any).invRole === "trash");
+
+    scene.input.emit("drop", null, slot0, trash);
+
+    expect(inventory.slots[0]).toBeNull();
+    expect(saveSpy).toHaveBeenCalled();
   });
 });

@@ -454,16 +454,14 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       const mb = m.body as Phaser.Physics.Arcade.Body;
       mb.setSize(14, 10).setOffset(5, 12);
       (m as any).__enemyId = isShadowForest ? "shadow_stalker" : "woods_slime";
-      (m as any).__hp = isShadowForest ? 3 : 1;
-      (m as any).__contactDamage = isShadowForest ? 2 : 1;
+      (m as any).__hp = isShadowForest ? 10 : 1;
+      (m as any).__contactDamage = isShadowForest ? 3 : 1;
       if (isShadowForest) {
         (m as any).__onDeath = (x: number, y: number) => {
           const roll = Math.random();
-          if (roll < 0.35) {
-            const itemId = roll < 0.18 ? "mythril_helm" : "mythril_leggings";
+          if (roll < 0.08) {
+            const itemId = roll < 0.03 ? "iron_armor" : roll < 0.055 ? "mythril_helm" : "mythril_leggings";
             scene.spawnEnemyDrop(x + 4, y - 2, "shadow_stalker", { kind: "item", itemId, qty: 1 });
-          } else if (roll < 0.7) {
-            scene.spawnEnemyDrop(x - 5, y + 3, "shadow_stalker");
           }
         };
       }
