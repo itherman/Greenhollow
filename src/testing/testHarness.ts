@@ -1,4 +1,5 @@
 import type Phaser from "phaser";
+import type { AreaId, EntryId } from "../core/areas";
 
 export type TestHarnessState = {
   areaId?: string;
@@ -12,6 +13,7 @@ export type TestHarness = {
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
   teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
+  restartInArea: (opts: { areaId: AreaId; entry?: EntryId }) => boolean;
 };
 
 declare global {
@@ -95,6 +97,13 @@ export function installTestHarness(game: Phaser.Game): void {
         scene.player.setPosition(x, y);
       }
       if (typeof scene.player.setVelocity === "function") scene.player.setVelocity(0, 0);
+      return true;
+    },
+    restartInArea: ({ areaId, entry }) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene) return false;
+      if (typeof scene.scene?.restart !== "function") return false;
+      scene.scene.restart({ areaId, entry });
       return true;
     },
   };
