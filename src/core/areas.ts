@@ -708,11 +708,12 @@ export function makeTrollClearing(): AreaDef {
     tiles[y]![width - 1] = 5;
   }
 
-  // Entry path: start near the bottom-left, go up halfway, then turn east toward the bridge.
+  // Entry path: start near the bottom-left exit, go up halfway, then turn east toward the bridge.
   const spawn = { x: 2, y: height - 3 };
-  for (let y = spawn.y; y >= Math.floor(height / 2); y--) tiles[y]![spawn.x] = 4;
   const turnY = Math.floor(height / 2);
-  for (let x = spawn.x; x <= width - 1; x++) tiles[turnY]![x] = 4;
+  for (let y = height - 1; y >= turnY; y--) tiles[y]![spawn.x] = 4;
+  const turnEndX = width - 3;
+  for (let x = spawn.x; x <= turnEndX; x++) tiles[turnY]![x] = 4;
 
   const lumps = [
     { x: 4, y: 4 },
@@ -751,7 +752,7 @@ export function makeTrollClearing(): AreaDef {
     exits: [
       {
         id: "backToBridge",
-        rect: { x: width - 1, y: turnY, w: 1, h: 1 },
+        rect: { x: spawn.x, y: height - 1, w: 1, h: 1 },
         toArea: "troll_bridge",
         toEntry: "fromTrollClearing",
       },

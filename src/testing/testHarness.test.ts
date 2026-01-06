@@ -4,6 +4,7 @@ import { installTestHarness, type TestHarness } from "./testHarness";
 type Rect = { left: number; top: number };
 
 function makeGame(opts: { active: boolean; areaId?: string }) {
+  const restarts: Array<{ areaId?: string; entry?: string }> = [];
   const scene: any = {
     area: opts.areaId ? { id: opts.areaId } : undefined,
     player: { x: 100, y: 200 },
@@ -16,6 +17,11 @@ function makeGame(opts: { active: boolean; areaId?: string }) {
         getBoundingClientRect: (): Rect => ({ left: 10, top: 20 }),
       },
     },
+    scene: {
+      restart: (args: { areaId?: string; entry?: string }) => {
+        restarts.push(args);
+      },
+    },
     sys: { settings: { active: opts.active } },
   };
 
@@ -26,7 +32,7 @@ function makeGame(opts: { active: boolean; areaId?: string }) {
     },
   };
 
-  return { game, scene };
+  return { game, scene, restarts };
 }
 
 describe("testHarness", () => {
@@ -91,6 +97,14 @@ describe("testHarness", () => {
     expect(ok).toBe(true);
     expect(harness.getState()?.player).toEqual({ x: (13 + 0.5) * 32, y: (9 + 0.5) * 32 });
   });
-});
 
+  it("restartInArea() restarts the WorldScene with the requested area and entry", () => {
+    const { game, restarts } = makeGame({ active: true, areaId: "village" });
+    installTestHarness(game);
+    const harness = (globalThis as any).window.__GREENHOLLOW_TEST_HOOKS__ as TestHarness;
+    const ok = harness.restartInArea({ areaId: "troll_clearing", entry: "fromTrollBridge" });
+    expect(ok).toBe(true);
+    expect(restarts).toEqual([{ areaId: "troll_clearing", entry: "fromTrollBridge" }]);
+  });
+});
 
