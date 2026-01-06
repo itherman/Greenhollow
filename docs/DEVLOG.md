@@ -10,6 +10,9 @@
 - Give the keep a stone tileset (new floor + wall styles) with an indoor layout full of guardians, mid-tier loot, and treasure chests that refill every visit.
 - Ship a Playwright regression that restarts into the keep and confirms the castle chest opens on every revisit.
 
+## 2025-12-30
+- Move the Arcane Keep refilling chests onto the castle pedestals and retarget the Playwright regression to the new location so the dialog triggers reliably on every visit.
+
 ## 2025-12-27
 - Fix store exit spawn so leaving the shop no longer drops the player back into the entrance trigger.
 - Rework the troll clearing layout to enter from the bottom-left path that turns east toward the bridge, and reroute the troll bridge approach to match (no top/left exits).
