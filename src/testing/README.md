@@ -37,17 +37,18 @@ This is intentionally minimal; extend it as we grow regression coverage.
 
 ## Wizard dialog regression test (browser-driven)
 
-File: `src/testing/wizardDialog.test.ts`
+File: `tests/e2e/wizard-dialog.spec.ts` (runs under the Playwright test runner).
 
 What it does:
-- launches a Vite dev server
-- opens the game in Chromium via Playwright (tablet-ish viewport)
+- launches the Vite dev server via `playwright.config.ts`
+- opens the game in Chromium/Firefox/WebKit
 - clicks through the intro and guest login
 - walks to the village elder and exercises every dialog choice (1, 2, 3), then closes the dialog
+- captures a full-page screenshot at `playwright-artifacts/screenshots/wizard-dialog.png`
 
 Running it locally:
-1) Install Playwright (browsers included): `npm install playwright && npx playwright install chromium`
-2) Run `npm test` — the test will auto-skip if Playwright is unavailable.
+1) Install dependencies (Playwright downloads browsers during install): `npm install`
+2) Run the end-to-end suite: `npm run test:e2e` (or `npm test` for unit + E2E)
 
 Notes:
 - The test uses the harness helpers to translate tile coords to screen coords, so it remains stable even if the canvas size changes.
