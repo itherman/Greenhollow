@@ -11,7 +11,9 @@ export function createGame(parent: string): Phaser.Game {
     typeof window === "undefined" ? { width: 960, height: 540 } : computeGameBaseSize(window.innerWidth, window.innerHeight);
 
   const config: Phaser.Types.Core.GameConfig = {
-    type: Phaser.AUTO,
+    // Playwright/automation in headless Chromium can fail to render WebGL reliably. Prefer CANVAS
+    // when `navigator.webdriver` is set (true under Playwright/Selenium/etc).
+    type: typeof navigator !== "undefined" && (navigator as any).webdriver ? Phaser.CANVAS : Phaser.AUTO,
     parent,
     // Always FIT (no crop). Base resolution is orientation-aware to reduce extreme letterboxing.
     scale: {

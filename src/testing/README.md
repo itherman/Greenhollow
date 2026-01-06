@@ -16,6 +16,8 @@ type TestHarness = {
   } | null;
   worldToScreen(world: { x: number; y: number }): { x: number; y: number } | null;
   tileCenterToScreen(tile: { x: number; y: number }): { x: number; y: number } | null;
+  // Useful for stabilizing E2E tests that don't need to validate movement/pathing.
+  teleportToTileCenter(tile: { x: number; y: number }): boolean;
 };
 ```
 
