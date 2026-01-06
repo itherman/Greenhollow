@@ -35,6 +35,16 @@ describe("areas", () => {
     }
   });
 
+  it("shadow forest return from the keep lands at the eastern gate path", () => {
+    const a = getArea("shadow_forest");
+    const exit = a.exits.find((e) => e.id === "toArcaneKeep");
+    expect(exit).toBeTruthy();
+
+    const spawn = a.spawns.fromShadowForest;
+    expect(spawn).toEqual({ x: exit!.rect.x - 1, y: exit!.rect.y + 1 });
+    expect(a.tiles[spawn.y]![spawn.x]).toBe(4);
+  });
+
   it("entering the special house from the hallway spawns near the locked door", () => {
     const a = getArea("house");
     expect(a.spawns.fromHallway).toEqual({ x: Math.floor(a.width / 2), y: 1 });
