@@ -407,6 +407,13 @@ export function worldSceneUpdate(scene: any): void {
             this.damageGoblin(gob, meleeStats.damage);
           });
         }
+        const arcane = this.arcaneWizardGroup;
+        if (arcane) {
+          this.physics.add.overlap(zone, arcane, (_z: Phaser.GameObjects.GameObject, w: Phaser.GameObjects.GameObject) => {
+            const wiz = w as Phaser.Physics.Arcade.Sprite;
+            this.damageArcaneWizard(wiz, meleeStats.damage);
+          });
+        }
         const trolls = this.trollGroup;
         if (trolls) {
           this.physics.add.overlap(zone, trolls, (_z: Phaser.GameObjects.GameObject, t: Phaser.GameObjects.GameObject) => {
@@ -508,7 +515,7 @@ export function worldSceneUpdate(scene: any): void {
     this.headArmorSprite = armorSprites.head as any;
     this.bodyArmorSprite = armorSprites.body as any;
     this.legArmorSprite = armorSprites.legs as any;
-    depthSortByY(this.chest as any);
+    for (const chest of this.chests) depthSortByY(chest.sprite as any);
     if (this.npcsGroup) depthSortManyByFeet(this.npcsGroup.getChildren() as any, getFeetDepth);
 
     const moving = vx !== 0 || vy !== 0;

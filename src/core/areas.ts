@@ -2,6 +2,7 @@ export type AreaId =
   | "village"
   | "woods"
   | "cave"
+  | "arcane_keep"
   | "troll_bridge"
   | "troll_clearing"
   | "river_village"
@@ -41,8 +42,10 @@ export type EntryId =
  * - 4: dirt path
  * - 5: tree wall (collides)
  * - 6: river (collides)
+ * - 7: castle floor (walkable stone)
+ * - 8: castle wall (collides)
  */
-export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type Point = { x: number; y: number };
 
@@ -72,7 +75,7 @@ export type AreaDef = {
 };
 
 export function isWalkable(tile: TileId): boolean {
-  return tile !== 1 && tile !== 5 && tile !== 6;
+  return tile !== 1 && tile !== 5 && tile !== 6 && tile !== 8;
 }
 
 /**
@@ -881,6 +884,9 @@ export function makeShadowForest(): AreaDef {
   for (let x = dock.x; x < width - 2; x++) tiles[trailY]![x] = 4;
   const northSpurX = Math.floor(width / 2);
   for (let y = trailY; y >= 3; y--) tiles[y]![northSpurX] = 4;
+  const keepGateY = Math.max(2, Math.min(height - 3, trailY - 2));
+  for (let y = keepGateY - 1; y <= keepGateY + 1; y++) tiles[y]![width - 1] = 4;
+  for (let x = width - 4; x < width - 1; x++) tiles[keepGateY]![x] = 4;
 
   const thickets = [
     { x: 8, y: 5 },
@@ -918,8 +924,119 @@ export function makeShadowForest(): AreaDef {
       fromHallway: spawn,
       fromStore: spawn,
     },
-    exits: [],
+    exits: [
+      {
+        id: "toArcaneKeep",
+        rect: { x: width - 1, y: keepGateY - 1, w: 1, h: 3 },
+        toArea: "arcane_keep",
+        toEntry: "fromShadowForest",
+      },
+    ],
     npcs: [{ id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" }],
+  };
+}
+
+export function makeArcaneKeep(): AreaDef {
+  const width = 30;
+  const height = 24;
+  const tiles = borderWalls(width, height, 2);
+
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  const gateY = Math.floor(height * 0.55);
+  for (let y = gateY - 1; y <= gateY + 1; y++) tiles[y]![0] = 4;
+  for (let x = 0; x < width - 6; x++) tiles[gateY]![x] = 4;
+  for (let x = 4; x < width - 6; x++) tiles[gateY - 1]![x] = 4;
+
+  const castle = { x: Math.floor(width / 2 - 6), y: Math.floor(height / 2 - 5), w: 12, h: 10 };
+  for (let y = castle.y; y < castle.y + castle.h; y++) {
+    for (let x = castle.x; x < castle.x + castle.w; x++) {
+      const border = x === castle.x || y === castle.y || x === castle.x + castle.w - 1 || y === castle.y + castle.h - 1;
+      tiles[y]![x] = border ? 8 : 7;
+    }
+  }
+
+  // Castle entry (west-facing) plus a simple courtyard apron.
+  const gateX = castle.x;
+  const gateYInside = castle.y + Math.floor(castle.h / 2);
+  tiles[gateYInside]![gateX] = 7;
+  tiles[gateYInside]![gateX - 1] = 7;
+  tiles[gateYInside]![gateX - 2] = 4;
+  tiles[gateYInside - 1]![gateX - 1] = 4;
+  tiles[gateYInside + 1]![gateX - 1] = 4;
+
+  // Interior rooms and corridors (three rows, two columns).
+  const innerX0 = castle.x + 1;
+  const innerX1 = castle.x + castle.w - 2;
+  const innerY0 = castle.y + 1;
+  const innerY1 = castle.y + castle.h - 2;
+  const midX = Math.floor((innerX0 + innerX1) / 2);
+  const midY = innerY0 + 3;
+  const midY2 = innerY0 + 6;
+
+  for (let y = innerY0; y <= innerY1; y++) {
+    if (y === midY || y === midY2) {
+      for (let x = innerX0; x <= innerX1; x++) tiles[y]![x] = 8;
+      tiles[y]![midX] = 7;
+      tiles[y]![midX + 1] = 7;
+    }
+    tiles[y]![midX] = 7;
+  }
+  for (let x = innerX0; x <= innerX1; x++) {
+    if (x === midX) continue;
+    tiles[midY + 1]![x] = 7;
+  }
+  for (let y = innerY0; y <= innerY1; y++) {
+    if (y === midY || y === midY2) continue;
+    tiles[y]![midX] = 8;
+  }
+  const doorSlots = [
+    { x: midX, y: midY - 1 },
+    { x: midX, y: midY + 2 },
+    { x: midX, y: midY2 + 2 },
+    { x: innerX0 + 2, y: midY },
+    { x: innerX1 - 2, y: midY },
+  ];
+  for (const d of doorSlots) tiles[d.y]![d.x] = 7;
+  // Ensure chest pedestals are walkable stone.
+  tiles[gateYInside]![innerX0 + 2] = 7;
+  tiles[gateYInside + 2]![innerX1 - 3] = 7;
+
+  // Small courtyard shrubs
+  for (const shrub of [
+    { x: castle.x - 3, y: gateYInside - 2 },
+    { x: castle.x - 4, y: gateYInside + 2 },
+    { x: castle.x + castle.w + 2, y: castle.y + 1 },
+    { x: castle.x + castle.w + 1, y: castle.y + castle.h - 2 },
+  ]) {
+    if (shrub.x >= 0 && shrub.x < width && shrub.y >= 0 && shrub.y < height) tiles[shrub.y]![shrub.x] = 5;
+  }
+
+  const spawn = { x: 2, y: gateY };
+
+  return {
+    id: "arcane_keep",
+    name: "Arcane Keep",
+    width,
+    height,
+    tiles,
+    spawns: fullSpawnMap(spawn),
+    exits: [
+      {
+        id: "toShadowForest",
+        rect: { x: 0, y: gateY - 1, w: 1, h: 3 },
+        toArea: "shadow_forest",
+        toEntry: "fromShadowForest",
+      },
+    ],
+    npcs: [],
   };
 }
 
@@ -1059,5 +1176,7 @@ export function getArea(areaId: AreaId): AreaDef {
       return makeRiverVillage();
     case "shadow_forest":
       return makeShadowForest();
+    case "arcane_keep":
+      return makeArcaneKeep();
   }
 }
