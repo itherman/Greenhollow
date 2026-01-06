@@ -884,6 +884,24 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     ctx.fillRect(10, 12, 4, 2);
   });
 
+  mk("item_warhammer", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // haft
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(11, 6, 2, 13);
+    ctx.fillStyle = "#4b3522";
+    ctx.fillRect(11, 17, 2, 4);
+    // hammer head
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(7, 2, 10, 6);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(9, 3, 6, 4);
+    // edges
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(7, 1, 10, 1);
+    ctx.fillRect(7, 8, 10, 1);
+  });
+
   mk("item_bread", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     ctx.fillStyle = "#8b5a2b";
@@ -919,6 +937,23 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     ctx.fillRect(15, 8, 1, 3);
   });
 
+  mk("item_herbal_tonic", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // bottle outline
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillRect(8, 5, 8, 12);
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillRect(9, 6, 6, 10);
+    // stopper
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(10, 3, 4, 3);
+    // liquid
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(10, 10, 4, 6);
+    ctx.fillStyle = "#16a34a";
+    ctx.fillRect(10, 14, 4, 2);
+  });
+
   mk("item_leather_armor", (ctx) => {
     ctx.clearRect(0, 0, 24, 24);
     // chest piece
@@ -952,6 +987,24 @@ export function ensureItemAndPropTextures(scene: Phaser.Scene) {
     // buckle
     ctx.fillStyle = "#f5d76e";
     ctx.fillRect(11, 15, 2, 2);
+  });
+
+  mk("item_scout_boots", (ctx) => {
+    ctx.clearRect(0, 0, 24, 24);
+    // left boot
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(6, 12, 6, 6);
+    ctx.fillStyle = "#4b3522";
+    ctx.fillRect(6, 16, 6, 2);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(6, 11, 6, 2);
+    // right boot
+    ctx.fillStyle = "#6b4f2a";
+    ctx.fillRect(12, 13, 6, 6);
+    ctx.fillStyle = "#4b3522";
+    ctx.fillRect(12, 17, 6, 2);
+    ctx.fillStyle = "#0ea5e9";
+    ctx.fillRect(12, 12, 6, 2);
   });
 
   mk("item_mythril_helm", (ctx) => {

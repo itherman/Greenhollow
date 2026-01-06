@@ -68,6 +68,33 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.uiCam.ignore(layer);
 
   const storeColliders: Phaser.GameObjects.Zone[] = [];
+  const createStorefront = (storeExit?: { rect: { x: number; y: number; w: number; h: number } }) => {
+    if (!storeExit) return;
+    ensureStoreExteriorTexture(scene);
+    const storeFrontWidthTiles = 6;
+    const storeFrontHeightTiles = 4;
+    const imgX = (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
+    const storeTopY = (storeExit.rect.y - 1) * tileSize;
+    const imgY = storeTopY + (storeFrontHeightTiles * tileSize) / 2;
+    const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
+    const storeImgDepth = (storeExit.rect.y + 0.5) * tileSize;
+    storeImg.setDepth(storeImgDepth);
+    scene.uiCam.ignore(storeImg);
+
+    const storeLeftX = (storeExit.rect.x - 2) * tileSize;
+    const storeHeightPx = storeFrontHeightTiles * tileSize;
+    const storeCenterY = storeTopY + storeHeightPx / 2;
+
+    const leftBlock = scene.add.zone(storeLeftX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+    scene.physics.add.existing(leftBlock, true);
+
+    const rightBlockX = storeLeftX + tileSize * 4;
+    const rightBlock = scene.add.zone(rightBlockX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+    scene.physics.add.existing(rightBlock, true);
+
+    scene.uiCam.ignore([leftBlock, rightBlock]);
+    storeColliders.push(leftBlock, rightBlock);
+  };
   const shouldProcessArrowTileCollision = (_obj: unknown, tile: Phaser.Tilemaps.Tile) => {
     if (scene.area.id === "troll_bridge" && tile?.index === 6) return false;
     return true;
@@ -356,6 +383,14 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.uiCam.ignore(scene.houseDoorSprite);
   }
 
+  if (scene.area.id === "river_village") {
+    const storeExit = scene.area.exits.find((ex: any) => ex.id === "toRiverStore");
+    createStorefront(storeExit);
+    for (const zone of storeColliders) {
+      scene.physics.add.collider(scene.player, zone);
+    }
+  }
+
   // Woods monsters + shadow forest foes
   if (scene.area.id === "woods" || scene.area.id === "shadow_forest") {
     const isShadowForest = scene.area.id === "shadow_forest";
@@ -366,35 +401,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     } else {
       ensureMonsterTexture(scene);
       ensureChestTextures(scene);
-      ensureStoreExteriorTexture(scene);
       const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
-      if (storeExit) {
-        const storeFrontWidthTiles = 6;
-        const storeFrontHeightTiles = 4;
-        const imgX =
-          (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
-        const imgY = (storeFrontHeightTiles * tileSize) / 2;
-        const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
-        const storeImgDepth = (storeExit.rect.y + 0.5) * tileSize;
-        storeImg.setDepth(storeImgDepth);
-        scene.uiCam.ignore(storeImg);
-
-        const storeLeftX = (storeExit.rect.x - 2) * tileSize;
-        const storeTopY = 0;
-        const storeHeightPx = storeFrontHeightTiles * tileSize;
-        const storeCenterY = storeTopY + storeHeightPx / 2;
-
-        const leftBlock = scene.add.zone(storeLeftX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
-        scene.physics.add.existing(leftBlock, true);
-        storeColliders.push(leftBlock);
-
-        const rightBlockX = storeLeftX + tileSize * 4;
-        const rightBlock = scene.add.zone(rightBlockX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
-        scene.physics.add.existing(rightBlock, true);
-        storeColliders.push(rightBlock);
-
-        scene.uiCam.ignore([leftBlock, rightBlock]);
-      }
+      createStorefront(storeExit);
       const chestOpened = hasFlag("chest.woods.arrows.1");
       const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
       const cy = 2 * tileSize + tileSize / 2;

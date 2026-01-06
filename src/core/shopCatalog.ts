@@ -67,11 +67,20 @@ export const SHOP_CATALOG: ShopCatalogEntry[] = [
     grantQty: 1,
     melee: { damage: 1, cooldownMs: 320, reachPx: 28, widthPx: 18, heightPx: 14, textureKey: "item_spear" },
   },
+  {
+    kind: "weapon",
+    itemId: "warhammer",
+    priceCoins: 310,
+    grantQty: 1,
+    melee: { damage: 3, cooldownMs: 440, reachPx: 22, widthPx: 22, heightPx: 18, textureKey: "item_warhammer" },
+  },
   { kind: "ammo", itemId: "arrows", priceCoins: 15, grantQty: 25 },
   { kind: "food", itemId: "bread", priceCoins: 12, grantQty: 1, healHp: 6 },
   { kind: "food", itemId: "stew", priceCoins: 30, grantQty: 1, healHp: 16 },
+  { kind: "food", itemId: "herbal_tonic", priceCoins: 55, grantQty: 1, healHp: 22 },
   { kind: "armor", itemId: "leather_armor", priceCoins: 80, grantQty: 1, maxHpBonus: 6 },
   { kind: "armor", itemId: "iron_armor", priceCoins: 160, grantQty: 1, maxHpBonus: 12 },
+  { kind: "armor", itemId: "scout_boots", priceCoins: 110, grantQty: 1, maxHpBonus: 8 },
   { kind: "armor", itemId: "mythril_helm", priceCoins: 260, grantQty: 1, maxHpBonus: 10 },
   { kind: "armor", itemId: "mythril_leggings", priceCoins: 320, grantQty: 1, maxHpBonus: 14 },
   { kind: "armor", itemId: "mythril_armor", priceCoins: 420, grantQty: 1, maxHpBonus: 18 },
@@ -115,4 +124,3 @@ export function getArmorBonus(itemId: ItemId | null): number {
   const e = itemId ? getShopEntry(itemId) : null;
   return e && e.kind === "armor" ? e.maxHpBonus : 0;
 }
-
