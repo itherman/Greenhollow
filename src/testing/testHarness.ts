@@ -1,8 +1,11 @@
 import type Phaser from "phaser";
 import type { AreaId, EntryId } from "../core/areas";
-import { ITEMS, addItem } from "../core/inventory";
+import { ITEMS, addItem, getItemCount, removeItem } from "../core/inventory";
 import { hasFlag, setFlag } from "../services/game/flags";
 import { loadInventory, saveInventory } from "../services/game/inventoryStore";
+import { loadEquipment, saveEquipment } from "../services/game/equipmentStore";
+import type { EquipmentState } from "../core/equipment";
+import { tryShootWithAmmo } from "../core/rangedAttack";
 import type { ItemId } from "../core/inventory";
 
 export type TestHarnessState = {
@@ -19,6 +22,11 @@ export type TestHarness = {
   teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
   restartInArea: (opts: { areaId: AreaId; entry?: EntryId }) => boolean;
   interactWithChest: (tile: { x: number; y: number }) => boolean;
+    prepareBow: (arrows: number) => boolean;
+    countPlayerArrows: () => number;
+    getEquipment: () => EquipmentState | null;
+    getInventoryCount: (itemId: ItemId) => number;
+    shootBowOnce: () => boolean;
 };
 
 declare global {
@@ -145,6 +153,65 @@ export function installTestHarness(game: Phaser.Game): void {
       } else {
         if (typeof scene.openNpcDialog === "function") scene.openNpcDialog(contents.emptyDialog);
       }
+      return true;
+    },
+    prepareBow: (arrows) => {
+      const scene = getWorldScene(game) as any;
+      const inv = loadInventory();
+      addItem(inv, ITEMS.bow, 1);
+      addItem(inv, ITEMS.arrows, Math.max(0, arrows));
+      saveInventory(inv);
+
+      const eq = loadEquipment();
+      const nextEq: EquipmentState = { ...eq, heldItemId: "bow" };
+      saveEquipment(nextEq);
+
+      if (scene) {
+        scene.equipment = nextEq;
+        if (typeof scene.renderInventoryPanel === "function" && scene.inventoryOpen) scene.renderInventoryPanel();
+      }
+      return true;
+    },
+    countPlayerArrows: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.playerArrowsGroup) return 0;
+      if (typeof scene.playerArrowsGroup.countActive === "function") {
+        return scene.playerArrowsGroup.countActive(true);
+      }
+      const children = scene.playerArrowsGroup.getChildren?.() ?? [];
+      return children.filter((c: any) => c?.active).length;
+    },
+    getEquipment: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.equipment) return null;
+      return { ...scene.equipment };
+    },
+    getInventoryCount: (itemId) => {
+      const inv = loadInventory();
+      return inv.slots.reduce((sum, s) => (s?.id === itemId ? sum + s.qty : sum), 0);
+    },
+    shootBowOnce: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.player || scene.equipment?.heldItemId !== "bow") return false;
+      const inv = loadInventory();
+      const arrows = getItemCount(inv, "arrows");
+      const now = scene.time?.now ?? Date.now();
+      const shot = tryShootWithAmmo({ nowMs: now, state: scene.bowState ?? { lastShotAtMs: -Infinity }, cooldownMs: 450, arrows });
+      if (!shot.ok) return false;
+      const removed = removeItem(inv, "arrows", 1);
+      if (!removed) return false;
+      saveInventory(inv);
+      scene.bowState = shot.next;
+      const dir =
+        scene.facing === "up"
+          ? { x: 0, y: -1 }
+          : scene.facing === "down"
+            ? { x: 0, y: 1 }
+            : scene.facing === "left"
+              ? { x: -1, y: 0 }
+              : { x: 1, y: 0 };
+      if (typeof scene.shootPlayerArrow === "function") scene.shootPlayerArrow(dir);
+      if (scene.inventoryOpen && typeof scene.renderInventoryPanel === "function") scene.renderInventoryPanel();
       return true;
     },
   };

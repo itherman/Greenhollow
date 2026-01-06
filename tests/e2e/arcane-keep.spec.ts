@@ -104,4 +104,37 @@ test.describe("Arcane Keep", () => {
     await waitForDialogScript(page, "arcaneChest");
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
   });
+
+  test("players can fire the bow inside the keep", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /start/i }).click();
+    await page.getByRole("button", { name: /continue as guest/i }).click();
+    await waitForArea(page, "village");
+    await waitForPlayerReady(page);
+
+    const harness = await getHarness(page);
+    await page.click("canvas");
+
+    const jumped = await harness.evaluate((h) => h.restartInArea({ areaId: "arcane_keep", entry: "fromShadowForest" }));
+    expect(jumped).toBe(true);
+    await waitForArea(page, "arcane_keep");
+    await waitForPlayerReady(page);
+
+    const prepared = await harness.evaluate((h) => h.prepareBow(5));
+    expect(prepared).toBe(true);
+
+    const equip = await harness.evaluate((h) => h.getEquipment());
+    expect(equip?.heldItemId).toBe("bow");
+    const arrowsBefore = await harness.evaluate((h) => h.getInventoryCount("arrows"));
+    expect(arrowsBefore).toBeGreaterThan(0);
+
+    const moved = await harness.evaluate((h) => h.teleportToTileCenter({ x: 8, y: 12 }));
+    expect(moved).toBe(true);
+    await page.click("canvas");
+    const fired = await harness.evaluate((h) => h.shootBowOnce());
+    expect(fired).toBe(true);
+    await page.waitForTimeout(200);
+    const arrowsAfter = await harness.evaluate((h) => h.getInventoryCount("arrows"));
+    expect(arrowsAfter).toBeLessThan(arrowsBefore);
+  });
 });
