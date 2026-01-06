@@ -82,6 +82,9 @@ export class InventoryPanelController {
   private deleteDialogVisible = false;
   private deleteDialogSlotIndex: number | null = null;
   private equippedSlotPreference: Partial<Record<ItemId, number>> = {};
+  private dragPreview?: any;
+  private draggingSlotIndex: number | null = null;
+  private dragHandlersAttached = false;
 
   private equipmentSlotRects: any[] = [];
   private equipmentSlotIcons: any[] = [];
@@ -112,6 +115,9 @@ export class InventoryPanelController {
     this.deleteDialogText = undefined;
     this.deleteDialogVisible = false;
     this.deleteDialogSlotIndex = null;
+    this.dragPreview = undefined;
+    this.draggingSlotIndex = null;
+    this.dragHandlersAttached = false;
   }
 
   /**
@@ -128,8 +134,6 @@ export class InventoryPanelController {
       this.deleteConfirmSlot = null;
     }
     this.deleteHoldTriggered = false;
-    const itemIconKey = (id: string): string => (id === "rusty_key" || id === "troll_key" ? "item_key" : `item_${id}`);
-
     // Lazily create modal elements
     if (!this.inventoryBackdrop) {
       this.inventoryBackdrop = scene.add
@@ -170,6 +174,14 @@ export class InventoryPanelController {
       (hint as any).invRole = "hint";
       this.inventoryPanel.setDepth(2500).setScrollFactor(0);
       scene.cameras.main.ignore(this.inventoryPanel);
+      if (!this.dragPreview) {
+        this.dragPreview = scene.add.image(0, 0, "ui_pouch").setOrigin(0.5, 0.5).setVisible(false).setDepth(2700).setScrollFactor(0);
+        scene.cameras.main.ignore(this.dragPreview);
+      }
+      if (!this.dragHandlersAttached && scene.input?.on) {
+        scene.input.on("drop", this.handleDrop);
+        this.dragHandlersAttached = true;
+      }
 
       // Equipment slots (Head/Body/Legs/Held)
       const mkEquipSlot = (label: string, onClick: () => void) => {
@@ -234,7 +246,9 @@ export class InventoryPanelController {
       // Build 20 slots (5x4 grid)
       for (let i = 0; i < 20; i++) {
         const r = scene.add.rectangle(0, 0, 10, 10, 0x14251a, 1).setStrokeStyle(1, 0x2f3b32, 1);
-        r.setInteractive({ useHandCursor: true });
+        r.setInteractive({ useHandCursor: true, dropZone: true });
+        scene.input?.setDraggable?.(r);
+        (r as any).invSlotIndex = i;
         let skipNextPrimary = false;
         const handlePrimary = () => {
           if (!this.inventoryPanel?.visible) return;
@@ -337,6 +351,18 @@ export class InventoryPanelController {
           handlePrimary();
         });
 
+        r.on("dragstart", (pointer: any) => {
+          const started = this.beginDrag(i, pointer);
+          if (started) skipNextPrimary = true;
+        });
+        r.on("drag", (pointer: any, dragX: number, dragY: number) => {
+          this.updateDragPreview(pointer, dragX, dragY);
+        });
+        r.on("dragend", () => {
+          this.endDrag();
+          skipNextPrimary = true;
+        });
+
         r.on("pointerup", (pointer: any) => {
           if (pointer?.pointerType !== "touch") return;
           if (skipNextPrimary) {
@@ -390,6 +416,15 @@ export class InventoryPanelController {
           color: "#ffffff",
         })
         .setOrigin(0, 0.5);
+      const trashBg = scene.add.rectangle(0, 0, 10, 10, 0x2b1c1c, 1).setStrokeStyle(1, 0x8b3a3a, 1);
+      trashBg.setInteractive({ useHandCursor: true, dropZone: true });
+      const trashText = scene.add
+        .text(0, 0, "Trash", {
+          fontFamily: "system-ui, sans-serif",
+          fontSize: "16px",
+          color: "#ffffff",
+        })
+        .setOrigin(0.5, 0.5);
       const exitBg = scene.add.rectangle(0, 0, 10, 10, 0x2a1b1b, 1).setStrokeStyle(1, 0x8b3a3a, 1);
       const exitText = scene.add
         .text(0, 0, "Save and Exit to Title", {
@@ -417,6 +452,8 @@ export class InventoryPanelController {
       (saveMsg as any).invRole = "saveMsg";
       (exitBg as any).invRole = "exitBg";
       (exitText as any).invRole = "exitText";
+      (trashBg as any).invRole = "trash";
+      (trashText as any).invRole = "trashText";
       (versionText as any).invRole = "version";
       // Set initial label depending on auth state.
       const initialSession = loadSession();
@@ -461,7 +498,7 @@ export class InventoryPanelController {
           },
         );
       });
-      this.inventoryPanel.add([saveBg, saveText, saveMsg, exitBg, exitText, versionText]);
+      this.inventoryPanel.add([saveBg, saveText, saveMsg, trashBg, trashText, exitBg, exitText, versionText]);
     }
 
     // Layout (responsive)
@@ -490,6 +527,8 @@ export class InventoryPanelController {
     const saveBg = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "saveBg");
     const saveText = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "saveText");
     const saveMsg = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "saveMsg");
+    const trashBg = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "trash");
+    const trashText = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "trashText");
     const exitBg = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "exitBg");
     const exitText = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "exitText");
     const versionText = this.inventoryPanel.list.find((o: any) => (o as any).invRole === "version");
@@ -534,7 +573,7 @@ export class InventoryPanelController {
         icon.setVisible(false);
       } else {
         rect.setFillStyle(0x1a2b20, 1).setStrokeStyle(2, 0xf5d76e, 1);
-        const key = itemIconKey(itemId);
+        const key = this.itemIconKey(itemId);
         const exists = scene.textures?.exists?.(key) ?? true;
         if (exists) icon.setTexture(key);
         icon.setPosition(x + eqSlotW / 2, eqY).setDisplaySize(20, 20).setVisible(exists);
@@ -546,14 +585,20 @@ export class InventoryPanelController {
     const saveH = 44;
     const exitW = 240;
     const exitH = 44;
+    const trashW = 124;
+    const trashH = 44;
     const buttonsGap = 16;
+    const footerMargin = 70;
+    const footerHeight = Math.max(exitH, trashH) + footerMargin;
     const canSave = (() => {
       const s = loadSession();
       return !!s && s.mode === "firebase";
     })();
-    const rowW = (canSave ? saveW + buttonsGap : 0) + exitW;
-    const buttonsStartX = -rowW / 2;
-    const buttonY = panelH / 2 - saveH / 2 + 38;
+    const actionRowW = (canSave ? saveW + buttonsGap : 0) + exitW;
+    const fullRowW = trashW + buttonsGap + actionRowW;
+    const buttonsStartX = -fullRowW / 2 + trashW + buttonsGap;
+    const buttonY = panelH / 2 - pad - Math.max(exitH, trashH) / 2 - 10;
+    const trashX = -fullRowW / 2;
 
     if (canSave) {
       saveBg.setSize(saveW, saveH).setPosition(buttonsStartX, buttonY).setOrigin(0, 0.5).setVisible(true);
@@ -562,19 +607,21 @@ export class InventoryPanelController {
       saveBg.setVisible(false);
       saveText.setVisible(false);
     }
-    saveMsg.setPosition(0, buttonY - saveH / 2 - 8);
+    saveMsg.setPosition(buttonsStartX + saveW / 2, buttonY - saveH / 2 - 8);
 
     exitBg.setSize(exitW, exitH).setPosition(buttonsStartX + (canSave ? saveW + buttonsGap : 0), buttonY).setOrigin(0, 0.5);
     exitText.setPosition(exitBg.x + exitW / 2, buttonY);
+    trashBg.setSize(trashW, trashH).setPosition(trashX, buttonY).setOrigin(0, 0.5).setVisible(true);
+    trashText.setPosition(trashX + trashW / 2, buttonY).setVisible(true);
     // saveMsg remains visible only when text is set; still hide when not logged in
     if (!canSave) saveMsg.setText("");
     saveMsg.setVisible(canSave);
 
     // Version tag at bottom-right of the panel
-    versionText.setPosition(panelW / 2 - pad, panelH / 2 - pad / 2).setVisible(true);
+    versionText.setPosition(panelW / 2 - pad, buttonY + Math.max(exitH, trashH) / 2 + 8).setVisible(true);
 
     const gridW = panelW - pad * 2;
-    const gridH = panelH - pad * 2 - topBarH - equipRowH;
+    const gridH = panelH - pad * 2 - topBarH - equipRowH - footerHeight;
     const slotW = Math.floor((gridW - gap * (cols - 1)) / cols);
     const slotH = Math.floor((gridH - gap * (rows - 1)) / rows);
     const gridStartX = -panelW / 2 + pad;
@@ -610,7 +657,7 @@ export class InventoryPanelController {
       } else {
         const equipped = equippedSlotIndices.has(i);
         rect.setFillStyle(0x1c2c22, 1).setStrokeStyle(equipped ? 2 : 1, equipped ? 0xf5d76e : 0x4f7a6b, 1);
-        const key = itemIconKey(s.id);
+        const key = this.itemIconKey(s.id);
         const exists = scene.textures?.exists?.(key) ?? true;
         if (exists) icon.setTexture(key);
         icon.setVisible(exists);
@@ -638,7 +685,11 @@ export class InventoryPanelController {
     const override = this.host.getInventoryHint?.(inv);
     if (override) return override;
     if (this.deleteDialogVisible) return "Confirm deletion?";
-    return "Tap pouch or Esc to close • Tap food to eat • 1-9 to hold • Hold or right-click to delete";
+    return "Tap pouch or Esc to close • Tap food to eat • Drag to move or delete • 1-9 to hold";
+  }
+
+  private itemIconKey(id: string): string {
+    return id === "rusty_key" || id === "troll_key" ? "item_key" : `item_${id}`;
   }
 
   private computeEquippedSlotIndices(inv: ReturnType<typeof loadInventory>, equipment: EquipmentState): Set<number> {
@@ -749,4 +800,99 @@ export class InventoryPanelController {
     this.hideDeleteDialog();
     this.render(true);
   }
+
+  private ensureDragPreview(): void {
+    if (this.dragPreview || !this.host?.scene?.add) return;
+    this.dragPreview = this.host.scene.add
+      .image(0, 0, "ui_pouch")
+      .setOrigin(0.5, 0.5)
+      .setVisible(false)
+      .setDepth(2700)
+      .setScrollFactor(0);
+    this.host.scene.cameras.main.ignore(this.dragPreview);
+  }
+
+  private beginDrag(slotIndex: number, pointer: any): boolean {
+    const invNow = loadInventory();
+    const slot = invNow.slots[slotIndex];
+    this.draggingSlotIndex = null;
+    if (!slot) {
+      this.endDrag();
+      return false;
+    }
+    this.deleteConfirmSlot = null;
+    this.deleteHoldTimer?.remove(false);
+    this.deleteHoldTimer = undefined;
+    this.deleteHoldTriggered = false;
+    this.hideDeleteDialog();
+    this.ensureDragPreview();
+    if (this.dragPreview) {
+      const key = this.itemIconKey(slot.id);
+      const exists = this.host.scene.textures?.exists?.(key) ?? true;
+      if (exists) this.dragPreview.setTexture(key);
+      this.dragPreview.setPosition(pointer?.x ?? 0, pointer?.y ?? 0).setVisible(true).setScale(1.1);
+    }
+    this.draggingSlotIndex = slotIndex;
+    return true;
+  }
+
+  private updateDragPreview(pointer: any, dragX: number, dragY: number): void {
+    if (!this.dragPreview || this.draggingSlotIndex == null) return;
+    const x = pointer?.x ?? dragX ?? 0;
+    const y = pointer?.y ?? dragY ?? 0;
+    this.dragPreview.setPosition(x, y);
+  }
+
+  private endDrag(): void {
+    this.draggingSlotIndex = null;
+    if (this.dragPreview) this.dragPreview.setVisible(false);
+  }
+
+  private moveSlotItem(from: number, to: number): boolean {
+    if (from === to) return false;
+    const inv = loadInventory();
+    if (from < 0 || from >= inv.slots.length || to < 0 || to >= inv.slots.length) return false;
+    const src = inv.slots[from];
+    if (!src) return false;
+    const dst = inv.slots[to];
+    inv.slots[from] = dst ?? null;
+    inv.slots[to] = src;
+    saveInventory(inv);
+    this.deleteConfirmSlot = null;
+    this.hideDeleteDialog();
+    this.host.writeProgress(true);
+    this.render(true);
+    return true;
+  }
+
+  private deleteSlotItem(slotIndex: number): boolean {
+    const inv = loadInventory();
+    if (slotIndex < 0 || slotIndex >= inv.slots.length) return false;
+    if (!inv.slots[slotIndex]) return false;
+    inv.slots[slotIndex] = null;
+    saveInventory(inv);
+    this.host.writeProgress(true);
+    this.deleteConfirmSlot = null;
+    this.deleteHoldTriggered = false;
+    this.hideDeleteDialog();
+    this.render(true);
+    return true;
+  }
+
+  private handleDrop = (_pointer: any, gameObject: any, dropZone: any) => {
+    const fromSlot =
+      typeof gameObject?.invSlotIndex === "number"
+        ? (gameObject.invSlotIndex as number)
+        : this.draggingSlotIndex ?? null;
+    if (fromSlot == null) {
+      this.endDrag();
+      return;
+    }
+    if (typeof dropZone?.invSlotIndex === "number") {
+      this.moveSlotItem(fromSlot, dropZone.invSlotIndex as number);
+    } else if ((dropZone as any)?.invRole === "trash") {
+      this.deleteSlotItem(fromSlot);
+    }
+    this.endDrag();
+  };
 }

@@ -82,6 +82,18 @@ export function worldSceneCreate(scene: any): void {
     this.bodyArmorSprite.setVisible(false);
     // UI camera should not render world objects.
     this.uiCam.ignore(this.bodyArmorSprite);
+    this.headArmorSprite?.destroy();
+    this.headArmorSprite = this.add.sprite(this.player.x, this.player.y, "player_armor_head_mythril");
+    this.headArmorSprite.setOrigin(0.5, 0.5);
+    this.headArmorSprite.setScale(1);
+    this.headArmorSprite.setVisible(false);
+    this.uiCam.ignore(this.headArmorSprite);
+    this.legArmorSprite?.destroy();
+    this.legArmorSprite = this.add.sprite(this.player.x, this.player.y, "player_armor_legs_mythril");
+    this.legArmorSprite.setOrigin(0.5, 0.5);
+    this.legArmorSprite.setScale(1);
+    this.legArmorSprite.setVisible(false);
+    this.uiCam.ignore(this.legArmorSprite);
 
     // Tap-to-move: set a world-space target on pointer down.
     // IMPORTANT: WorldScene is restarted between areas; avoid stacking listeners.
