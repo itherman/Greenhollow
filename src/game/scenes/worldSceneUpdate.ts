@@ -240,8 +240,9 @@ export function worldSceneUpdate(scene: any): void {
                   ? 3
                 : -1;
         if (pick >= 0 && node.kind === "choice") {
-          const isShop = script.id === "shopkeeper";
+          const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
           const isBuyer = script.id === "buyerNpc";
+          const isTravel = script.id === "riverSailor";
           if (isShop) {
             if (node.id === "menu") {
               const MORE_ID = "__more_items__";
@@ -306,6 +307,14 @@ export function worldSceneUpdate(scene: any): void {
             if (pick < node.choices.length) {
               const ch = node.choices[pick]!;
               if (this.handleBuyerChoice(ch.id, script)) return;
+            }
+            return;
+          }
+
+          if (isTravel) {
+            if (pick < node.choices.length) {
+              const ch = node.choices[pick]!;
+              if (this.handleTravelChoice(ch.id)) return;
             }
             return;
           }
@@ -386,8 +395,7 @@ export function worldSceneUpdate(scene: any): void {
         if (monsters) {
           this.physics.add.overlap(zone, monsters, (_z: Phaser.GameObjects.GameObject, m: Phaser.GameObjects.GameObject) => {
             const mon = m as Phaser.Physics.Arcade.Sprite;
-            this.spawnEnemyDrop(mon.x, mon.y, "woods_slime");
-            mon.destroy();
+            this.damageMonster(mon, meleeStats.damage);
           });
         }
 

@@ -13,9 +13,11 @@ import {
   homeowner4Advice,
   keyFound,
   shopkeeper,
+  rareShopkeeper,
   swordFound,
   swordTaken,
   villagerGossip,
+  riverSailor,
 } from "./scripts";
 
 describe("dialog scripts", () => {
@@ -45,6 +47,10 @@ describe("dialog scripts", () => {
     expect(validateScript(shopkeeper)).toEqual({ ok: true });
   });
 
+  it("rareShopkeeper validates", () => {
+    expect(validateScript(rareShopkeeper)).toEqual({ ok: true });
+  });
+
   it("buyerNpc validates", () => {
     expect(validateScript(buyerNpc)).toEqual({ ok: true });
   });
@@ -67,5 +73,9 @@ describe("dialog scripts", () => {
 
   it("swordTaken validates", () => {
     expect(validateScript(swordTaken)).toEqual({ ok: true });
+  });
+
+  it("riverSailor validates", () => {
+    expect(validateScript(riverSailor)).toEqual({ ok: true });
   });
 });
