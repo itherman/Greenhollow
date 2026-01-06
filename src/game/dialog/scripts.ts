@@ -198,6 +198,37 @@ export const buyerNpc: DialogScript = {
   },
 };
 
+export const rareShopkeeper: DialogScript = {
+  id: "rareShopkeeper",
+  start: "menu",
+  nodes: {
+    menu: {
+      id: "menu",
+      kind: "choice",
+      text: "Only the finest wares. What calls to you?",
+      choices: [
+        { id: "buy_mythril_helm", text: "Mythril Helm (260c)", next: "confirm" },
+        { id: "buy_mythril_leggings", text: "Mythril Leggings (320c)", next: "confirm" },
+        { id: "buy_mythril_armor", text: "Mythril Armor (420c)", next: "confirm" },
+        { id: "bye", text: "Nothing right now.", next: "end" },
+      ],
+    },
+    confirm: {
+      id: "confirm",
+      kind: "choice",
+      text: "Commit to the purchase?",
+      choices: [
+        { id: "confirm_yes", text: "Yes, make it mine.", next: "menu" },
+        { id: "confirm_no", text: "No, back to the list.", next: "menu" },
+      ],
+    },
+    buyOk: { id: "buyOk", kind: "line", text: "Spend well. These are rare.", next: "menu" },
+    buyNoCoins: { id: "buyNoCoins", kind: "line", text: "Save up—quality costs coin.", next: "menu" },
+    buyNoSpace: { id: "buyNoSpace", kind: "line", text: "You have no room to stow that.", next: "menu" },
+    end: { id: "end", kind: "end", text: "I'll keep them safe." },
+  },
+};
+
 export const chestMessage: DialogScript = {
   id: "chestMessage",
   start: "a",
@@ -287,6 +318,25 @@ export const bowFound: DialogScript = {
   },
 };
 
+export const riverSailor: DialogScript = {
+  id: "riverSailor",
+  start: "menu",
+  nodes: {
+    menu: {
+      id: "menu",
+      kind: "choice",
+      text: "Hop aboard. Where are we headed?",
+      choices: [
+        { id: "sail_river_village", text: "River Village (rare market)", next: "end" },
+        { id: "sail_shadow_forest", text: "Shadowed Wilds (dangerous)", next: "end" },
+        { id: "sail_troll_bridge", text: "Back to the troll bridge", next: "end" },
+        { id: "stay", text: "I'll stay here.", next: "end" },
+      ],
+    },
+    end: { id: "end", kind: "end", text: "The boat rocks softly." },
+  },
+};
+
 export function getDialogScript(scriptId: string): DialogScript | null {
   switch (scriptId) {
     case "elderIntro":
@@ -303,6 +353,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return homeowner4Advice;
     case "shopkeeper":
       return shopkeeper;
+    case "rareShopkeeper":
+      return rareShopkeeper;
     case "buyerNpc":
       return buyerNpc;
     case "chestMessage":
@@ -323,6 +375,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return swordTaken;
     case "bowFound":
       return bowFound;
+    case "riverSailor":
+      return riverSailor;
     default:
       return null;
   }

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import {
+  BOAT_ANCHOR_TILES,
   VILLAGE_HOUSE_TOP_LEFTS,
   getArea,
   type AreaId,
@@ -20,7 +21,7 @@ import {
   type TilePos,
   type TileRect,
 } from "../../../core/exitGate";
-import { ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureStoreExteriorTexture, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
+import { ensureBoatTexture, ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureShadowStalkerTexture, ensureStoreExteriorTexture, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
 import { addNpcColliders } from "../physicsColliders";
 import { configureStaticPickupBody } from "./arcadeBody";
 import { addBobbingTween } from "./bobbingTween";
@@ -83,6 +84,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   scene.chest?.destroy();
   scene.chest = undefined;
   scene.chestContents = undefined;
+  scene.boatSprite?.destroy();
+  scene.boatSprite = undefined;
   scene.trollWarningZone?.destroy();
   scene.trollWarningZone = undefined;
   scene.trollGuardRail?.destroy();
@@ -263,7 +266,9 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   const npcTextureForId = (id: string) => {
     if (id === "elder") return "npc_elder";
     if (id === "shopkeeper") return "npc_shopkeeper";
+    if (id === "rare_shopkeeper") return "npc_shopkeeper_dark";
     if (id === "buyer_npc") return "npc_buyer_dark";
+    if (id === "river_sailor") return "npc_sailor";
     if (id === "homeowner2" || id === "homeowner4") return "npc_villager_dark";
     return "npc_villager";
   };
@@ -292,6 +297,18 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.uiCam.ignore(s);
   }
   scene.npcsGroup = npcs;
+
+  // Boat visuals where applicable.
+  const boatTile = BOAT_ANCHOR_TILES[scene.area.id as AreaId];
+  if (boatTile) {
+    ensureBoatTexture(scene);
+    const bx = boatTile.x * tileSize + tileSize / 2;
+    const by = boatTile.y * tileSize + tileSize / 2;
+    scene.boatSprite = scene.add.sprite(bx, by, "prop_boat");
+    scene.boatSprite.setDepth(by + 2);
+    scene.uiCam.ignore(scene.boatSprite);
+    addBobbingTween(scene.tweens, scene.boatSprite, { baseY: by, durationMs: 1200 });
+  }
 
   // Village houses (visual only; collision is handled by wall tiles).
   if (scene.area.id === "village") {
@@ -339,69 +356,75 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.uiCam.ignore(scene.houseDoorSprite);
   }
 
-  // Woods monsters
-  if (scene.area.id === "woods") {
-    ensureMonsterTexture(scene);
+  // Woods monsters + shadow forest foes
+  if (scene.area.id === "woods" || scene.area.id === "shadow_forest") {
+    const isShadowForest = scene.area.id === "shadow_forest";
+    storeColliders.length = 0;
     ensureItemAndPropTextures(scene);
-    ensureChestTextures(scene);
-    ensureStoreExteriorTexture(scene);
-    const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
-    if (storeExit) {
-      const storeFrontWidthTiles = 6;
-      const storeFrontHeightTiles = 4;
-      const imgX =
-        (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
-      const imgY = (storeFrontHeightTiles * tileSize) / 2;
-      const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
-      const storeImgDepth = (storeExit.rect.y + 0.5) * tileSize;
-      storeImg.setDepth(storeImgDepth);
-      scene.uiCam.ignore(storeImg);
-
-      const storeLeftX = (storeExit.rect.x - 2) * tileSize;
-      const storeTopY = 0;
-      const storeHeightPx = storeFrontHeightTiles * tileSize;
-      const storeCenterY = storeTopY + storeHeightPx / 2;
-
-      const leftBlock = scene.add.zone(storeLeftX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
-      scene.physics.add.existing(leftBlock, true);
-      storeColliders.push(leftBlock);
-
-      const rightBlockX = storeLeftX + tileSize * 4;
-      const rightBlock = scene.add.zone(rightBlockX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
-      scene.physics.add.existing(rightBlock, true);
-      storeColliders.push(rightBlock);
-
-      scene.uiCam.ignore([leftBlock, rightBlock]);
-    }
-    const chestOpened = hasFlag("chest.woods.arrows.1");
-    const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
-    const cy = 2 * tileSize + tileSize / 2;
-    scene.chest = scene.physics.add.sprite(cx, cy, chestOpened ? "chest_open" : "chest_closed");
-    scene.chest.setImmovable(true);
-    scene.chest.setDepth(scene.chest.y);
-    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
-    cb.setSize(16, 12);
-    cb.setOffset(4, 10);
-    scene.physics.add.collider(scene.player, scene.chest);
-    scene.uiCam.ignore(scene.chest);
-    scene.chestContents = {
-      flag: "chest.woods.arrows.1",
-      loot: [{ itemId: "arrows", qty: 25 }],
-      openedDialog: "arrowsChest",
-      emptyDialog: "chestEmpty",
-    };
-    // Key in the middle of the forest (once)
-    if (!hasFlag("item.rusty_key.woods.1")) {
-      const kx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
-      const ky = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
-      scene.keySprite = scene.physics.add.sprite(kx, ky, "item_key");
-      scene.keySprite.setDepth(scene.keySprite.y);
-      const kb = scene.keySprite.body as Phaser.Physics.Arcade.Body;
-      kb.setSize(14, 10).setOffset(5, 12);
-      scene.physics.add.collider(scene.keySprite, layer);
-      scene.uiCam.ignore(scene.keySprite);
+    if (isShadowForest) {
+      ensureShadowStalkerTexture(scene);
     } else {
-      scene.keySprite = undefined;
+      ensureMonsterTexture(scene);
+      ensureChestTextures(scene);
+      ensureStoreExteriorTexture(scene);
+      const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
+      if (storeExit) {
+        const storeFrontWidthTiles = 6;
+        const storeFrontHeightTiles = 4;
+        const imgX =
+          (storeExit.rect.x - 2) * tileSize + (storeFrontWidthTiles * tileSize) / 2;
+        const imgY = (storeFrontHeightTiles * tileSize) / 2;
+        const storeImg = scene.add.image(imgX, imgY, "prop_store_exterior");
+        const storeImgDepth = (storeExit.rect.y + 0.5) * tileSize;
+        storeImg.setDepth(storeImgDepth);
+        scene.uiCam.ignore(storeImg);
+
+        const storeLeftX = (storeExit.rect.x - 2) * tileSize;
+        const storeTopY = 0;
+        const storeHeightPx = storeFrontHeightTiles * tileSize;
+        const storeCenterY = storeTopY + storeHeightPx / 2;
+
+        const leftBlock = scene.add.zone(storeLeftX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+        scene.physics.add.existing(leftBlock, true);
+        storeColliders.push(leftBlock);
+
+        const rightBlockX = storeLeftX + tileSize * 4;
+        const rightBlock = scene.add.zone(rightBlockX + tileSize, storeCenterY, tileSize * 2, storeHeightPx);
+        scene.physics.add.existing(rightBlock, true);
+        storeColliders.push(rightBlock);
+
+        scene.uiCam.ignore([leftBlock, rightBlock]);
+      }
+      const chestOpened = hasFlag("chest.woods.arrows.1");
+      const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
+      const cy = 2 * tileSize + tileSize / 2;
+      scene.chest = scene.physics.add.sprite(cx, cy, chestOpened ? "chest_open" : "chest_closed");
+      scene.chest.setImmovable(true);
+      scene.chest.setDepth(scene.chest.y);
+      const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
+      cb.setSize(16, 12);
+      cb.setOffset(4, 10);
+      scene.physics.add.collider(scene.player, scene.chest);
+      scene.uiCam.ignore(scene.chest);
+      scene.chestContents = {
+        flag: "chest.woods.arrows.1",
+        loot: [{ itemId: "arrows", qty: 25 }],
+        openedDialog: "arrowsChest",
+        emptyDialog: "chestEmpty",
+      };
+      // Key in the middle of the forest (once)
+      if (!hasFlag("item.rusty_key.woods.1")) {
+        const kx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
+        const ky = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
+        scene.keySprite = scene.physics.add.sprite(kx, ky, "item_key");
+        scene.keySprite.setDepth(scene.keySprite.y);
+        const kb = scene.keySprite.body as Phaser.Physics.Arcade.Body;
+        kb.setSize(14, 10).setOffset(5, 12);
+        scene.physics.add.collider(scene.keySprite, layer);
+        scene.uiCam.ignore(scene.keySprite);
+      } else {
+        scene.keySprite = undefined;
+      }
     }
 
     const monsters = scene.physics.add.group();
@@ -410,17 +433,32 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     const avoid = scene.getPlayerTilePos();
     const monsterTiles = chooseEnemySpawnTiles({
       area: scene.area,
-      count: 5,
+      count: isShadowForest ? 6 : 5,
       rng: () => Math.random(),
       avoid: [avoid],
-      minDistTiles: 4,
+      minDistTiles: isShadowForest ? 6 : 4,
     });
     for (const p of monsterTiles) {
       const mx = p.x * tileSize + tileSize / 2;
       const my = p.y * tileSize + tileSize / 2;
-      const m = scene.physics.add.sprite(mx, my, "monster_slime");
+      const m = scene.physics.add.sprite(mx, my, isShadowForest ? "enemy_shadow_stalker" : "monster_slime");
       m.setDepth(m.y);
-      (m.body as Phaser.Physics.Arcade.Body).setSize(14, 10).setOffset(5, 12);
+      const mb = m.body as Phaser.Physics.Arcade.Body;
+      mb.setSize(14, 10).setOffset(5, 12);
+      (m as any).__enemyId = isShadowForest ? "shadow_stalker" : "woods_slime";
+      (m as any).__hp = isShadowForest ? 3 : 1;
+      (m as any).__contactDamage = isShadowForest ? 2 : 1;
+      if (isShadowForest) {
+        (m as any).__onDeath = (x: number, y: number) => {
+          const roll = Math.random();
+          if (roll < 0.35) {
+            const itemId = roll < 0.18 ? "mythril_helm" : "mythril_leggings";
+            scene.spawnEnemyDrop(x + 4, y - 2, "shadow_stalker", { kind: "item", itemId, qty: 1 });
+          } else if (roll < 0.7) {
+            scene.spawnEnemyDrop(x - 5, y + 3, "shadow_stalker");
+          }
+        };
+      }
       monsters.add(m);
       scene.uiCam.ignore(m);
       // collide vs walls
@@ -440,8 +478,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         const arrow = _a as Phaser.Physics.Arcade.Sprite;
         const mon = m as Phaser.Physics.Arcade.Sprite;
         arrow.destroy();
-        scene.spawnEnemyDrop(mon.x, mon.y, "woods_slime");
-        mon.destroy();
+        scene.damageMonster(mon, 1);
       });
     }
 
@@ -458,11 +495,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           const chaseRadius = (32 * 6) ** 2;
           if (d2 <= chaseRadius) {
             const d = Math.max(1, Math.sqrt(d2));
-            const speed = 70;
+            const speed = isShadowForest ? 90 : 70;
             m.setVelocity((dx / d) * speed, (dy / d) * speed);
           } else {
             const dir = Phaser.Math.Between(0, 3);
-            const speed = 45;
+            const speed = isShadowForest ? 60 : 45;
             if (dir === 0) m.setVelocity(speed, 0);
             if (dir === 1) m.setVelocity(-speed, 0);
             if (dir === 2) m.setVelocity(0, speed);
@@ -477,12 +514,13 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     scene.physics.add.collider(scene.player, monsters, (_p: unknown, m: unknown) => {
       const mon = m as Phaser.Physics.Arcade.Sprite;
       const now = scene.time.now;
+      const contactDamage = ((mon as any).__contactDamage as number | undefined) ?? 1;
       const r = applyContactDamage({
         hp: scene.hp,
         nowMs: now,
         lastHitAtMs: scene.lastHitAtMs,
         cooldownMs: 450,
-        damage: 1,
+        damage: contactDamage,
       });
       scene.hp = r.hp;
       scene.lastHitAtMs = r.lastHitAtMs;
@@ -490,7 +528,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       if (r.tookHit) scene.writeProgress(true);
     });
   } else {
-    // no monsters outside woods
+    // no monsters outside woods and the shadow forest
     scene.monstersGroup?.destroy(true);
     scene.monstersGroup = undefined;
     scene.keySprite?.destroy();
