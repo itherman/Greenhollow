@@ -832,7 +832,6 @@ export function makeRiverVillage(): AreaDef {
       start: spawn,
       fromBoat: spawn,
       fromRiverVillage: spawn,
-      fromShadowForest: spawn,
       fromVillage: spawn,
       fromWoods: spawn,
       fromCave: spawn,
@@ -845,6 +844,7 @@ export function makeRiverVillage(): AreaDef {
       fromHouse4: spawn,
       fromHallway: spawn,
       fromStore: storeFront,
+      fromShadowForest: spawn,
     },
     exits: [
       {
@@ -899,6 +899,7 @@ export function makeShadowForest(): AreaDef {
   }
 
   const spawn = dock;
+  const arcaneGateSpawn = { x: width - 2, y: keepGateY };
 
   return {
     id: "shadow_forest",
@@ -910,7 +911,6 @@ export function makeShadowForest(): AreaDef {
       start: spawn,
       fromBoat: spawn,
       fromRiverVillage: spawn,
-      fromShadowForest: spawn,
       fromVillage: spawn,
       fromWoods: spawn,
       fromCave: spawn,
@@ -923,6 +923,7 @@ export function makeShadowForest(): AreaDef {
       fromHouse4: spawn,
       fromHallway: spawn,
       fromStore: spawn,
+      fromShadowForest: arcaneGateSpawn,
     },
     exits: [
       {

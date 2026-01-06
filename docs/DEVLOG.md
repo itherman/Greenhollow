@@ -11,6 +11,8 @@
 - Ship a Playwright regression that restarts into the keep and confirms the castle chest opens on every revisit.
 
 ## 2025-12-30
+- Spawn Arcane Keep return trips on the eastern gate path of the shadowed wilds instead of the ferry dock, so exits feel consistent with the entrance.
+- Extend the Playwright harness with a bow/arrow helper and add a keep regression that equips the bow and fires inside the castle to avoid area-specific input bugs.
 - Move the Arcane Keep refilling chests onto the castle pedestals and retarget the Playwright regression to the new location so the dialog triggers reliably on every visit.
 
 ## 2025-12-27
