@@ -5,6 +5,11 @@
 - Add a Playwright regression that warps into the troll clearing and verifies the new exit links back to the bridge.
 - Extend the browser test harness with a `restartInArea` helper to quickly hop between areas during automation.
 
+## 2025-12-29
+- Add the Arcane Keep area east of the shadowed wilds, guarded by wizards who sling high-damage bolts before players can reach the castle gate.
+- Give the keep a stone tileset (new floor + wall styles) with an indoor layout full of guardians, mid-tier loot, and treasure chests that refill every visit.
+- Ship a Playwright regression that restarts into the keep and confirms the castle chest opens on every revisit.
+
 ## 2025-12-27
 - Fix store exit spawn so leaving the shop no longer drops the player back into the entrance trigger.
 - Rework the troll clearing layout to enter from the bottom-left path that turns east toward the bridge, and reroute the troll bridge approach to match (no top/left exits).

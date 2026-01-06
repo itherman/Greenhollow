@@ -3,6 +3,7 @@ import { validateScript } from "../../core/dialog";
 import {
   chestEmpty,
   chestMessage,
+  arcaneChest,
   doorLocked,
   trollDoorLocked,
   elderIntro,
@@ -31,6 +32,10 @@ describe("dialog scripts", () => {
 
   it("chestMessage validates", () => {
     expect(validateScript(chestMessage)).toEqual({ ok: true });
+  });
+
+  it("arcaneChest validates", () => {
+    expect(validateScript(arcaneChest)).toEqual({ ok: true });
   });
 
   it("chestEmpty validates", () => {

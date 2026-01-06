@@ -21,7 +21,7 @@ import {
   type TilePos,
   type TileRect,
 } from "../../../core/exitGate";
-import { ensureBoatTexture, ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureShadowStalkerTexture, ensureStoreExteriorTexture, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
+import { ensureArcaneWizardTextures, ensureBoatTexture, ensureChestTextures, ensureGoblinAndArrowTextures, ensureItemAndPropTextures, ensureMonsterTexture, ensureNpcTextures, ensureShadowStalkerTexture, ensureStoreExteriorTexture, ensureTrollTexture, ensureVillageHouseTexture } from "../../art/sprites";
 import { addNpcColliders } from "../physicsColliders";
 import { configureStaticPickupBody } from "./arcadeBody";
 import { addBobbingTween } from "./bobbingTween";
@@ -63,9 +63,26 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   const tileset = map.addTilesetImage("tileset_2x2");
   const layer = map.createLayer(0, tileset!, 0, 0);
   if (!layer) throw new Error("Failed to create tilemap layer");
-  layer.setCollision([1, 5, 6]);
+  layer.setCollision([1, 5, 6, 8]);
   layer.setDepth(-10000);
   scene.uiCam.ignore(layer);
+
+  const addChest = (pos: { x: number; y: number }, contents: any) => {
+    ensureChestTextures(scene);
+    ensureItemAndPropTextures(scene);
+    const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
+    const tx = pos.x * tileSize + tileSize / 2;
+    const ty = pos.y * tileSize + tileSize / 2;
+    const chest = scene.physics.add.sprite(tx, ty, opened ? "chest_open" : "chest_closed");
+    chest.setImmovable(true);
+    chest.setDepth(chest.y);
+    const cb = chest.body as Phaser.Physics.Arcade.Body;
+    cb.setSize(16, 12);
+    cb.setOffset(4, 10);
+    scene.physics.add.collider(scene.player, chest);
+    scene.uiCam.ignore(chest);
+    scene.chests.push({ sprite: chest, contents });
+  };
 
   const storeColliders: Phaser.GameObjects.Zone[] = [];
   const createStorefront = (storeExit?: { rect: { x: number; y: number; w: number; h: number } }) => {
@@ -108,9 +125,16 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   // Collide player with walls.
   scene.physics.add.collider(scene.player, layer);
   // Fresh area: clear single-area objects.
-  scene.chest?.destroy();
-  scene.chest = undefined;
-  scene.chestContents = undefined;
+  if (scene.chests) {
+    for (const c of scene.chests) c.sprite.destroy();
+  }
+  scene.chests = [];
+  scene.keySprite?.destroy();
+  scene.keySprite = undefined;
+  scene.arcaneWizardGroup?.destroy(true);
+  scene.arcaneWizardGroup = undefined;
+  scene.arcaneSpellGroup?.destroy(true);
+  scene.arcaneSpellGroup = undefined;
   scene.boatSprite?.destroy();
   scene.boatSprite = undefined;
   scene.trollWarningZone?.destroy();
@@ -353,26 +377,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
 
   // House chest
   if (scene.area.id === "house") {
-    ensureChestTextures(scene);
-    ensureItemAndPropTextures(scene);
-    const opened = hasFlag("chest.house.1");
-    const tx = opened ? "chest_open" : "chest_closed";
-    const cx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
-    const cy = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
-    scene.chest = scene.physics.add.sprite(cx, cy, tx);
-    scene.chest.setImmovable(true);
-    scene.chest.setDepth(scene.chest.y);
-    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
-    cb.setSize(16, 12);
-    cb.setOffset(4, 10);
-    scene.physics.add.collider(scene.player, scene.chest);
-    scene.uiCam.ignore(scene.chest);
-    scene.chestContents = {
-      flag: "chest.house.1",
-      loot: [{ itemId: "coins", qty: 25 }],
-      openedDialog: "chestMessage",
-      emptyDialog: "chestEmpty",
-    };
+    addChest(
+      { x: Math.floor(scene.area.width / 2), y: Math.floor(scene.area.height / 2) },
+      {
+        flag: "chest.house.1",
+        loot: [{ itemId: "coins", qty: 25 }],
+        openedDialog: "chestMessage",
+        emptyDialog: "chestEmpty",
+      },
+    );
 
     // Locked door prop at top center
     const unlocked = hasFlag("door.house.hallway.unlocked");
@@ -403,23 +416,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       ensureChestTextures(scene);
       const storeExit = scene.area.exits.find((ex: any) => ex.id === "toStore");
       createStorefront(storeExit);
-      const chestOpened = hasFlag("chest.woods.arrows.1");
-      const cx = (scene.area.width - 3) * tileSize + tileSize / 2;
-      const cy = 2 * tileSize + tileSize / 2;
-      scene.chest = scene.physics.add.sprite(cx, cy, chestOpened ? "chest_open" : "chest_closed");
-      scene.chest.setImmovable(true);
-      scene.chest.setDepth(scene.chest.y);
-      const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
-      cb.setSize(16, 12);
-      cb.setOffset(4, 10);
-      scene.physics.add.collider(scene.player, scene.chest);
-      scene.uiCam.ignore(scene.chest);
-      scene.chestContents = {
-        flag: "chest.woods.arrows.1",
-        loot: [{ itemId: "arrows", qty: 25 }],
-        openedDialog: "arrowsChest",
-        emptyDialog: "chestEmpty",
-      };
+      addChest(
+        { x: scene.area.width - 3, y: 2 },
+        {
+          flag: "chest.woods.arrows.1",
+          loot: [{ itemId: "arrows", qty: 25 }],
+          openedDialog: "arrowsChest",
+          emptyDialog: "chestEmpty",
+        },
+      );
       // Key in the middle of the forest (once)
       if (!hasFlag("item.rusty_key.woods.1")) {
         const kx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
@@ -534,11 +539,254 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       if (r.tookHit) scene.writeProgress(true);
     });
   } else {
-    // no monsters outside woods and the shadow forest
-    scene.monstersGroup?.destroy(true);
-    scene.monstersGroup = undefined;
-    scene.keySprite?.destroy();
-    scene.keySprite = undefined;
+    // Arcane keep defenders
+    if (scene.area.id === "arcane_keep") {
+      ensureArcaneWizardTextures(scene);
+      ensureItemAndPropTextures(scene);
+
+      const guards = scene.physics.add.group();
+      scene.monstersGroup = guards;
+      const guardTiles = [
+        { x: 13, y: 12 },
+        { x: 15, y: 13 },
+        { x: 17, y: 12 },
+      ];
+      for (const p of guardTiles) {
+        const gx = p.x * tileSize + tileSize / 2;
+        const gy = p.y * tileSize + tileSize / 2;
+        const g = scene.physics.add.sprite(gx, gy, "enemy_castle_guard");
+        g.setDepth(g.y);
+        const gb = g.body as Phaser.Physics.Arcade.Body;
+        gb.setSize(14, 10).setOffset(5, 12);
+        (g as any).__enemyId = "castle_guardian";
+        (g as any).__hp = 4;
+        (g as any).__contactDamage = 2;
+        guards.add(g);
+        scene.uiCam.ignore(g);
+        scene.physics.add.collider(g, layer);
+      }
+      scene.physics.add.collider(scene.player, guards, (_p: unknown, m: unknown) => {
+        const mon = m as Phaser.Physics.Arcade.Sprite;
+        const now = scene.time.now;
+        const contactDamage = ((mon as any).__contactDamage as number | undefined) ?? 2;
+        const r = applyContactDamage({
+          hp: scene.hp,
+          nowMs: now,
+          lastHitAtMs: scene.lastHitAtMs,
+          cooldownMs: 420,
+          damage: contactDamage,
+        });
+        scene.hp = r.hp;
+        scene.lastHitAtMs = r.lastHitAtMs;
+        if (r.tookHit) scene.playEnemyAttackAnim(mon);
+        if (r.tookHit) scene.writeProgress(true);
+      });
+      scene.physics.add.collider(guards, guards);
+
+      scene.time.addEvent({
+        delay: 520,
+        loop: true,
+        callback: () => {
+          for (const obj of guards.getChildren()) {
+            const g = obj as Phaser.Physics.Arcade.Sprite;
+            const dx = scene.player.x - g.x;
+            const dy = scene.player.y - g.y;
+            const d2 = dx * dx + dy * dy;
+            const chaseRadius = (32 * 7) ** 2;
+            if (d2 <= chaseRadius) {
+              const d = Math.max(1, Math.sqrt(d2));
+              const speed = 80;
+              g.setVelocity((dx / d) * speed, (dy / d) * speed);
+            } else {
+              g.setVelocity(0, 0);
+            }
+            g.setDepth(g.y);
+          }
+        },
+      });
+
+      const wizards = scene.physics.add.group();
+      const spells = scene.physics.add.group();
+      scene.arcaneWizardGroup = wizards;
+      scene.arcaneSpellGroup = spells;
+      const wizardTiles = [
+        { x: 5, y: Math.floor(scene.area.height * 0.55) },
+        { x: 7, y: Math.floor(scene.area.height * 0.55) - 2 },
+        { x: 8, y: Math.floor(scene.area.height * 0.55) + 2 },
+        { x: 10, y: Math.floor(scene.area.height * 0.55) },
+      ];
+      for (const p of wizardTiles) {
+        const wx = p.x * tileSize + tileSize / 2;
+        const wy = p.y * tileSize + tileSize / 2;
+        const w = scene.physics.add.sprite(wx, wy, "enemy_arcane_wizard");
+        w.setDepth(w.y);
+        const wb = w.body as Phaser.Physics.Arcade.Body;
+        wb.setSize(14, 12).setOffset(5, 11);
+        (w as any).__hp = 8;
+        (w as any).__lastShotAtMs = -Infinity;
+        (w as any).__strafeSign = Math.random() < 0.5 ? -1 : 1;
+        wizards.add(w);
+        scene.uiCam.ignore(w);
+        scene.physics.add.collider(w, layer);
+      }
+
+      scene.physics.add.collider(wizards, guards);
+      scene.physics.add.collider(wizards, wizards);
+      scene.physics.add.collider(scene.player, wizards, (_p: unknown, w: unknown) => {
+        const wiz = w as Phaser.Physics.Arcade.Sprite;
+        const now = scene.time.now;
+        const r = applyContactDamage({
+          hp: scene.hp,
+          nowMs: now,
+          lastHitAtMs: scene.lastHitAtMs,
+          cooldownMs: 450,
+          damage: 3,
+        });
+        scene.hp = r.hp;
+        scene.lastHitAtMs = r.lastHitAtMs;
+        if (r.tookHit) scene.playEnemyAttackAnim(wiz);
+        if (r.tookHit) scene.writeProgress(true);
+      });
+
+      scene.physics.add.collider(
+        spells,
+        layer,
+        (_s: unknown) => {
+          const s = _s as Phaser.Physics.Arcade.Sprite;
+          s.destroy();
+        },
+        shouldProcessArrowTileCollision,
+      );
+      scene.physics.add.collider(spells, guards, (_s: unknown) => {
+        const s = _s as Phaser.Physics.Arcade.Sprite;
+        s.destroy();
+      });
+      scene.physics.add.overlap(scene.player, spells, (_p: unknown, s: unknown) => {
+        const spell = s as Phaser.Physics.Arcade.Sprite;
+        const now = scene.time.now;
+        const r = applyContactDamage({
+          hp: scene.hp,
+          nowMs: now,
+          lastHitAtMs: scene.lastRangedHitAtMs,
+          cooldownMs: 500,
+          damage: 4,
+        });
+        scene.hp = r.hp;
+        scene.lastRangedHitAtMs = r.lastHitAtMs;
+        spell.destroy();
+        if (r.tookHit) {
+          scene.cameras.main.flash(80, 140, 90, 255);
+        }
+      });
+
+      if (scene.playerArrowsGroup) {
+        scene.physics.add.overlap(scene.playerArrowsGroup, wizards, (_a: unknown, w: unknown) => {
+          const arrow = _a as Phaser.Physics.Arcade.Sprite;
+          const wiz = w as Phaser.Physics.Arcade.Sprite;
+          scene.damageArcaneWizard(wiz, 1);
+          arrow.destroy();
+        });
+      }
+
+      scene.time.addEvent({
+        delay: 260,
+        loop: true,
+        callback: () => {
+          for (const obj of wizards.getChildren()) {
+            const w = obj as Phaser.Physics.Arcade.Sprite;
+            if (!w.active) continue;
+            const dx = scene.player.x - w.x;
+            const dy = scene.player.y - w.y;
+            const d = Math.hypot(dx, dy);
+            const dir = d > 0 ? { x: dx / d, y: dy / d } : { x: 0, y: 0 };
+            const tooClose = d < 32 * 5;
+            const tooFar = d > 32 * 9;
+            const speed = tooClose ? 70 : tooFar ? 55 : 0;
+            const strafe = { x: -dir.y, y: dir.x };
+            const toward = tooFar ? 1 : -1;
+            const vx = speed * (dir.x * toward + strafe.x * 0.45);
+            const vy = speed * (dir.y * toward + strafe.y * 0.45);
+            w.setVelocity(vx, vy);
+            w.setDepth(w.y);
+          }
+        },
+      });
+
+      scene.time.addEvent({
+        delay: 220,
+        loop: true,
+        callback: () => {
+          const now = scene.time.now;
+          for (const obj of wizards.getChildren()) {
+            const w = obj as Phaser.Physics.Arcade.Sprite;
+            if (!w.active) continue;
+            const dx = scene.player.x - w.x;
+            const dy = scene.player.y - w.y;
+            const d2 = dx * dx + dy * dy;
+            const range2 = (32 * 12) ** 2;
+            if (d2 > range2) continue;
+            const lastShotAtMs = (w as any).__lastShotAtMs as number;
+            const attempt = tryShoot({ nowMs: now, state: { lastShotAtMs }, cooldownMs: 750 });
+            if (!attempt.ok) continue;
+            (w as any).__lastShotAtMs = attempt.next.lastShotAtMs;
+
+            const dir = normalize({ x: dx, y: dy });
+            if (dir.x === 0 && dir.y === 0) continue;
+            const speed = 220;
+            const spawnDist = 18;
+            const sx = w.x + dir.x * spawnDist;
+            const sy = w.y + dir.y * spawnDist;
+            const spell = spells.create(sx, sy, "proj_arcane_bolt") as Phaser.Physics.Arcade.Sprite;
+            spell.setDepth(spell.y);
+            const sb = spell.body as Phaser.Physics.Arcade.Body;
+            sb.setAllowGravity(false);
+            sb.setSize(12, 8).setOffset(1, 1);
+            sb.setVelocity(dir.x * speed, dir.y * speed);
+            spell.setRotation(Math.atan2(dir.y, dir.x));
+            scene.uiCam.ignore(spell);
+            scene.time.delayedCall(2000, () => {
+              if (spell.active) spell.destroy();
+            });
+          }
+        },
+      });
+
+      const gateSpawn = scene.area.spawns.fromShadowForest ?? spawn;
+      addChest(
+        { x: gateSpawn.x + 1, y: gateSpawn.y },
+        {
+          loot: [
+            { itemId: "coins", qty: 35 },
+            { itemId: "bread", qty: 2 },
+          ],
+          openedDialog: "arcaneChest",
+          emptyDialog: "chestEmpty",
+          resetOnAreaLoad: true,
+        },
+      );
+      addChest(
+        { x: gateSpawn.x + 2, y: gateSpawn.y + 1 },
+        {
+          loot: [
+            { itemId: "coins", qty: 40 },
+            { itemId: "stew", qty: 1 },
+          ],
+          openedDialog: "arcaneChest",
+          emptyDialog: "chestEmpty",
+          resetOnAreaLoad: true,
+        },
+      );
+    } else {
+      // no monsters outside woods and the shadow forest
+      scene.monstersGroup?.destroy(true);
+      scene.monstersGroup = undefined;
+      scene.keySprite?.destroy();
+      scene.keySprite = undefined;
+      scene.arcaneWizardGroup?.destroy(true);
+      scene.arcaneWizardGroup = undefined;
+      scene.arcaneSpellGroup?.destroy(true);
+      scene.arcaneSpellGroup = undefined;
+    }
   }
 
   // Troll bridge boss
@@ -852,26 +1100,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   }
 
   if (scene.area.id === "troll_clearing") {
-    ensureChestTextures(scene);
-    ensureItemAndPropTextures(scene);
-    const opened = hasFlag("chest.troll.clearing.1");
-    const tx = opened ? "chest_open" : "chest_closed";
-    const cx = Math.floor(scene.area.width / 2) * tileSize + tileSize / 2;
-    const cy = Math.floor(scene.area.height / 2) * tileSize + tileSize / 2;
-    scene.chest = scene.physics.add.sprite(cx, cy, tx);
-    scene.chest.setImmovable(true);
-    scene.chest.setDepth(scene.chest.y);
-    const cb = scene.chest.body as Phaser.Physics.Arcade.Body;
-    cb.setSize(16, 12);
-    cb.setOffset(4, 10);
-    scene.physics.add.collider(scene.player, scene.chest);
-    scene.uiCam.ignore(scene.chest);
-    scene.chestContents = {
-      flag: "chest.troll.clearing.1",
-      loot: [{ itemId: "coins", qty: 60 }],
-      openedDialog: "chestMessage",
-      emptyDialog: "chestEmpty",
-    };
+    addChest(
+      { x: Math.floor(scene.area.width / 2), y: Math.floor(scene.area.height / 2) },
+      {
+        flag: "chest.troll.clearing.1",
+        loot: [{ itemId: "coins", qty: 60 }],
+        openedDialog: "chestMessage",
+        emptyDialog: "chestEmpty",
+      },
+    );
   }
 
   // Hallway props: torches + sword

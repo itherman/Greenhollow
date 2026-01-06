@@ -241,6 +241,15 @@ export const chestMessage: DialogScript = {
   },
 };
 
+export const arcaneChest: DialogScript = {
+  id: "arcaneChest",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "line", text: "Arcane supplies spill out again—freshly restocked.", next: "end" },
+    end: { id: "end", kind: "end", text: "Take what you can carry." },
+  },
+};
+
 export const chestEmpty: DialogScript = {
   id: "chestEmpty",
   start: "a",
@@ -362,6 +371,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return buyerNpc;
     case "chestMessage":
       return chestMessage;
+    case "arcaneChest":
+      return arcaneChest;
     case "chestEmpty":
       return chestEmpty;
     case "arrowsChest":
