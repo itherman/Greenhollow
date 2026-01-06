@@ -8,6 +8,7 @@ import { saveCloudPlayerState } from "../../../services/game/cloudPlayerState";
 import { withLoadingOverlay } from "../../../ui/loadingOverlay";
 import type { ItemId } from "../../../core/inventory";
 import { normalizeScreenSize } from "../../../core/screen";
+import { APP_VERSION } from "../../../version";
 
 /**
  * Inventory / “Pouch” modal controller extracted from `WorldScene`.
@@ -405,7 +406,7 @@ export class InventoryPanelController {
         })
         .setOrigin(0.5, 0.5);
       const versionText = scene.add
-        .text(0, 0, "v0.1.2", {
+        .text(0, 0, APP_VERSION, {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: "11px",
           color: "#9fb5c4",
