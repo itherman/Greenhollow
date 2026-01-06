@@ -19,6 +19,22 @@ describe("areas", () => {
     expect(ex!.toArea).toBe("house");
   });
 
+  it("troll clearing exit sits on the entry-side path back to the bridge", () => {
+    const a = getArea("troll_clearing");
+    const spawn = a.spawns.fromTrollBridge;
+    const exit = a.exits.find((e) => e.id === "backToBridge");
+    expect(exit).toBeTruthy();
+    expect(exit!.rect).toEqual({ x: spawn.x, y: a.height - 1, w: 1, h: 1 });
+
+    const turnY = Math.floor(a.height / 2);
+    for (let y = a.height - 1; y >= turnY; y--) {
+      expect(a.tiles[y]![spawn.x]).toBe(4);
+    }
+    for (let x = spawn.x; x <= a.width - 3; x++) {
+      expect(a.tiles[turnY]![x]).toBe(4);
+    }
+  });
+
   it("entering the special house from the hallway spawns near the locked door", () => {
     const a = getArea("house");
     expect(a.spawns.fromHallway).toEqual({ x: Math.floor(a.width / 2), y: 1 });
