@@ -588,7 +588,7 @@ export class InventoryPanelController {
     const trashW = 124;
     const trashH = 44;
     const buttonsGap = 16;
-    const footerMargin = 70;
+    const footerMargin = 32;
     const footerHeight = Math.max(exitH, trashH) + footerMargin;
     const canSave = (() => {
       const s = loadSession();
