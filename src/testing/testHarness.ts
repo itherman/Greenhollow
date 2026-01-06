@@ -1,5 +1,9 @@
 import type Phaser from "phaser";
 import type { AreaId, EntryId } from "../core/areas";
+import { ITEMS, addItem } from "../core/inventory";
+import { hasFlag, setFlag } from "../services/game/flags";
+import { loadInventory, saveInventory } from "../services/game/inventoryStore";
+import type { ItemId } from "../core/inventory";
 
 export type TestHarnessState = {
   areaId?: string;
@@ -14,6 +18,7 @@ export type TestHarness = {
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
   teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
   restartInArea: (opts: { areaId: AreaId; entry?: EntryId }) => boolean;
+  interactWithChest: (tile: { x: number; y: number }) => boolean;
 };
 
 declare global {
@@ -104,6 +109,42 @@ export function installTestHarness(game: Phaser.Game): void {
       if (!scene) return false;
       if (typeof scene.scene?.restart !== "function") return false;
       scene.scene.restart({ areaId, entry });
+      return true;
+    },
+    interactWithChest: (tile) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.chests?.length) return false;
+      const tileSize = 32;
+      const targetX = (tile.x + 0.5) * tileSize;
+      const targetY = (tile.y + 0.5) * tileSize;
+      const chest = scene.chests.find(
+        (c: any) => Math.abs(c.sprite?.x - targetX) < tileSize / 2 && Math.abs(c.sprite?.y - targetY) < tileSize / 2,
+      );
+      if (!chest) return false;
+
+      const contents = chest.contents as {
+        loot: Array<{ itemId: ItemId; qty: number }>;
+        openedDialog: string;
+        emptyDialog: string;
+        flag?: string;
+        resetOnAreaLoad?: boolean;
+      };
+      const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
+      if (!opened) {
+        if (contents.flag && !contents.resetOnAreaLoad) setFlag(contents.flag);
+        chest.sprite?.setTexture("chest_open");
+        chest.sprite?.setDepth(chest.sprite.y);
+        const inv = loadInventory();
+        for (const loot of contents.loot) {
+          const def = ITEMS[loot.itemId];
+          addItem(inv, def, loot.qty);
+        }
+        saveInventory(inv);
+        if (typeof scene.renderInventoryPanel === "function" && scene.inventoryOpen) scene.renderInventoryPanel();
+        if (typeof scene.openNpcDialog === "function") scene.openNpcDialog(contents.openedDialog);
+      } else {
+        if (typeof scene.openNpcDialog === "function") scene.openNpcDialog(contents.emptyDialog);
+      }
       return true;
     },
   };

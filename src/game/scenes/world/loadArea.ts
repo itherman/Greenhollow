@@ -751,9 +751,21 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         },
       });
 
-      const gateSpawn = scene.area.spawns.fromShadowForest ?? spawn;
-      addChest(
-        { x: gateSpawn.x + 1, y: gateSpawn.y },
+      const castle = {
+        x: Math.floor(scene.area.width / 2 - 6),
+        y: Math.floor(scene.area.height / 2 - 5),
+        w: 12,
+        h: 10,
+      };
+      const gateYInside = castle.y + Math.floor(castle.h / 2);
+      const innerX0 = castle.x + 1;
+      const innerX1 = castle.x + castle.w - 2;
+      const chestSlots = [
+        { x: innerX0 + 2, y: gateYInside },
+        { x: innerX1 - 3, y: gateYInside + 2 },
+      ];
+
+      const chestContents = [
         {
           loot: [
             { itemId: "coins", qty: 35 },
@@ -763,9 +775,6 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           emptyDialog: "chestEmpty",
           resetOnAreaLoad: true,
         },
-      );
-      addChest(
-        { x: gateSpawn.x + 2, y: gateSpawn.y + 1 },
         {
           loot: [
             { itemId: "coins", qty: 40 },
@@ -775,7 +784,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           emptyDialog: "chestEmpty",
           resetOnAreaLoad: true,
         },
-      );
+      ];
+
+      for (let i = 0; i < chestSlots.length; i++) {
+        addChest(chestSlots[i]!, chestContents[i]!);
+      }
     } else {
       // no monsters outside woods and the shadow forest
       scene.monstersGroup?.destroy(true);

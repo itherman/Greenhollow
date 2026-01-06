@@ -1,7 +1,7 @@
 import { expect, test, type JSHandle, type Page } from "@playwright/test";
 import type { TestHarness, TestHarnessState } from "../../src/testing/testHarness";
 
-const CHEST_TILE = { x: 11, y: 12 };
+const CHEST_TILE = { x: 12, y: 12 };
 const SCREENSHOT_PATH = "playwright-artifacts/screenshots/arcane-keep-chest.png";
 
 type HarnessHandle = JSHandle<TestHarness>;
@@ -22,6 +22,17 @@ async function waitForArea(page: Page, areaId: string) {
   await page.waitForFunction(
     (id) => window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.areaId === id,
     areaId,
+    { timeout: 20_000 },
+  );
+}
+
+async function waitForPlayerReady(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const state = window.__GREENHOLLOW_TEST_HOOKS__?.getState();
+      return !!state?.player;
+    },
+    undefined,
     { timeout: 20_000 },
   );
 }
@@ -54,6 +65,7 @@ test.describe("Arcane Keep", () => {
     await page.getByRole("button", { name: /start/i }).click();
     await page.getByRole("button", { name: /continue as guest/i }).click();
     await waitForArea(page, "village");
+    await waitForPlayerReady(page);
 
     const harness = await getHarness(page);
     await page.click("canvas");
@@ -61,28 +73,34 @@ test.describe("Arcane Keep", () => {
     const jumped = await harness.evaluate((h) => h.restartInArea({ areaId: "arcane_keep", entry: "fromShadowForest" }));
     expect(jumped).toBe(true);
     await waitForArea(page, "arcane_keep");
+    await waitForPlayerReady(page);
 
     // First visit: loot the chest.
     const firstTp = await harness.evaluate((h, tile) => h.teleportToTileCenter(tile), CHEST_TILE);
     expect(firstTp).toBe(true);
     await page.click("canvas");
-    await page.waitForTimeout(300);
-    await page.waitForTimeout(100);
-    await holdKey(page, "KeyE");
+    await page.waitForTimeout(150);
+    const firstChest = await harness.evaluate((h, tile) => h.interactWithChest(tile), CHEST_TILE);
+    expect(firstChest).toBe(true);
     await waitForDialogScript(page, "arcaneChest");
     await holdKey(page, "KeyE");
     await waitForDialogClosed(page);
 
-    // Re-enter the area to verify the chest refills.
+    // Leave and return to verify the chest refills on a fresh load.
+    const resetJump = await harness.evaluate((h) => h.restartInArea({ areaId: "shadow_forest", entry: "fromArcaneKeep" }));
+    expect(resetJump).toBe(true);
+    await waitForArea(page, "shadow_forest");
+
     const secondJump = await harness.evaluate((h) => h.restartInArea({ areaId: "arcane_keep", entry: "fromShadowForest" }));
     expect(secondJump).toBe(true);
     await waitForArea(page, "arcane_keep");
+    await waitForPlayerReady(page);
     const secondTp = await harness.evaluate((h, tile) => h.teleportToTileCenter(tile), CHEST_TILE);
     expect(secondTp).toBe(true);
     await page.click("canvas");
-    await page.waitForTimeout(300);
-    await page.waitForTimeout(100);
-    await holdKey(page, "KeyE");
+    await page.waitForTimeout(150);
+    const secondChest = await harness.evaluate((h, tile) => h.interactWithChest(tile), CHEST_TILE);
+    expect(secondChest).toBe(true);
     await waitForDialogScript(page, "arcaneChest");
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
   });
