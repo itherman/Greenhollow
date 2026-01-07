@@ -5,6 +5,7 @@
 - Shift the river boat and sailor onto the waterline by each dock and hide travel options that point back to the current area.
 - Refresh peasant sprites and armor overlays so the base tunic and arms read more clearly while armored.
 - Add a Playwright regression that checks ferry travel options and dock placement for the boat and sailor.
+- Widen keyboard NPC interaction range so dock-side conversations reliably open when standing on adjacent tiles.
 
 ## 2026-01-06
 - Split the Vite build output into dedicated Phaser/Firebase chunks to shrink the main bundle and suppress chunk size warnings.
