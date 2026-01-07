@@ -175,9 +175,17 @@ export function installTestHarness(game: Phaser.Game): void {
         flag?: string;
         resetOnAreaLoad?: boolean;
       };
-      const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
+      const opened = contents.resetOnAreaLoad
+        ? !!chest.openedThisVisit
+        : contents.flag
+          ? hasFlag(contents.flag)
+          : false;
       if (!opened) {
-        if (contents.flag && !contents.resetOnAreaLoad) setFlag(contents.flag);
+        if (contents.resetOnAreaLoad) {
+          chest.openedThisVisit = true;
+        } else if (contents.flag) {
+          setFlag(contents.flag);
+        }
         chest.sprite?.setTexture("chest_open");
         chest.sprite?.setDepth(chest.sprite.y);
         const inv = loadInventory();

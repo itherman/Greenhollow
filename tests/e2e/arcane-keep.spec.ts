@@ -86,6 +86,16 @@ test.describe("Arcane Keep", () => {
     await holdKey(page, "KeyE");
     await waitForDialogClosed(page);
 
+    const coinsAfterFirst = await harness.evaluate((h) => h.getInventoryCount("coins"));
+
+    const secondChestSameVisit = await harness.evaluate((h, tile) => h.interactWithChest(tile), CHEST_TILE);
+    expect(secondChestSameVisit).toBe(true);
+    await waitForDialogScript(page, "chestEmpty");
+    await holdKey(page, "KeyE");
+    await waitForDialogClosed(page);
+    const coinsAfterSecond = await harness.evaluate((h) => h.getInventoryCount("coins"));
+    expect(coinsAfterSecond).toBe(coinsAfterFirst);
+
     // Leave and return to verify the chest refills on a fresh load.
     const resetJump = await harness.evaluate((h) => h.restartInArea({ areaId: "shadow_forest", entry: "fromArcaneKeep" }));
     expect(resetJump).toBe(true);
@@ -102,6 +112,8 @@ test.describe("Arcane Keep", () => {
     const secondChest = await harness.evaluate((h, tile) => h.interactWithChest(tile), CHEST_TILE);
     expect(secondChest).toBe(true);
     await waitForDialogScript(page, "arcaneChest");
+    const coinsAfterReturn = await harness.evaluate((h) => h.getInventoryCount("coins"));
+    expect(coinsAfterReturn).toBeGreaterThan(coinsAfterSecond);
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });
   });
 

@@ -127,7 +127,7 @@ export function worldSceneUpdate(scene: any): void {
           }
         }
       } else if (this.tapIntent.kind === "chest") {
-        const ok = this.tryInteract("chest");
+        const ok = this.tryInteract("chest", this.tapIntent.id);
         if (ok) {
           this.tapTarget = undefined;
           this.tapIntent = undefined;

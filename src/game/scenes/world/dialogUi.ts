@@ -35,6 +35,17 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     const isTravel = script.id === "riverSailor";
     const showShopHud = isShop || isBuyer;
 
+    const needsDialogUi =
+      !this.dialogBox ||
+      !this.dialogBox.active ||
+      !this.dialogText ||
+      !this.dialogText.active ||
+      !this.dialogChoicesText ||
+      !this.dialogChoicesText.active;
+    if (needsDialogUi && typeof this.closeDialogUi === "function") {
+      this.closeDialogUi();
+    }
+
     if (!this.dialogBox) {
       this.dialogBox = this.add
         .rectangle(layout.x, layout.y, layout.w, layout.h, 0x0f1418, 0.92)

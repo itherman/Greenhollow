@@ -4,6 +4,11 @@
 - Track dialog quantity control state in the world scene to keep UI cleanup consistent.
 - Add inventory coverage for multi-item add operations that must fully fit.
 
+## 2026-01-10
+- Limit Arcane Keep chest loot to one extraction per visit, resetting only after leaving the area.
+- Target chest interactions to the tapped chest so dialogs no longer open from another chest nearby.
+- Extend the Arcane Keep Playwright regression to assert chest loot does not repeat within the same visit.
+
 ## 2026-01-08
 - Block item pickups (including chest loot) when the inventory is full so items stay in the world until space opens up.
 - Add quantity controls to shop confirmations for buying or selling multiple items at once.
