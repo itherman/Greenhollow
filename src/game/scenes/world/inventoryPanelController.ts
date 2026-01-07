@@ -662,7 +662,7 @@ export class InventoryPanelController {
         if (exists) icon.setTexture(key);
         icon.setVisible(exists);
         name.setText(s.name).setColor("#e8f0e6");
-        qty.setText(String(s.qty));
+        qty.setText(s.maxStack > 1 ? String(s.qty) : "");
       }
     }
 
