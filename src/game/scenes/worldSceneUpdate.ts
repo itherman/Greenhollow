@@ -6,6 +6,7 @@ import { toggleEquipFromInventorySlot } from "../../core/equipment";
 import { saveEquipment } from "../../services/game/equipmentStore";
 import { advanceLine, choose, closeDialog, getNode } from "../../core/dialog";
 import { paginateDialogChoices } from "../../core/dialogPagination";
+import { filterTravelChoices } from "../dialog/travelChoices";
 import { getDialogScript } from "../dialog/scripts";
 import { getMeleeWeaponStats } from "../../core/shopCatalog";
 import { tryStartAttack } from "../../core/playerAttack";
@@ -313,8 +314,9 @@ export function worldSceneUpdate(scene: any): void {
           }
 
           if (isTravel) {
-            if (pick < node.choices.length) {
-              const ch = node.choices[pick]!;
+            const travelChoices = filterTravelChoices(node.choices, this.area?.id);
+            if (pick < travelChoices.length) {
+              const ch = travelChoices[pick]!;
               if (this.handleTravelChoice(ch.id)) return;
             }
             return;

@@ -459,8 +459,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       const mb = m.body as Phaser.Physics.Arcade.Body;
       mb.setSize(14, 10).setOffset(5, 12);
       (m as any).__enemyId = isShadowForest ? "shadow_stalker" : "woods_slime";
-      (m as any).__hp = isShadowForest ? 10 : 1;
-      (m as any).__contactDamage = isShadowForest ? 3 : 1;
+      (m as any).__hp = isShadowForest ? 20 : 2;
+      (m as any).__contactDamage = isShadowForest ? 6 : 2;
       if (isShadowForest) {
         (m as any).__onDeath = (x: number, y: number) => {
           const roll = Math.random();
@@ -559,8 +559,8 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         const gb = g.body as Phaser.Physics.Arcade.Body;
         gb.setSize(14, 10).setOffset(5, 12);
         (g as any).__enemyId = "castle_guardian";
-        (g as any).__hp = 4;
-        (g as any).__contactDamage = 2;
+        (g as any).__hp = 8;
+        (g as any).__contactDamage = 4;
         guards.add(g);
         scene.uiCam.ignore(g);
         scene.physics.add.collider(g, layer);
@@ -622,7 +622,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         w.setDepth(w.y);
         const wb = w.body as Phaser.Physics.Arcade.Body;
         wb.setSize(14, 12).setOffset(5, 11);
-        (w as any).__hp = 8;
+        (w as any).__hp = 16;
         (w as any).__lastShotAtMs = -Infinity;
         (w as any).__strafeSign = Math.random() < 0.5 ? -1 : 1;
         wizards.add(w);
@@ -640,7 +640,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           nowMs: now,
           lastHitAtMs: scene.lastHitAtMs,
           cooldownMs: 450,
-          damage: 3,
+          damage: 6,
         });
         scene.hp = r.hp;
         scene.lastHitAtMs = r.lastHitAtMs;
@@ -669,7 +669,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
           nowMs: now,
           lastHitAtMs: scene.lastRangedHitAtMs,
           cooldownMs: 500,
-          damage: 4,
+          damage: 8,
         });
         scene.hp = r.hp;
         scene.lastRangedHitAtMs = r.lastHitAtMs;
@@ -821,7 +821,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     troll.setScale(1.4);
     const tb = troll.body as Phaser.Physics.Arcade.Body;
     tb.setSize(18, 14).setOffset(7, 16);
-    (troll as any).__hp = 16;
+    (troll as any).__hp = 32;
     (troll as any).setPushable?.(false);
     trolls.add(troll);
     scene.uiCam.ignore(troll);
@@ -851,7 +851,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         nowMs: now,
         lastHitAtMs: scene.lastHitAtMs,
         cooldownMs: 400,
-        damage: 3,
+        damage: 6,
       });
       scene.hp = r.hp;
       scene.lastHitAtMs = r.lastHitAtMs;
@@ -963,7 +963,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       gb.setImmovable(true);
       (g as any).setPushable?.(false);
       (g as any).__lastShotAtMs = -Infinity;
-      (g as any).__hp = 3;
+      (g as any).__hp = 6;
       (g as any).__strafeSign = Math.random() < 0.5 ? -1 : 1;
       goblins.add(g);
       scene.uiCam.ignore(g);
@@ -992,7 +992,7 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
         nowMs: now,
         lastHitAtMs: scene.lastRangedHitAtMs,
         cooldownMs: 350,
-        damage: 1,
+        damage: 2,
       });
       scene.hp = r.hp;
       scene.lastRangedHitAtMs = r.lastHitAtMs;

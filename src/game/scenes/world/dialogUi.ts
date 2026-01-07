@@ -8,6 +8,7 @@ import { attemptPurchase } from "../../../core/shopLogic";
 import { getShopEntry } from "../../../core/shopCatalog";
 import { paginateDialogChoices } from "../../../core/dialogPagination";
 import type { getDialogScript } from "../../dialog/scripts";
+import { filterTravelChoices } from "../../dialog/travelChoices";
 
 /**
  * Dialog UI rendering extracted from `WorldScene`.
@@ -28,9 +29,9 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     }
 
     const layout = computeDialogLayout(this.scale.width, this.scale.height);
-          const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
-          const isBuyer = script.id === "buyerNpc";
-          const isTravel = script.id === "riverSailor";
+    const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
+    const isBuyer = script.id === "buyerNpc";
+    const isTravel = script.id === "riverSailor";
     const showShopHud = isShop || isBuyer;
 
     if (!this.dialogBox) {
@@ -161,10 +162,13 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const lineH = 22;
 
       const MORE_ID = "__more_items__";
-    const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
-    const isBuyer = script.id === "buyerNpc";
+      const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
+      const isBuyer = script.id === "buyerNpc";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
+      if (isTravel) {
+        choicesToRender = filterTravelChoices(choicesToRender, this.area?.id);
+      }
       if (isShop && node.id === "menu") {
         const page = paginateDialogChoices(node.choices, this.shopDialogPage, 3);
         choicesToRender = page.visible;
