@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // User profile + save state
+    // users/{uid} stores:
+    // - { username, createdAt }
+    // - { state, stateUpdatedAt } (merged on save)
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    // Username reservation (immutable mapping)
+    // usernames/{username} stores: { uid, createdAt }
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+
+      // Can only be created once, by the same signed-in user whose uid is being reserved.
+      allow create: if isSignedIn()
+        && !exists(/databases/$(database)/documents/usernames/$(username))
+        && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid;
+
+      // Treat usernames as immutable in MVP.
+      allow update, delete: if false;
+    }
+
+    // Planned leaderboard (safe defaults: public read, owner-write)
+    match /leaderboards/global/scores/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['username', 'score', 'updatedAt'])
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0;
+      allow delete: if false;
+    }
+  }
+}
+
+
