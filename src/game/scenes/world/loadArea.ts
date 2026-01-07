@@ -81,7 +81,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     cb.setOffset(4, 10);
     scene.physics.add.collider(scene.player, chest);
     scene.uiCam.ignore(chest);
-    scene.chests.push({ sprite: chest, contents });
+    scene.chests.push({
+      id: `${scene.area.id}-chest-${scene.chests.length}`,
+      sprite: chest,
+      contents,
+    });
   };
 
   const storeColliders: Phaser.GameObjects.Zone[] = [];

@@ -78,7 +78,12 @@ export class WorldScene extends Phaser.Scene {
   private npcMoveStates: Map<Phaser.GameObjects.Sprite, NpcMovementState> = new Map();
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and loadArea.ts
   private interactingNpc?: Phaser.GameObjects.Sprite;
-  private chests: Array<{ sprite: Phaser.Physics.Arcade.Sprite; contents: ChestContents }> = [];
+  private chests: Array<{
+    id: string;
+    sprite: Phaser.Physics.Arcade.Sprite;
+    contents: ChestContents;
+    openedThisVisit?: boolean;
+  }> = [];
   // @ts-expect-error TS6133 - Used in loadArea.ts
   private boatSprite?: Phaser.GameObjects.Sprite;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
@@ -109,13 +114,13 @@ export class WorldScene extends Phaser.Scene {
   private shopCoinsText?: Phaser.GameObjects.Text;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private dialogQtyControls: Phaser.GameObjects.GameObject[] = [];
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private dialogQtyRepeatEvents: Phaser.Time.TimerEvent[] = [];
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private shopDialogPage = 0;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private pendingPurchaseItemId: ItemId | null = null;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private pendingPurchaseQty = 1;
   private buyerSelectionActive = false;
   private buyerOffer:
@@ -245,7 +250,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
-  private tryInteract(prefer: TapCandidateKind | "any", npcScriptId?: string): boolean {
+  private tryInteract(prefer: TapCandidateKind | "any", targetId?: string): boolean {
     const playerPos = { x: this.player.x, y: this.player.y };
 
     const tryKey = () => {
@@ -322,7 +327,11 @@ export class WorldScene extends Phaser.Scene {
     const tryChest = () => {
       if (!this.chests.length) return false;
       const rangePx = getTapInteractRangePx("chest");
-      for (const chest of this.chests) {
+      const chestsToCheck = targetId
+        ? this.chests.filter((chest) => chest.id === targetId)
+        : this.chests;
+      if (!chestsToCheck.length) return false;
+      for (const chest of chestsToCheck) {
         if (
           tryPickupSprite({
             player: playerPos,
@@ -330,7 +339,11 @@ export class WorldScene extends Phaser.Scene {
             rangePx,
             onPickup: () => {
               const contents = chest.contents;
-              const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
+              const opened = contents.resetOnAreaLoad
+                ? !!chest.openedThisVisit
+                : contents.flag
+                  ? hasFlag(contents.flag)
+                  : false;
               if (!opened) {
                 const inv = loadInventory();
                 const added = addItemsIfFit(
@@ -341,7 +354,11 @@ export class WorldScene extends Phaser.Scene {
                   this.openNpcDialog("pouchFull");
                   return;
                 }
-                if (contents.flag && !contents.resetOnAreaLoad) setFlag(contents.flag);
+                if (contents.resetOnAreaLoad) {
+                  chest.openedThisVisit = true;
+                } else if (contents.flag) {
+                  setFlag(contents.flag);
+                }
                 chest.sprite?.setTexture("chest_open");
                 chest.sprite?.setDepth(chest.sprite.y);
                 saveInventory(inv);
@@ -367,13 +384,13 @@ export class WorldScene extends Phaser.Scene {
         player: playerPos,
         npcs: npcs as any,
         rangePx,
-        scriptId: npcScriptId,
+        scriptId: targetId,
         tapTarget: this.tapTarget,
       }) as Phaser.GameObjects.Sprite | null;
 
       if (!chosen) return false;
       const npcDef = (chosen as any).npcDef as { dialogScriptId?: string } | undefined;
-      const scriptId = npcScriptId ?? npcDef?.dialogScriptId;
+      const scriptId = targetId ?? npcDef?.dialogScriptId;
       if (!scriptId) return false;
       const script = getDialogScript(scriptId);
       if (!script) return false;
@@ -841,7 +858,7 @@ export class WorldScene extends Phaser.Scene {
     if (this.swordSprite?.active) out.push({ kind: "sword", x: this.swordSprite.x, y: this.swordSprite.y });
     if (this.bowSprite?.active) out.push({ kind: "bow", x: this.bowSprite.x, y: this.bowSprite.y });
     for (const chest of this.chests) {
-      if (chest.sprite?.active) out.push({ kind: "chest", x: chest.sprite.x, y: chest.sprite.y });
+      if (chest.sprite?.active) out.push({ kind: "chest", x: chest.sprite.x, y: chest.sprite.y, id: chest.id });
     }
     if (this.npcsGroup) {
       for (const obj of this.npcsGroup.getChildren()) {
