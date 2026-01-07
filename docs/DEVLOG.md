@@ -1,5 +1,8 @@
 # Devlog
 
+## 2026-01-06
+- Split the Vite build output into dedicated Phaser/Firebase chunks to shrink the main bundle and suppress chunk size warnings.
+
 ## 2025-12-28
 - Move the troll clearing return exit to the bottom-left entry path so players can double back the way they arrived.
 - Add a Playwright regression that warps into the troll clearing and verifies the new exit links back to the bridge.
