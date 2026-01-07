@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "deploy": "npm run build && firebase deploy",
@@ -20,6 +21,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-tools": "^14.27.0",
     "typescript": "~5.9.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"
