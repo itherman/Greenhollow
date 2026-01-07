@@ -231,6 +231,24 @@ export function worldSceneUpdate(scene: any): void {
       // Choice selection (1..4)
       const node = getNode(script, this.dialog);
       if (node && node.kind === "choice") {
+        const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
+        const isBuyer = script.id === "buyerNpc";
+        const qtyDelta = Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.UP)
+          ? 1
+          : Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.DOWN)
+            ? -1
+            : 0;
+        if (qtyDelta !== 0) {
+          if (isShop && node.id === "confirm") {
+            if (this.adjustPurchaseQuantity(qtyDelta)) this.renderDialog(script);
+            return;
+          }
+          if (isBuyer && node.id === "offer") {
+            if (this.adjustBuyerOfferQuantity(qtyDelta)) this.renderDialog(script);
+            return;
+          }
+        }
+
         const pick =
           Phaser.Input.Keyboard.JustDown(this.choiceKeys.ONE)
             ? 0
@@ -242,8 +260,6 @@ export function worldSceneUpdate(scene: any): void {
                   ? 3
                 : -1;
         if (pick >= 0 && node.kind === "choice") {
-          const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
-          const isBuyer = script.id === "buyerNpc";
           const isTravel = script.id === "riverSailor";
           if (isShop) {
             if (node.id === "menu") {
@@ -261,6 +277,7 @@ export function worldSceneUpdate(scene: any): void {
                 }
                 if (ch.id.startsWith("buy_")) {
                   this.pendingPurchaseItemId = ch.id.slice("buy_".length);
+                  this.pendingPurchaseQty = 1;
                   this.shopDialogPage = 0;
                   this.dialog = { open: true, scriptId: script.id, nodeId: "confirm" };
                   this.renderDialog(script);
@@ -278,6 +295,7 @@ export function worldSceneUpdate(scene: any): void {
                 const ch = node.choices[pick]!;
                 if (ch.id === "confirm_no") {
                   this.pendingPurchaseItemId = null;
+                  this.pendingPurchaseQty = 1;
                   this.shopDialogPage = 0;
                   this.dialog = { open: true, scriptId: script.id, nodeId: "menu" };
                   this.renderDialog(script);
@@ -287,7 +305,10 @@ export function worldSceneUpdate(scene: any): void {
                   const itemId = this.pendingPurchaseItemId;
                   this.pendingPurchaseItemId = null;
                   const inv = loadInventory();
-                  const res = itemId ? attemptPurchase(inv, itemId) : { ok: false, reason: "unknown_item" as const };
+                  const res = itemId
+                    ? attemptPurchase(inv, itemId, this.pendingPurchaseQty)
+                    : { ok: false, reason: "unknown_item" as const };
+                  this.pendingPurchaseQty = 1;
                   saveInventory(inv);
                   if (this.inventoryOpen) this.renderInventoryPanel();
                   const nodeId =

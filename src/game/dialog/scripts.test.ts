@@ -13,6 +13,7 @@ import {
   homeowner3Advice,
   homeowner4Advice,
   keyFound,
+  pouchFull,
   shopkeeper,
   rareShopkeeper,
   swordFound,
@@ -62,6 +63,10 @@ describe("dialog scripts", () => {
 
   it("keyFound validates", () => {
     expect(validateScript(keyFound)).toEqual({ ok: true });
+  });
+
+  it("pouchFull validates", () => {
+    expect(validateScript(pouchFull)).toEqual({ ok: true });
   });
 
   it("doorLocked validates", () => {

@@ -7,7 +7,7 @@ import {
 } from "../../core/dialog";
 import { getDialogScript } from "../dialog/scripts";
 import { clearFlags, hasFlag, setFlag } from "../../services/game/flags";
-import { ITEMS, addItem, type ItemId } from "../../core/inventory";
+import { ITEMS, addItemIfFits, addItemsIfFit, getItemCount, type ItemId } from "../../core/inventory";
 import { clearInventory, loadInventory, saveInventory } from "../../services/game/inventoryStore";
 import { ensureItemAndPropTextures } from "../art/sprites";
 import { createExitGate, type TilePos } from "../../core/exitGate";
@@ -26,8 +26,8 @@ import { clearSession } from "../../services/auth/session";
 import { canToggleInventory } from "../../core/uiGating";
 import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild } from "../../core/pouchUi";
-import { getArmorBonus, isMeleeWeapon } from "../../core/shopCatalog";
-import { attemptSaleFromSlot, getSellOffer } from "../../core/shopLogic";
+import { getArmorBonus, getShopEntry, isMeleeWeapon } from "../../core/shopCatalog";
+import { attemptSaleFromSlot, getSellOfferForQty } from "../../core/shopLogic";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { getEnemyDefinition, type EnemyId } from "../../core/enemies";
@@ -91,6 +91,11 @@ export class WorldScene extends Phaser.Scene {
     FOUR: Phaser.Input.Keyboard.Key;
   };
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
+  private qtyAdjustKeys!: {
+    UP: Phaser.Input.Keyboard.Key;
+    DOWN: Phaser.Input.Keyboard.Key;
+  };
+  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private escapeKey!: Phaser.Input.Keyboard.Key;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
   private dialog: DialogState = { open: false };
@@ -104,12 +109,18 @@ export class WorldScene extends Phaser.Scene {
   private shopCoinsText?: Phaser.GameObjects.Text;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
+  private dialogQtyControls: Phaser.GameObjects.GameObject[] = [];
+  private dialogQtyRepeatEvents: Phaser.Time.TimerEvent[] = [];
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private shopDialogPage = 0;
   // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private pendingPurchaseItemId: ItemId | null = null;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
+  private pendingPurchaseQty = 1;
   private buyerSelectionActive = false;
-  private buyerOffer: { slotIndex: number; coins: number; itemName: string; qty: number; itemId: ItemId } | null = null;
+  private buyerOffer:
+    | { slotIndex: number; coins: number; itemName: string; qty: number; maxQty: number; itemId: ItemId }
+    | null = null;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
   private startAreaId: AreaId = "village";
   private startEntry: EntryId = "start";
@@ -243,11 +254,15 @@ export class WorldScene extends Phaser.Scene {
         sprite: this.keySprite,
         rangePx: getTapInteractRangePx("key"),
         onPickup: () => {
+          const inv = loadInventory();
+          const added = addItemIfFits(inv, ITEMS.rusty_key, 1);
+          if (!added.ok) {
+            this.openNpcDialog("pouchFull");
+            return;
+          }
           setFlag("item.rusty_key.woods.1");
           this.keySprite?.destroy();
           this.keySprite = undefined;
-          const inv = loadInventory();
-          addItem(inv, ITEMS.rusty_key, 1);
           saveInventory(inv);
           if (this.inventoryOpen) this.renderInventoryPanel();
           this.openNpcDialog("keyFound");
@@ -261,11 +276,15 @@ export class WorldScene extends Phaser.Scene {
         sprite: this.swordSprite,
         rangePx: getTapInteractRangePx("sword"),
         onPickup: () => {
+          const inv = loadInventory();
+          const added = addItemIfFits(inv, ITEMS.sword, 1);
+          if (!added.ok) {
+            this.openNpcDialog("pouchFull");
+            return;
+          }
           setFlag("item.sword.1");
           this.swordSprite?.destroy();
           this.swordSprite = undefined;
-          const inv = loadInventory();
-          addItem(inv, ITEMS.sword, 1);
           saveInventory(inv);
           if (this.inventoryOpen) this.renderInventoryPanel();
           this.openNpcDialog("swordFound");
@@ -279,11 +298,15 @@ export class WorldScene extends Phaser.Scene {
         sprite: this.bowSprite,
         rangePx: getTapInteractRangePx("bow"),
         onPickup: () => {
+          const inv = loadInventory();
+          const added = addItemIfFits(inv, ITEMS.bow, 1);
+          if (!added.ok) {
+            this.openNpcDialog("pouchFull");
+            return;
+          }
           setFlag("item.bow.1");
           this.bowSprite?.destroy();
           this.bowSprite = undefined;
-          const inv = loadInventory();
-          addItem(inv, ITEMS.bow, 1);
           saveInventory(inv);
           // Auto-equip bow if nothing is held.
           if (!this.equipment.heldItemId) {
@@ -309,14 +332,18 @@ export class WorldScene extends Phaser.Scene {
               const contents = chest.contents;
               const opened = contents.resetOnAreaLoad ? false : contents.flag ? hasFlag(contents.flag) : false;
               if (!opened) {
+                const inv = loadInventory();
+                const added = addItemsIfFit(
+                  inv,
+                  contents.loot.map((loot) => ({ item: ITEMS[loot.itemId], qty: loot.qty })),
+                );
+                if (!added.ok) {
+                  this.openNpcDialog("pouchFull");
+                  return;
+                }
                 if (contents.flag && !contents.resetOnAreaLoad) setFlag(contents.flag);
                 chest.sprite?.setTexture("chest_open");
                 chest.sprite?.setDepth(chest.sprite.y);
-                const inv = loadInventory();
-                for (const loot of contents.loot) {
-                  const def = ITEMS[loot.itemId];
-                  addItem(inv, def, loot.qty);
-                }
                 saveInventory(inv);
                 if (this.inventoryOpen) this.renderInventoryPanel();
                 this.openNpcDialog(contents.openedDialog);
@@ -954,7 +981,7 @@ export class WorldScene extends Phaser.Scene {
       return true;
     }
 
-    const offer = getSellOffer(slot);
+    const offer = getSellOfferForQty(slot, slot.qty);
     if (!offer.ok) {
       this.buyerOffer = null;
       this.dialog = { open: true, scriptId: script.id, nodeId: "noValue" };
@@ -962,7 +989,14 @@ export class WorldScene extends Phaser.Scene {
       return true;
     }
 
-    this.buyerOffer = { slotIndex, coins: offer.coins, itemName: slot.name, qty: slot.qty, itemId: slot.id };
+    this.buyerOffer = {
+      slotIndex,
+      coins: offer.coins,
+      itemName: slot.name,
+      qty: slot.qty,
+      maxQty: slot.qty,
+      itemId: slot.id,
+    };
     this.dialog = { open: true, scriptId: script.id, nodeId: "offer" };
     this.renderDialog(script);
     return true;
@@ -1081,6 +1115,7 @@ export class WorldScene extends Phaser.Scene {
     // Reset paging state whenever a dialog is opened (especially for shop menus).
     this.shopDialogPage = 0;
     this.pendingPurchaseItemId = null;
+    this.pendingPurchaseQty = 1;
     this.resetBuyerFlow();
     this.dialog = openDialog(script);
     this.renderDialog(script);
@@ -1133,7 +1168,7 @@ export class WorldScene extends Phaser.Scene {
         return true;
       }
       const inv = loadInventory();
-      const res = attemptSaleFromSlot(inv, offer.slotIndex);
+      const res = attemptSaleFromSlot(inv, offer.slotIndex, offer.qty);
       if (res.ok) {
         saveInventory(inv);
         this.resetBuyerFlow();
@@ -1150,6 +1185,38 @@ export class WorldScene extends Phaser.Scene {
       return true;
     }
     return false;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and dialogUi.ts
+  private adjustPurchaseQuantity(delta: number): boolean {
+    if (!this.pendingPurchaseItemId) return false;
+    const entry = getShopEntry(this.pendingPurchaseItemId);
+    if (!entry) return false;
+    const inv = loadInventory();
+    const coins = getItemCount(inv, "coins");
+    const maxAffordable =
+      entry.priceCoins > 0 ? Math.floor(coins / entry.priceCoins) : 99;
+    const maxQty = entry.priceCoins > 0 ? Math.max(1, Math.min(99, maxAffordable)) : 99;
+    const next = Math.max(1, Math.min(maxQty, this.pendingPurchaseQty + delta));
+    if (next === this.pendingPurchaseQty) return false;
+    this.pendingPurchaseQty = next;
+    return true;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and dialogUi.ts
+  private adjustBuyerOfferQuantity(delta: number): boolean {
+    const offer = this.buyerOffer;
+    if (!offer) return false;
+    const nextQty = Math.max(1, Math.min(offer.maxQty, offer.qty + delta));
+    if (nextQty === offer.qty) return false;
+    const def = ITEMS[offer.itemId];
+    const nextOffer = getSellOfferForQty(
+      { id: offer.itemId, name: offer.itemName, qty: offer.maxQty, maxStack: def.maxStack },
+      nextQty,
+    );
+    if (!nextOffer.ok) return false;
+    this.buyerOffer = { ...offer, qty: nextQty, coins: nextOffer.coins };
+    return true;
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and dialogUi.ts

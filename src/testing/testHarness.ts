@@ -1,6 +1,7 @@
 import type Phaser from "phaser";
 import type { AreaId, EntryId } from "../core/areas";
-import { ITEMS, addItem, getItemCount, removeItem } from "../core/inventory";
+import { ITEMS, addItem, addItemsIfFit, getItemCount, removeItem } from "../core/inventory";
+import { getDialogScript } from "../game/dialog/scripts";
 import { hasFlag, setFlag } from "../services/game/flags";
 import { loadInventory, saveInventory } from "../services/game/inventoryStore";
 import { loadEquipment, saveEquipment } from "../services/game/equipmentStore";
@@ -18,17 +19,22 @@ export type TestHarness = {
   version: string;
   getState: () => TestHarnessState | null;
   getDialogChoiceTexts: () => string[];
+  getDialogHeaderText: () => string | null;
   getBoatAndSailorTiles: () => { boat?: { x: number; y: number; tileIndex?: number }; sailor?: { x: number; y: number; tileIndex?: number } } | null;
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
   teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
   restartInArea: (opts: { areaId: AreaId; entry?: EntryId }) => boolean;
   interactWithChest: (tile: { x: number; y: number }) => boolean;
-    prepareBow: (arrows: number) => boolean;
-    countPlayerArrows: () => number;
-    getEquipment: () => EquipmentState | null;
-    getInventoryCount: (itemId: ItemId) => number;
-    shootBowOnce: () => boolean;
+  openDialog: (scriptId: string) => boolean;
+  openShopConfirm: (itemId: ItemId) => boolean;
+  adjustShopQuantity: (delta: number) => boolean;
+  grantCoins: (qty: number) => boolean;
+  prepareBow: (arrows: number) => boolean;
+  countPlayerArrows: () => number;
+  getEquipment: () => EquipmentState | null;
+  getInventoryCount: (itemId: ItemId) => number;
+  shootBowOnce: () => boolean;
 };
 
 declare global {
@@ -77,6 +83,11 @@ export function installTestHarness(game: Phaser.Game): void {
       const scene = getWorldScene(game) as any;
       if (!scene?.dialogChoiceTexts) return [];
       return scene.dialogChoiceTexts.map((t: any) => t?.text ?? "").filter((t: string) => t.length > 0);
+    },
+    getDialogHeaderText: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.dialogText) return null;
+      return scene.dialogText.text ?? null;
     },
     getBoatAndSailorTiles: () => {
       const scene = getWorldScene(game) as any;
@@ -170,9 +181,13 @@ export function installTestHarness(game: Phaser.Game): void {
         chest.sprite?.setTexture("chest_open");
         chest.sprite?.setDepth(chest.sprite.y);
         const inv = loadInventory();
-        for (const loot of contents.loot) {
-          const def = ITEMS[loot.itemId];
-          addItem(inv, def, loot.qty);
+        const added = addItemsIfFit(
+          inv,
+          contents.loot.map((loot) => ({ item: ITEMS[loot.itemId], qty: loot.qty })),
+        );
+        if (!added.ok) {
+          if (typeof scene.openNpcDialog === "function") scene.openNpcDialog("pouchFull");
+          return true;
         }
         saveInventory(inv);
         if (typeof scene.renderInventoryPanel === "function" && scene.inventoryOpen) scene.renderInventoryPanel();
@@ -180,6 +195,38 @@ export function installTestHarness(game: Phaser.Game): void {
       } else {
         if (typeof scene.openNpcDialog === "function") scene.openNpcDialog(contents.emptyDialog);
       }
+      return true;
+    },
+    openDialog: (scriptId) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.openNpcDialog) return false;
+      scene.openNpcDialog(scriptId);
+      return true;
+    },
+    openShopConfirm: (itemId) => {
+      const scene = getWorldScene(game) as any;
+      const script = getDialogScript("shopkeeper");
+      if (!scene || !script || typeof scene.renderDialog !== "function") return false;
+      scene.pendingPurchaseItemId = itemId;
+      scene.pendingPurchaseQty = 1;
+      scene.shopDialogPage = 0;
+      scene.dialog = { open: true, scriptId: script.id, nodeId: "confirm" };
+      scene.renderDialog(script);
+      return true;
+    },
+    adjustShopQuantity: (delta) => {
+      const scene = getWorldScene(game) as any;
+      const script = getDialogScript("shopkeeper");
+      if (!scene || !script || typeof scene.adjustPurchaseQuantity !== "function") return false;
+      const changed = scene.adjustPurchaseQuantity(delta);
+      if (changed && typeof scene.renderDialog === "function") scene.renderDialog(script);
+      return changed;
+    },
+    grantCoins: (qty) => {
+      if (!Number.isFinite(qty) || qty <= 0) return false;
+      const inv = loadInventory();
+      addItem(inv, ITEMS.coins, Math.floor(qty));
+      saveInventory(inv);
       return true;
     },
     prepareBow: (arrows) => {

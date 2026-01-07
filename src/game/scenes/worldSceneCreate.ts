@@ -39,6 +39,10 @@ export function worldSceneCreate(scene: any): void {
       THREE: Phaser.Input.Keyboard.Key;
       FOUR: Phaser.Input.Keyboard.Key;
     };
+    this.qtyAdjustKeys = this.input.keyboard!.addKeys("UP,DOWN") as {
+      UP: Phaser.Input.Keyboard.Key;
+      DOWN: Phaser.Input.Keyboard.Key;
+    };
 
     this.ensureTilesetTexture();
     // Ensure item textures exist for held-item rendering even in areas that don't spawn items.

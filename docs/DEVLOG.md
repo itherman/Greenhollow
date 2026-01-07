@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-01-09
+- Track dialog quantity control state in the world scene to keep UI cleanup consistent.
+- Add inventory coverage for multi-item add operations that must fully fit.
+
+## 2026-01-08
+- Block item pickups (including chest loot) when the inventory is full so items stay in the world until space opens up.
+- Add quantity controls to shop confirmations for buying or selling multiple items at once.
+- Add a Playwright regression that checks quantity adjustments inside the shop purchase dialog.
+
 ## 2026-01-07
 - Double enemy health pools and attack damage so monsters hit harder and take more punishment across every combat encounter.
 - Shift the river boat and sailor onto the waterline by each dock and hide travel options that point back to the current area.

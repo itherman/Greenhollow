@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ITEMS,
   addItem,
+  addItemIfFits,
+  addItemsIfFit,
   createInventory,
   getItemCount,
   inventoryFromJSON,
@@ -71,6 +73,28 @@ describe("inventory", () => {
     addItem(inv, ITEMS.arrows, 10);
     expect(getItemCount(inv, "arrows")).toBe(25);
   });
+
+  it("rejects additions that do not fully fit", () => {
+    const inv = createInventory(1);
+    expect(addItemIfFits(inv, ITEMS.sword, 1)).toEqual({ ok: true });
+    expect(addItemIfFits(inv, ITEMS.sword, 1)).toEqual({ ok: false, reason: "inventory_full" });
+    expect(inv.slots[0]?.id).toBe("sword");
+  });
+
+  it("rejects multi-item additions that do not fully fit", () => {
+    const inv = createInventory(2);
+    expect(
+      addItemsIfFit(inv, [
+        { item: ITEMS.sword, qty: 1 },
+        { item: ITEMS.rusty_key, qty: 1 },
+      ]),
+    ).toEqual({ ok: true });
+    expect(inv.slots.filter(Boolean)).toHaveLength(2);
+    expect(
+      addItemsIfFit(inv, [
+        { item: ITEMS.sword, qty: 1 },
+        { item: ITEMS.rusty_key, qty: 1 },
+      ]),
+    ).toEqual({ ok: false, reason: "inventory_full" });
+  });
 });
-
-
