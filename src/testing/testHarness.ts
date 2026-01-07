@@ -34,6 +34,7 @@ export type TestHarness = {
   countPlayerArrows: () => number;
   getEquipment: () => EquipmentState | null;
   getInventoryCount: (itemId: ItemId) => number;
+  getInventoryStacks: (itemId: ItemId) => number[];
   shootBowOnce: () => boolean;
 };
 
@@ -271,6 +272,10 @@ export function installTestHarness(game: Phaser.Game): void {
     getInventoryCount: (itemId) => {
       const inv = loadInventory();
       return inv.slots.reduce((sum, s) => (s?.id === itemId ? sum + s.qty : sum), 0);
+    },
+    getInventoryStacks: (itemId) => {
+      const inv = loadInventory();
+      return inv.slots.filter((s) => s?.id === itemId).map((s) => s?.qty ?? 0);
     },
     shootBowOnce: () => {
       const scene = getWorldScene(game) as any;

@@ -136,7 +136,10 @@ export function inventoryFromJSON(raw: string, fallbackSize = 20): Inventory {
       if (typeof s.id !== "string" || typeof s.name !== "string") continue;
       if (typeof s.qty !== "number" || typeof s.maxStack !== "number") continue;
       if (s.qty <= 0 || s.maxStack <= 0) continue;
-      inv.slots[i] = { ...s, qty: Math.min(Math.floor(s.qty), Math.floor(s.maxStack)) };
+      const catalog = (ITEMS as Record<string, Omit<ItemStack, "qty">>)[s.id];
+      const base = catalog ? { ...catalog } : { id: s.id as ItemId, name: s.name, maxStack: s.maxStack };
+      if (!Number.isFinite(base.maxStack) || base.maxStack <= 0) continue;
+      addItem(inv, base, Math.floor(s.qty));
     }
     return inv;
   } catch {
@@ -145,19 +148,19 @@ export function inventoryFromJSON(raw: string, fallbackSize = 20): Inventory {
 }
 
 export const ITEMS: Record<ItemId, Omit<ItemStack, "qty">> = {
-  coins: { id: "coins", name: "Coins", maxStack: 999 },
+  coins: { id: "coins", name: "Coins", maxStack: 999_999 },
   rusty_key: { id: "rusty_key", name: "Rusty Key", maxStack: 1 },
   troll_key: { id: "troll_key", name: "Troll's Key", maxStack: 1 },
   sword: { id: "sword", name: "Sword", maxStack: 1 },
   bow: { id: "bow", name: "Bow", maxStack: 1 },
-  arrows: { id: "arrows", name: "Arrows", maxStack: 999 },
+  arrows: { id: "arrows", name: "Arrows", maxStack: 999_999 },
   dagger: { id: "dagger", name: "Dagger", maxStack: 1 },
   longsword: { id: "longsword", name: "Longsword", maxStack: 1 },
   spear: { id: "spear", name: "Spear", maxStack: 1 },
   warhammer: { id: "warhammer", name: "Warhammer", maxStack: 1 },
-  bread: { id: "bread", name: "Bread", maxStack: 20 },
-  stew: { id: "stew", name: "Stew", maxStack: 10 },
-  herbal_tonic: { id: "herbal_tonic", name: "Herbal Tonic", maxStack: 8 },
+  bread: { id: "bread", name: "Bread", maxStack: 999_999 },
+  stew: { id: "stew", name: "Stew", maxStack: 999_999 },
+  herbal_tonic: { id: "herbal_tonic", name: "Herbal Tonic", maxStack: 999_999 },
   leather_armor: { id: "leather_armor", name: "Leather Armor", maxStack: 1 },
   iron_armor: { id: "iron_armor", name: "Iron Armor", maxStack: 1 },
   scout_boots: { id: "scout_boots", name: "Scout Boots", maxStack: 1 },

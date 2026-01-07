@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-11
+- Normalize saved inventories so stackable items (coins, food, ammo) merge into a single stack up to the 999,999 cap.
+- Hide quantity labels for single-slot gear so weapons and armor no longer show an implied "1".
+- Add a Playwright regression to validate legacy stacks collapse when loading.
+
 ## 2026-01-09
 - Track dialog quantity control state in the world scene to keep UI cleanup consistent.
 - Add inventory coverage for multi-item add operations that must fully fit.

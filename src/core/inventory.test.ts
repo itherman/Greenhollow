@@ -67,6 +67,25 @@ describe("inventory", () => {
     expect(loaded.slots[0]?.qty).toBe(12);
   });
 
+  it("normalizes stacks to catalog limits on load", () => {
+    const raw = JSON.stringify({
+      size: 6,
+      slots: [
+        { id: "coins", name: "Coins", qty: 720, maxStack: 999 },
+        { id: "coins", name: "Coins", qty: 334, maxStack: 999 },
+        { id: "stew", name: "Stew", qty: 3, maxStack: 10 },
+        { id: "stew", name: "Stew", qty: 10, maxStack: 10 },
+      ],
+    });
+    const loaded = inventoryFromJSON(raw, 20);
+    const coinStacks = loaded.slots.filter((s) => s?.id === "coins");
+    const stewStacks = loaded.slots.filter((s) => s?.id === "stew");
+    expect(coinStacks).toHaveLength(1);
+    expect(coinStacks[0]?.qty).toBe(1054);
+    expect(stewStacks).toHaveLength(1);
+    expect(stewStacks[0]?.qty).toBe(13);
+  });
+
   it("counts items across multiple stacks", () => {
     const inv = createInventory(2);
     addItem(inv, ITEMS.arrows, 15);
