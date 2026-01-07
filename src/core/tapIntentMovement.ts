@@ -14,9 +14,8 @@ export function getTapInteractRangePx(kind: TapCandidateKind): number {
   // Chests/NPCs (auto-tap): require being closer than keyboard interact.
   // This makes tapping an NPC feel like you walk up to them before talking.
   if (kind === "chest") return 32 * 1.1;
-  if (kind === "npc") return 28;
+  if (kind === "npc") return 32;
   // Heart pickup is via overlap, not explicit interact.
   return 0;
 }
-
 
