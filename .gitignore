@@ -15,6 +15,11 @@ playwright-report
 playwright-artifacts
 test-results
 
+# Env files (never commit secrets/config)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
