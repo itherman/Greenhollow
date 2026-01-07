@@ -17,6 +17,8 @@ export type TestHarnessState = {
 export type TestHarness = {
   version: string;
   getState: () => TestHarnessState | null;
+  getDialogChoiceTexts: () => string[];
+  getBoatAndSailorTiles: () => { boat?: { x: number; y: number; tileIndex?: number }; sailor?: { x: number; y: number; tileIndex?: number } } | null;
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
   teleportToTileCenter: (tile: { x: number; y: number }) => boolean;
@@ -70,6 +72,31 @@ export function installTestHarness(game: Phaser.Game): void {
         player: scene.player ? { x: scene.player.x, y: scene.player.y } : undefined,
         dialog: scene.dialog,
       } satisfies TestHarnessState;
+    },
+    getDialogChoiceTexts: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.dialogChoiceTexts) return [];
+      return scene.dialogChoiceTexts.map((t: any) => t?.text ?? "").filter((t: string) => t.length > 0);
+    },
+    getBoatAndSailorTiles: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.area) return null;
+      const tileSize = 32;
+      const toTile = (sprite?: { x: number; y: number }) => {
+        if (!sprite) return undefined;
+        const tx = Math.floor(sprite.x / tileSize);
+        const ty = Math.floor(sprite.y / tileSize);
+        const tileIndex = scene.area?.tiles?.[ty]?.[tx];
+        return { x: tx, y: ty, tileIndex };
+      };
+      const boat = scene.boatSprite ? toTile(scene.boatSprite) : undefined;
+      let sailor;
+      if (scene.npcsGroup?.getChildren) {
+        const npcs = scene.npcsGroup.getChildren();
+        const sailorSprite = npcs.find((n: any) => n?.npcDef?.id === "river_sailor");
+        sailor = toTile(sailorSprite);
+      }
+      return { boat, sailor };
     },
     worldToScreen: (world) => {
       const scene = getWorldScene(game);

@@ -96,6 +96,10 @@ export function getTile(area: AreaDef, p: Point): TileId | null {
 
 export function validateArea(area: AreaDef): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
+  const isNpcWalkable = (npc: NpcDef, tile: TileId) => {
+    if (isWalkable(tile)) return true;
+    return npc.id === "river_sailor" && tile === 6;
+  };
 
   if (area.tiles.length !== area.height) errors.push("tiles_height_mismatch");
   for (let y = 0; y < area.height; y++) {
@@ -130,7 +134,7 @@ export function validateArea(area: AreaDef): { ok: true } | { ok: false; errors:
   for (const npc of area.npcs) {
     const t = getTile(area, npc.pos);
     if (t == null) errors.push(`npc_oob_${npc.id}`);
-    else if (!isWalkable(t)) errors.push(`npc_not_walkable_${npc.id}`);
+    else if (!isNpcWalkable(npc, t)) errors.push(`npc_not_walkable_${npc.id}`);
   }
 
   return errors.length ? { ok: false, errors } : { ok: true };
@@ -653,6 +657,7 @@ export function makeTrollBridge(): AreaDef {
 
   const entrySpawn = { x: entryX, y: height - 3 } as const;
   const boatSpawn = { x: boatDock.x, y: boatDock.y } as const;
+  const boatWater = { x: boatDock.x + 1, y: boatDock.y } as const;
   const clearingReturnSpawn = { x: Math.max(width - 5, barrierX + 2), y: bridgeY } as const;
 
   return {
@@ -693,7 +698,7 @@ export function makeTrollBridge(): AreaDef {
         toEntry: "fromTrollBridge",
       },
     ],
-    npcs: [{ id: "river_sailor", name: "Sailor", pos: boatSpawn, dialogScriptId: "riverSailor" }],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: boatWater, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -785,6 +790,7 @@ export function makeRiverVillage(): AreaDef {
   }
 
   const dock = { x: 5, y: height - 4 };
+  const boatWater = { x: dock.x - 1, y: dock.y };
   // Dock path toward the plaza.
   for (let y = dock.y; y >= 2; y--) tiles[y]![dock.x] = 4;
   const plazaY = Math.floor(height / 2);
@@ -854,7 +860,7 @@ export function makeRiverVillage(): AreaDef {
         toEntry: "fromRiverVillage",
       },
     ],
-    npcs: [{ id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" }],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: boatWater, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -879,6 +885,7 @@ export function makeShadowForest(): AreaDef {
   }
 
   const dock = { x: 4, y: height - 3 };
+  const boatWater = { x: dock.x - 1, y: dock.y };
   for (let y = dock.y; y >= 2; y--) tiles[y]![dock.x] = 4;
   const trailY = Math.floor(height * 0.62);
   for (let x = dock.x; x < width - 2; x++) tiles[trailY]![x] = 4;
@@ -933,7 +940,7 @@ export function makeShadowForest(): AreaDef {
         toEntry: "fromShadowForest",
       },
     ],
-    npcs: [{ id: "river_sailor", name: "Sailor", pos: { x: dock.x, y: dock.y }, dialogScriptId: "riverSailor" }],
+    npcs: [{ id: "river_sailor", name: "Sailor", pos: boatWater, dialogScriptId: "riverSailor" }],
   };
 }
 
@@ -1140,9 +1147,9 @@ export function makeRiverStore(): AreaDef {
 }
 
 export const BOAT_ANCHOR_TILES: Partial<Record<AreaId, Point>> = {
-  troll_bridge: { x: 10, y: 4 },
-  river_village: { x: 5, y: 10 },
-  shadow_forest: { x: 4, y: 13 },
+  troll_bridge: { x: 11, y: 4 },
+  river_village: { x: 4, y: 10 },
+  shadow_forest: { x: 3, y: 13 },
 };
 
 export function getArea(areaId: AreaId): AreaDef {
