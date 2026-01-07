@@ -35,6 +35,9 @@ export type AddItemResult =
   | { ok: true; remaining: 0 }
   | { ok: true; remaining: number }
   | { ok: false; reason: "invalid_qty" };
+export type AddItemIfFitsResult =
+  | { ok: true }
+  | { ok: false; reason: "invalid_qty" | "inventory_full" };
 
 export function createInventory(size = 20): Inventory {
   return { size, slots: Array.from({ length: size }, () => null) };
@@ -70,6 +73,31 @@ export function addItem(inv: Inventory, item: Omit<ItemStack, "qty">, qty: numbe
 
   inv.slots = next.slots;
   return { ok: true, remaining };
+}
+
+export function addItemIfFits(inv: Inventory, item: Omit<ItemStack, "qty">, qty: number): AddItemIfFitsResult {
+  if (!Number.isFinite(qty) || qty <= 0) return { ok: false, reason: "invalid_qty" };
+  const next = cloneInventory(inv);
+  const added = addItem(next, item, qty);
+  if (!added.ok) return { ok: false, reason: added.reason };
+  if (added.remaining > 0) return { ok: false, reason: "inventory_full" };
+  inv.slots = next.slots;
+  return { ok: true };
+}
+
+export function addItemsIfFit(
+  inv: Inventory,
+  items: Array<{ item: Omit<ItemStack, "qty">; qty: number }>,
+): AddItemIfFitsResult {
+  const next = cloneInventory(inv);
+  for (const entry of items) {
+    if (!Number.isFinite(entry.qty) || entry.qty <= 0) return { ok: false, reason: "invalid_qty" };
+    const added = addItem(next, entry.item, entry.qty);
+    if (!added.ok) return { ok: false, reason: added.reason };
+    if (added.remaining > 0) return { ok: false, reason: "inventory_full" };
+  }
+  inv.slots = next.slots;
+  return { ok: true };
 }
 
 export function removeItem(inv: Inventory, itemId: ItemId, qty: number): boolean {

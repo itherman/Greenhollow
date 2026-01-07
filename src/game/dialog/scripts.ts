@@ -258,6 +258,14 @@ export const chestEmpty: DialogScript = {
   },
 };
 
+export const pouchFull: DialogScript = {
+  id: "pouchFull",
+  start: "a",
+  nodes: {
+    a: { id: "a", kind: "end", text: "Your pouch is full." },
+  },
+};
+
 export const keyFound: DialogScript = {
   id: "keyFound",
   start: "a",
@@ -379,6 +387,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return arrowsChest;
     case "keyFound":
       return keyFound;
+    case "pouchFull":
+      return pouchFull;
     case "doorLocked":
       return doorLocked;
     case "trollDoorLocked":

@@ -1,3 +1,4 @@
+import Phaser from "phaser";
 import { advanceLine, choose, closeDialog, getNode, type DialogState } from "../../../core/dialog";
 import { computeDialogLayout } from "../../../core/dialogLayout";
 import { computeDialogTapAction } from "../../../core/dialogTap";
@@ -144,7 +145,14 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const pendingItemId = this.pendingPurchaseItemId as ItemId | null;
       const entry = pendingItemId ? getShopEntry(pendingItemId) : null;
       const label = pendingItemId ? ITEMS[pendingItemId]?.name ?? pendingItemId : "that item";
-      header = entry ? `Buy ${label} for ${entry.priceCoins}c?` : `Buy ${label}?`;
+      if (entry) {
+        const qty = this.pendingPurchaseQty ?? 1;
+        const totalQty = entry.grantQty * qty;
+        const totalPrice = entry.priceCoins * qty;
+        header = `Buy ${label} x${totalQty} for ${totalPrice}c?`;
+      } else {
+        header = `Buy ${label}?`;
+      }
     }
     this.dialogText!.setText(header);
 
@@ -153,12 +161,16 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
     this.dialogChoiceBgs = [];
+    for (const o of this.dialogQtyControls ?? []) o.destroy();
+    this.dialogQtyControls = [];
+    for (const ev of this.dialogQtyRepeatEvents ?? []) ev.remove();
+    this.dialogQtyRepeatEvents = [];
 
     if (node.kind === "choice") {
       const baseX = layout.x - layout.w / 2 + layout.padding;
       // Reduce spacing: start choices just below the header text block.
       const headerH = Math.max(18, Math.ceil(this.dialogText!.getBounds().height));
-      const baseY = layout.y - layout.h / 2 + 10 + headerH + 6;
+      let baseY = layout.y - layout.h / 2 + 10 + headerH + 6;
       const lineH = 22;
 
       const MORE_ID = "__more_items__";
@@ -180,6 +192,94 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
             { id: MORE_ID, text: "More items...", next: node.id },
           ];
         }
+      }
+
+      const wantsQtyControl =
+        (isShop && node.id === "confirm" && this.pendingPurchaseItemId) || (isBuyer && node.id === "offer" && this.buyerOffer);
+      if (wantsQtyControl) {
+        const qty =
+          isShop && node.id === "confirm"
+            ? this.pendingPurchaseQty ?? 1
+            : isBuyer && node.id === "offer" && this.buyerOffer
+              ? this.buyerOffer.qty
+              : 1;
+        const rightEdge = layout.x + layout.w / 2 - layout.padding;
+        const btnSize = 18;
+        const minusX = rightEdge - btnSize * 2 - 10;
+        const plusX = rightEdge - btnSize;
+        const controlY = baseY + 2;
+
+        const label = this.add
+          .text(baseX + 10, baseY, `Qty: ${qty}`, {
+            fontFamily: "monospace",
+            fontSize: "13px",
+            color: "#f5d76e",
+          })
+          .setScrollFactor(0)
+          .setDepth(2002);
+        const minusBg = this.add
+          .rectangle(minusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
+          .setStrokeStyle(1, 0x2a3a44, 1)
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2001);
+        const minusText = this.add
+          .text(minusX, controlY + 8, "-", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#e2e8f0",
+          })
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2002);
+        const plusBg = this.add
+          .rectangle(plusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
+          .setStrokeStyle(1, 0x2a3a44, 1)
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2001);
+        const plusText = this.add
+          .text(plusX, controlY + 8, "+", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#e2e8f0",
+          })
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2002);
+
+        const adjustQty = (delta: number) => {
+          const changed = isShop && node.id === "confirm"
+            ? this.adjustPurchaseQuantity(delta)
+            : this.adjustBuyerOfferQuantity(delta);
+          if (changed) this.renderDialog(script);
+        };
+        const attachRepeater = (obj: Phaser.GameObjects.GameObject, delta: number) => {
+          obj.setInteractive({ useHandCursor: true });
+          obj.on("pointerdown", () => {
+            adjustQty(delta);
+            const event = this.time.addEvent({
+              delay: 140,
+              loop: true,
+              callback: () => adjustQty(delta),
+            });
+            this.dialogQtyRepeatEvents.push(event);
+            obj.once("pointerup", () => event.remove());
+            obj.once("pointerout", () => event.remove());
+          });
+        };
+
+        attachRepeater(minusBg, -1);
+        attachRepeater(minusText, -1);
+        attachRepeater(plusBg, 1);
+        attachRepeater(plusText, 1);
+
+        for (const obj of [label, minusBg, minusText, plusBg, plusText] as const) {
+          this.cameras.main.ignore(obj);
+          this.dialogQtyControls.push(obj);
+        }
+
+        baseY += lineH + 4;
       }
 
       for (let i = 0; i < choicesToRender.length; i++) {
@@ -222,6 +322,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
 
           if (isShop && node.id === "menu" && ch.id.startsWith("buy_")) {
             this.pendingPurchaseItemId = ch.id.slice("buy_".length) as ItemId;
+            this.pendingPurchaseQty = 1;
             this.shopDialogPage = 0;
             this.dialog = { open: true, scriptId: script.id, nodeId: "confirm" } as DialogState;
             this.renderDialog(script);
@@ -231,6 +332,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           if (isShop && node.id === "confirm") {
             if (ch.id === "confirm_no") {
               this.pendingPurchaseItemId = null;
+              this.pendingPurchaseQty = 1;
               this.shopDialogPage = 0;
               this.dialog = { open: true, scriptId: script.id, nodeId: "menu" } as DialogState;
               this.renderDialog(script);
@@ -240,7 +342,10 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
               const itemId = this.pendingPurchaseItemId;
               this.pendingPurchaseItemId = null;
               const inv = loadInventory();
-              const res = itemId ? attemptPurchase(inv, itemId) : { ok: false, reason: "unknown_item" as const };
+              const res = itemId
+                ? attemptPurchase(inv, itemId, this.pendingPurchaseQty)
+                : { ok: false, reason: "unknown_item" as const };
+              this.pendingPurchaseQty = 1;
               saveInventory(inv);
               if (this.inventoryOpen) this.renderInventoryPanel();
               const nodeId =
@@ -273,7 +378,11 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
         this.dialogChoiceBgs.push(bg);
       }
 
-      this.dialogChoicesText!.setText("Tap a choice • Tap dialog to close");
+      this.dialogChoicesText!.setText(
+        wantsQtyControl
+          ? "Tap a choice • Tap +/- or use ↑/↓ for qty"
+          : "Tap a choice • Tap dialog to close",
+      );
     } else if (node.kind === "line") {
       this.dialogChoicesText!.setText("Tap dialog to continue");
     } else {
@@ -292,6 +401,10 @@ export function closeDialogUiInWorldScene(scene: any): void {
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
     this.dialogChoiceBgs = [];
+    for (const o of this.dialogQtyControls ?? []) o.destroy();
+    this.dialogQtyControls = [];
+    for (const ev of this.dialogQtyRepeatEvents ?? []) ev.remove();
+    this.dialogQtyRepeatEvents = [];
     this.dialogBox = undefined;
     this.dialogText = undefined;
     this.dialogChoicesText = undefined;

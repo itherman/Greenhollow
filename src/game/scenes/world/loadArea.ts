@@ -6,7 +6,7 @@ import {
   type AreaId,
   type EntryId,
 } from "../../../core/areas";
-import { ITEMS, addItem, removeItem } from "../../../core/inventory";
+import { ITEMS, addItemIfFits, removeItem } from "../../../core/inventory";
 import { applyContactDamage } from "../../../core/combat";
 import { chooseHeartSpawnTile } from "../../../core/heartSpawn";
 import { createRangedState, normalize, tryShoot } from "../../../core/rangedAttack";
@@ -176,13 +176,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       return;
     }
     const inv = loadInventory();
+    let added = { ok: true } as { ok: boolean };
     if (meta.kind === "coins") {
-      addItem(inv, ITEMS.coins, meta.qty);
+      added = addItemIfFits(inv, ITEMS.coins, meta.qty);
     } else if (meta.kind === "food") {
-      addItem(inv, ITEMS[meta.itemId], meta.qty);
+      added = addItemIfFits(inv, ITEMS[meta.itemId], meta.qty);
     } else if (meta.kind === "item") {
-      addItem(inv, ITEMS[meta.itemId], meta.qty);
+      added = addItemIfFits(inv, ITEMS[meta.itemId], meta.qty);
     }
+    if (!added.ok) return;
     saveInventory(inv);
     if (scene.inventoryOpen) scene.renderInventoryPanel();
     drop.destroy();

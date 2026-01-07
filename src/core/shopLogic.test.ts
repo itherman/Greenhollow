@@ -13,10 +13,10 @@ describe("shopLogic", () => {
     const inv = createInventory(5);
     addItem(inv, ITEMS.coins, 999);
     const beforeCoins = getItemCount(inv, "coins");
-    const r = attemptPurchase(inv, "bread");
+    const r = attemptPurchase(inv, "bread", 2);
     expect(r).toEqual({ ok: true });
-    expect(getItemCount(inv, "coins")).toBeLessThan(beforeCoins);
-    expect(getItemCount(inv, "bread")).toBeGreaterThan(0);
+    expect(getItemCount(inv, "coins")).toBe(beforeCoins - 24);
+    expect(getItemCount(inv, "bread")).toBe(2);
   });
 
   it("offers half the catalog value rounded down", () => {
@@ -26,11 +26,11 @@ describe("shopLogic", () => {
 
   it("sells an item from a slot and grants coins", () => {
     const inv = createInventory(5);
-    addItem(inv, ITEMS.bread, 1);
+    addItem(inv, ITEMS.bread, 3);
     const coinsBefore = getItemCount(inv, "coins");
-    const res = attemptSaleFromSlot(inv, 0);
+    const res = attemptSaleFromSlot(inv, 0, 2);
     expect(res.ok).toBe(true);
     expect(getItemCount(inv, "coins")).toBeGreaterThan(coinsBefore);
-    expect(inv.slots.some((s) => s?.id === "bread")).toBe(false);
+    expect(getItemCount(inv, "bread")).toBe(1);
   });
 });
