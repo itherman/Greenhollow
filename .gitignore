@@ -20,6 +20,9 @@ test-results
 .env.*
 !.env.example
 
+# Local one-off tooling files (never commit)
+.git-filter-repo-replacements.txt
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
