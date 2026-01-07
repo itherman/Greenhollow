@@ -69,17 +69,19 @@ export function ensurePeasantPlayerSpriteSheet(scene: Phaser.Scene) {
     fill(ox + 9, oy + 8, 2, 6, tunicD); // left shadow band
     fill(ox + 9, oy + 12, 6, 1, belt);
 
-    // Arms (simple)
+    // Arms (simple, slightly wider so they read through armor)
+    const armY = oy + 9;
+    const armH = 4;
     if (row === 1) {
       // left
-      fill(ox + 8, oy + 9, 1, 4, tunicD);
+      fill(ox + 7, armY, 2, armH, tunicD);
     } else if (row === 2) {
       // right
-      fill(ox + 15, oy + 9, 1, 4, tunicD);
+      fill(ox + 15, armY, 2, armH, tunicD);
     } else {
       // down/up: both sides
-      fill(ox + 8, oy + 9, 1, 4, tunicD);
-      fill(ox + 15, oy + 9, 1, 4, tunicD);
+      fill(ox + 7, armY, 2, armH, tunicD);
+      fill(ox + 15, armY, 2, armH, tunicD);
     }
 
     // Pants
@@ -157,11 +159,11 @@ export function ensurePeasantPlayerBodyArmorSpriteSheets(scene: Phaser.Scene) {
       const oy = row * frameH;
       clearFrame(ox, oy);
 
-      // Torso overlay (matches `ensurePeasantPlayerSpriteSheet` tunic region).
-      fill(ox + 9, oy + 8, 6, 6, colors.main);
-      fill(ox + 9, oy + 8, 2, 6, colors.shadow);
-      // Lower skirt/plates band
-      fill(ox + 9, oy + 13, 6, 1, colors.shadow);
+      // Torso overlay: keep narrower so base tunic + arms stay visible.
+      fill(ox + 10, oy + 9, 4, 4, colors.main);
+      fill(ox + 10, oy + 9, 1, 4, colors.shadow);
+      // Lower skirt/plates band (smaller to avoid covering the tunic hem)
+      fill(ox + 10, oy + 13, 4, 1, colors.shadow);
       // Simple straps (more visible in down/left/right; subtler for up)
       const strapAlpha = row === 3 ? 0.6 : 1;
       ctx.globalAlpha = strapAlpha;
