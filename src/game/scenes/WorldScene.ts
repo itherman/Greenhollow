@@ -1242,7 +1242,7 @@ export class WorldScene extends Phaser.Scene {
       this.dialog = { open: false };
       this.closeDialogUi();
       return true;
-    }
+    } 
 
     const dest =
       choiceId === "sail_river_village"
