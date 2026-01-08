@@ -40,8 +40,8 @@ Use these rules so authenticated players can publish their own presence and read
     "towns": {
       "$townId": {
         "presence": {
+          ".read": "auth != null",
           "$uid": {
-            ".read": "auth != null",
             ".write": "auth != null && auth.uid == $uid"
           }
         }
@@ -60,4 +60,3 @@ Current auth/profile + save system uses:
 
 ## 9) Realtime Database data used today
 - `towns/town/presence/{uid}`: `{ areaId, username, x, y, facing, updatedAtMs, updatedAt }` (town hub presence)
-
