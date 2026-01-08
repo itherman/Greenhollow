@@ -49,8 +49,8 @@ If Firebase is configured and the session mode is `firebase`:
 
 ### Town presence (firebase mode only)
 When a player enters the Town hub:
-- `src/services/game/presence.ts` publishes tile + facing data to `presence/{uid}`.
-- Other clients subscribe to the `presence` collection filtered to `areaId = "town"`.
+- `src/services/game/presence.ts` publishes tile + facing data to Realtime Database at `towns/town/presence/{uid}`.
+- Other clients subscribe to the `towns/town/presence` path and filter locally.
 
 ## Auth model (username + password)
 - The UI collects `username` + `password`.
@@ -61,4 +61,3 @@ When a player enters the Town hub:
 ## Testing strategy
 - Vitest runs in **Node** (`vitest.config.ts`), so code under test should not require `window`.
 - If a module needs storage, prefer injecting a `StorageLike` interface (many modules already do).
-
