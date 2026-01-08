@@ -1,5 +1,6 @@
 export type AreaId =
   | "village"
+  | "town"
   | "woods"
   | "cave"
   | "arcane_keep"
@@ -16,6 +17,7 @@ export type AreaId =
   | "house3"
   | "house4";
 export type EntryId =
+  | "fromTown"
   | "fromVillage"
   | "fromWoods"
   | "fromCave"
@@ -89,6 +91,8 @@ export const VILLAGE_HOUSE_TOP_LEFTS: Point[] = [
   { x: 18, y: 11 },
 ];
 
+export const TOWN_HOUSE_TOP_LEFT: Point = { x: 9, y: 3 };
+
 export function getTile(area: AreaDef, p: Point): TileId | null {
   if (p.x < 0 || p.y < 0 || p.x >= area.width || p.y >= area.height) return null;
   return area.tiles[p.y]?.[p.x] ?? null;
@@ -155,6 +159,7 @@ function borderWalls(width: number, height: number, fill: TileId): TileId[][] {
 
 function fullSpawnMap(p: Point): Record<EntryId, Point> {
   return {
+    fromTown: p,
     fromVillage: p,
     fromWoods: p,
     fromCave: p,
@@ -192,6 +197,8 @@ export function makeVillage(): AreaDef {
 
   // Gate line: slightly below mid so the main path runs in front of top houses.
   const gateY = Math.min(height - 4, Math.max(4, Math.floor(height * 0.6)));
+  // Town gate on the western edge for the multiplayer hub.
+  const townGateY = height - 3;
 
   // House footprints (7x4 each), with a door tile at bottom-center (walkable).
   const doorForHouse = (topLeft: Point) => ({ x: topLeft.x + 3, y: topLeft.y + 3 });
@@ -215,6 +222,10 @@ export function makeVillage(): AreaDef {
   for (let x = 2; x < width; x++) if (tiles[gateY]![x] !== 1) tiles[gateY]![x] = 4;
   // Vertical spur from spawn to the main path.
   for (let y = 2; y <= gateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
+  // Extend the main path down to the town gate.
+  for (let y = gateY; y <= townGateY; y++) if (tiles[y]![2] !== 1) tiles[y]![2] = 4;
+  // Horizontal spur to the western town gate opening.
+  for (let x = 0; x <= 2; x++) if (tiles[townGateY]![x] !== 1) tiles[townGateY]![x] = 4;
 
   // Northward spur toward the troll bridge gate tucked above the houses.
   const trollGateX = Math.max(4, Math.min(width - 5, Math.floor(width * 0.45)));
@@ -264,6 +275,8 @@ export function makeVillage(): AreaDef {
   tiles[gateY]![width - 1] = 4;
   // Carve the troll bridge opening on the north border.
   tiles[0]![trollGateX] = 4;
+  // Carve the town gate opening on the west border.
+  tiles[townGateY]![0] = 4;
 
   return {
     id: "village",
@@ -288,8 +301,15 @@ export function makeVillage(): AreaDef {
       fromHouse3: houseFronts[2]!,
       fromHouse4: houseFronts[3]!,
       fromVillage: { x: 2, y: 2 },
+      fromTown: { x: 1, y: townGateY },
     },
     exits: [
+      {
+        id: "toTown",
+        rect: { x: 0, y: townGateY, w: 1, h: 1 },
+        toArea: "town",
+        toEntry: "fromVillage",
+      },
       {
         id: "toWoods",
         rect: { x: width - 1, y: gateY, w: 1, h: 1 },
@@ -316,6 +336,60 @@ export function makeVillage(): AreaDef {
       { id: "homeowner3", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[2]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[2]!.y + 4 }, dialogScriptId: "homeowner3Advice" },
       { id: "homeowner4", name: "Homeowner", pos: { x: VILLAGE_HOUSE_TOP_LEFTS[3]!.x + 3, y: VILLAGE_HOUSE_TOP_LEFTS[3]!.y + 4 }, dialogScriptId: "homeowner4Advice" },
     ],
+  };
+}
+
+export function makeTown(): AreaDef {
+  const width = 20;
+  const height = 14;
+  const tiles = borderWalls(width, height, 0);
+
+  // Tree border to frame the hub, with an opening carved for the village gate.
+  for (let x = 0; x < width; x++) {
+    tiles[0]![x] = 5;
+    tiles[height - 1]![x] = 5;
+  }
+  for (let y = 0; y < height; y++) {
+    tiles[y]![0] = 5;
+    tiles[y]![width - 1] = 5;
+  }
+
+  const gateY = height - 4;
+  const houseTopLeft = TOWN_HOUSE_TOP_LEFT;
+  const door = { x: houseTopLeft.x + 3, y: houseTopLeft.y + 3 };
+
+  // House footprint (7x4), with door tile kept walkable.
+  for (let y = houseTopLeft.y; y <= houseTopLeft.y + 3; y++) {
+    for (let x = houseTopLeft.x; x <= houseTopLeft.x + 6; x++) {
+      tiles[y]![x] = 1;
+    }
+  }
+  tiles[door.y]![door.x] = 4;
+
+  // Paths from the village gate to the house door.
+  tiles[gateY]![width - 1] = 4;
+  tiles[gateY]![width - 2] = 4;
+  for (let x = door.x; x <= width - 2; x++) tiles[gateY]![x] = 4;
+  for (let y = door.y; y <= gateY; y++) tiles[y]![door.x] = 4;
+
+  const spawnFromVillage = { x: width - 2, y: gateY };
+
+  return {
+    id: "town",
+    name: "Town Hub",
+    width,
+    height,
+    tiles,
+    spawns: fullSpawnMap(spawnFromVillage),
+    exits: [
+      {
+        id: "toVillage",
+        rect: { x: width - 1, y: gateY, w: 1, h: 1 },
+        toArea: "village",
+        toEntry: "fromTown",
+      },
+    ],
+    npcs: [{ id: "town_wanderer", name: "Wanderer", pos: { x: 6, y: gateY - 1 }, dialogScriptId: "villagerGossip" }],
   };
 }
 
@@ -391,6 +465,7 @@ export function makeWoods(): AreaDef {
     height,
     tiles,
     spawns: {
+      fromTown: { x: 2, y: Math.floor(height / 2) },
       fromVillage: { x: 2, y: Math.floor(height / 2) },
       fromCave: { x: width - 4, y: height - 4 },
       fromTrollBridge: { x: 2, y: Math.floor(height / 2) },
@@ -486,6 +561,7 @@ export function makeCave(): AreaDef {
     tiles,
     spawns: {
       fromWoods: { x: 2, y: height - 4 },
+      fromTown: { x: 2, y: height - 4 },
       fromVillage: { x: 2, y: height - 4 },
       fromTrollBridge: { x: 2, y: height - 4 },
       fromTrollClearing: { x: 2, y: height - 4 },
@@ -536,6 +612,7 @@ export function makeHouse(): AreaDef {
     tiles,
     spawns: {
       start: spawnFromVillage,
+      fromTown: spawnFromVillage,
       fromVillage: spawnFromVillage,
       fromWoods: spawnFromVillage,
       fromCave: spawnFromVillage,
@@ -667,6 +744,7 @@ export function makeTrollBridge(): AreaDef {
     height,
     tiles,
     spawns: {
+      fromTown: entrySpawn,
       fromVillage: entrySpawn,
       fromWoods: entrySpawn,
       fromCave: entrySpawn,
@@ -740,6 +818,7 @@ export function makeTrollClearing(): AreaDef {
     height,
     tiles,
     spawns: {
+      fromTown: spawn,
       fromTrollBridge: spawn,
       fromVillage: spawn,
       fromWoods: spawn,
@@ -838,6 +917,7 @@ export function makeRiverVillage(): AreaDef {
       start: spawn,
       fromBoat: spawn,
       fromRiverVillage: spawn,
+      fromTown: spawn,
       fromVillage: spawn,
       fromWoods: spawn,
       fromCave: spawn,
@@ -918,6 +998,7 @@ export function makeShadowForest(): AreaDef {
       start: spawn,
       fromBoat: spawn,
       fromRiverVillage: spawn,
+      fromTown: spawn,
       fromVillage: spawn,
       fromWoods: spawn,
       fromCave: spawn,
@@ -1156,6 +1237,8 @@ export function getArea(areaId: AreaId): AreaDef {
   switch (areaId) {
     case "village":
       return makeVillage();
+    case "town":
+      return makeTown();
     case "woods":
       return makeWoods();
     case "cave":

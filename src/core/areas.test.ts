@@ -3,7 +3,7 @@ import { getArea, validateArea } from "./areas";
 
 describe("areas", () => {
   it("all areas validate", () => {
-    for (const id of ["village", "woods", "cave", "house", "hallway", "store", "river_store", "house1", "house2", "house3", "house4", "troll_bridge", "troll_clearing", "river_village", "shadow_forest", "arcane_keep"] as const) {
+    for (const id of ["village", "town", "woods", "cave", "house", "hallway", "store", "river_store", "house1", "house2", "house3", "house4", "troll_bridge", "troll_clearing", "river_village", "shadow_forest", "arcane_keep"] as const) {
       const area = getArea(id);
       const v = validateArea(area);
       if (v.ok !== true) {
@@ -127,6 +127,17 @@ describe("areas", () => {
       // Main gate line is path across.
       expect(a.tiles[gateY]![doorX]).toBe(4);
     }
+  });
+
+  it("town gate connects to the village entry and the house door sits on the path", () => {
+    const town = getArea("town");
+    const exit = town.exits.find((e) => e.id === "toVillage");
+    expect(exit).toBeTruthy();
+    expect(exit!.toEntry).toBe("fromTown");
+    expect(town.spawns.fromVillage).toEqual({ x: town.width - 2, y: town.height - 4 });
+
+    const door = { x: 12, y: 6 };
+    expect(town.tiles[door.y]![door.x]).toBe(4);
   });
 
   it("cave is a small labyrinth with a single cathedral-like open area plus corridors", () => {
