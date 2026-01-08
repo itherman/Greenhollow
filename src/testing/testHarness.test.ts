@@ -63,7 +63,7 @@ describe("testHarness", () => {
       areaId: "village",
       player: { x: 100, y: 200 },
       dialog: { open: false, scriptId: undefined, nodeId: undefined },
-      townPresence: { active: false, peerCount: 0 },
+      townPresence: { active: false, peerCount: 0, spriteCount: 0 },
     });
   });
 

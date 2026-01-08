@@ -13,7 +13,7 @@ export type TestHarnessState = {
   areaId?: string;
   player?: { x: number; y: number };
   dialog?: { open: boolean; scriptId?: string; nodeId?: string };
-  townPresence?: { active: boolean; peerCount: number };
+  townPresence?: { active: boolean; peerCount: number; spriteCount: number };
 };
 
 export type TestHarness = {
@@ -37,6 +37,14 @@ export type TestHarness = {
   getInventoryCount: (itemId: ItemId) => number;
   getInventoryStacks: (itemId: ItemId) => number[];
   shootBowOnce: () => boolean;
+  setTownPresencePeers: (peers: Array<{
+    uid: string;
+    username: string;
+    x: number;
+    y: number;
+    facing: "up" | "down" | "left" | "right";
+    updatedAtMs: number;
+  }>) => boolean;
 };
 
 declare global {
@@ -79,11 +87,13 @@ export function installTestHarness(game: Phaser.Game): void {
         typeof (scene as any).isTownPresenceActive === "function" ? (scene as any).isTownPresenceActive() : false;
       const townPresencePeers =
         typeof (scene as any).getTownPresencePeers === "function" ? (scene as any).getTownPresencePeers() : [];
+      const townPresenceSprites =
+        typeof (scene as any).getTownPresenceSpriteCount === "function" ? (scene as any).getTownPresenceSpriteCount() : 0;
       return {
         areaId: scene.area?.id,
         player: scene.player ? { x: scene.player.x, y: scene.player.y } : undefined,
         dialog: scene.dialog,
-        townPresence: { active: townPresenceActive, peerCount: townPresencePeers.length },
+        townPresence: { active: townPresenceActive, peerCount: townPresencePeers.length, spriteCount: townPresenceSprites },
       } satisfies TestHarnessState;
     },
     getDialogChoiceTexts: () => {
@@ -305,6 +315,13 @@ export function installTestHarness(game: Phaser.Game): void {
               : { x: 1, y: 0 };
       if (typeof scene.shootPlayerArrow === "function") scene.shootPlayerArrow(dir);
       if (scene.inventoryOpen && typeof scene.renderInventoryPanel === "function") scene.renderInventoryPanel();
+      return true;
+    },
+    setTownPresencePeers: (peers) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene) return false;
+      if (typeof scene.setTownPresencePeersForTest !== "function") return false;
+      scene.setTownPresencePeersForTest(peers);
       return true;
     },
   };

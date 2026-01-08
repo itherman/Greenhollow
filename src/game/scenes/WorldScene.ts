@@ -141,6 +141,7 @@ export class WorldScene extends Phaser.Scene {
   private townPresencePeers: TownPresenceEntry[] = [];
   private lastTownPresencePayload?: TownPresencePayload;
   private lastTownPresencePublishAtMs = 0;
+  private townPresenceSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private inventoryKey!: Phaser.Input.Keyboard.Key;
@@ -1274,6 +1275,7 @@ export class WorldScene extends Phaser.Scene {
     this.townPresencePeers = [];
     this.lastTownPresencePayload = undefined;
     this.lastTownPresencePublishAtMs = 0;
+    this.clearTownPresenceSprites();
     this.townPresenceUnsubscribe = this.townPresence.subscribe((entries) => {
       this.townPresencePeers = entries;
     });
@@ -1289,6 +1291,7 @@ export class WorldScene extends Phaser.Scene {
     this.townPresencePeers = [];
     this.lastTownPresencePayload = undefined;
     this.lastTownPresencePublishAtMs = 0;
+    this.clearTownPresenceSprites();
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and tests
@@ -1299,6 +1302,66 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and tests
   private isTownPresenceActive(): boolean {
     return !!this.townPresence;
+  }
+
+  // @ts-expect-error TS6133 - Used in tests
+  private getTownPresenceSpriteCount(): number {
+    return this.townPresenceSprites.size;
+  }
+
+  // @ts-expect-error TS6133 - Used in tests
+  private setTownPresencePeersForTest(entries: TownPresenceEntry[]): void {
+    this.townPresencePeers = entries;
+    this.syncTownPresenceSprites();
+  }
+
+  private clearTownPresenceSprites(): void {
+    for (const sprite of this.townPresenceSprites.values()) {
+      sprite.destroy();
+    }
+    this.townPresenceSprites.clear();
+  }
+
+  private getPresenceFrame(facing: Exclude<Direction, "none">): number {
+    const row = facing === "down" ? 0 : facing === "left" ? 1 : facing === "right" ? 2 : 3;
+    return row * 4;
+  }
+
+  private syncTownPresenceSprites(): void {
+    if (!this.area || this.area.id !== "town") {
+      this.clearTownPresenceSprites();
+      return;
+    }
+
+    const tileSize = 32;
+    const seen = new Set<string>();
+
+    for (const peer of this.townPresencePeers) {
+      seen.add(peer.uid);
+      let sprite = this.townPresenceSprites.get(peer.uid);
+      if (!sprite || !sprite.active) {
+        sprite?.destroy();
+        sprite = this.add.sprite(0, 0, "player");
+        sprite.setOrigin(0.5, 0.5);
+        sprite.setScale(1);
+        sprite.setAlpha(0.85);
+        this.uiCam?.ignore(sprite);
+        this.townPresenceSprites.set(peer.uid, sprite);
+      }
+
+      const px = (peer.x + 0.5) * tileSize;
+      const py = (peer.y + 0.5) * tileSize;
+      sprite.setPosition(px, py);
+      sprite.setFrame(this.getPresenceFrame(peer.facing));
+      sprite.setDepth(getFeetDepth(sprite as any));
+    }
+
+    for (const [uid, sprite] of this.townPresenceSprites.entries()) {
+      if (!seen.has(uid)) {
+        sprite.destroy();
+        this.townPresenceSprites.delete(uid);
+      }
+    }
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts

@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-01-16
+- Render town presence peers as visible player sprites in the town hub.
+- Extend the Playwright suite with a regression that injects town presence peers and verifies sprites appear.
+
 ## 2026-01-15
 - Allow authenticated reads on the town presence list so players can see each other in the hub.
 
