@@ -17,6 +17,10 @@ export type TownPresenceSnapshotInput = {
 
 const VALID_FACING: ReadonlySet<string> = new Set(["up", "down", "left", "right"]);
 
+export function buildTownPresencePath(townId: string, uid: string): string {
+  return `towns/${townId}/presence/${uid}`;
+}
+
 export function buildTownPresencePayload(input: TownPresenceSnapshotInput): TownPresencePayload {
   const tileX = Math.floor(input.playerX / input.tileSize);
   const tileY = Math.floor(input.playerY / input.tileSize);

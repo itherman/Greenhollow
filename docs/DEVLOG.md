@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-14
+- Move Town presence syncing to Firebase Realtime Database with on-disconnect cleanup.
+- Add a helper to build town presence paths and cover it with unit tests.
+- Document the Realtime Database setup + rules needed for presence.
+
 ## 2026-01-13
 - Add a Town presence service that publishes player tile/facing and listens for other players while in the hub.
 - Wire the town entry/exit flow to start and stop presence updates.

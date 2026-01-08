@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTownPresencePayload, isSameTownPresence, parseTownPresencePayload } from "./presence";
+import { buildTownPresencePath, buildTownPresencePayload, isSameTownPresence, parseTownPresencePayload } from "./presence";
 
 describe("town presence helpers", () => {
   it("builds a payload from player world coords", () => {
@@ -12,6 +12,10 @@ describe("town presence helpers", () => {
     });
 
     expect(payload).toEqual({ x: 3, y: 2, facing: "left", updatedAtMs: 12345 });
+  });
+
+  it("builds a town presence path", () => {
+    expect(buildTownPresencePath("town", "user-1")).toBe("towns/town/presence/user-1");
   });
 
   it("compares presence payloads ignoring timestamps", () => {

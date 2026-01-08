@@ -1,11 +1,13 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getDatabase, type Database } from "firebase/database";
 
 export type FirebaseServices = {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
+  rtdb: Database;
 };
 
 let cached: FirebaseServices | null = null;
@@ -18,6 +20,7 @@ export function hasFirebaseConfig(): boolean {
     VITE_FIREBASE_STORAGE_BUCKET,
     VITE_FIREBASE_MESSAGING_SENDER_ID,
     VITE_FIREBASE_APP_ID,
+    VITE_FIREBASE_DATABASE_URL,
   } = import.meta.env;
 
   return !!(
@@ -26,7 +29,8 @@ export function hasFirebaseConfig(): boolean {
     VITE_FIREBASE_PROJECT_ID &&
     VITE_FIREBASE_STORAGE_BUCKET &&
     VITE_FIREBASE_MESSAGING_SENDER_ID &&
-    VITE_FIREBASE_APP_ID
+    VITE_FIREBASE_APP_ID &&
+    VITE_FIREBASE_DATABASE_URL
   );
 }
 
@@ -40,6 +44,7 @@ export function getFirebase(): FirebaseServices {
     VITE_FIREBASE_STORAGE_BUCKET,
     VITE_FIREBASE_MESSAGING_SENDER_ID,
     VITE_FIREBASE_APP_ID,
+    VITE_FIREBASE_DATABASE_URL,
   } = import.meta.env;
 
   if (!hasFirebaseConfig()) {
@@ -55,15 +60,16 @@ export function getFirebase(): FirebaseServices {
     storageBucket: VITE_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: VITE_FIREBASE_APP_ID,
+    databaseURL: VITE_FIREBASE_DATABASE_URL,
   });
 
   cached = {
     app,
     auth: getAuth(app),
     db: getFirestore(app),
+    rtdb: getDatabase(app),
   };
 
   return cached;
 }
-
 
