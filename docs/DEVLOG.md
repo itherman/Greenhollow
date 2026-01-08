@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-12
+- Add a Town Hub area linked from the village, including a house exterior and wandering NPC.
+- Route town entry through the loading overlay with a minimum one-second display to prep for multiplayer syncing.
+- Add a Playwright regression that walks into town and verifies the hub load experience.
+
 ## 2026-01-11
 - Normalize saved inventories so stackable items (coins, food, ammo) merge into a single stack up to the 999,999 cap.
 - Hide quantity labels for single-slot gear so weapons and armor no longer show an implied "1".

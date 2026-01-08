@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import {
   BOAT_ANCHOR_TILES,
+  TOWN_HOUSE_TOP_LEFT,
   VILLAGE_HOUSE_TOP_LEFTS,
   getArea,
   type AreaId,
@@ -25,6 +26,7 @@ import { ensureArcaneWizardTextures, ensureBoatTexture, ensureChestTextures, ens
 import { addNpcColliders } from "../physicsColliders";
 import { configureStaticPickupBody } from "./arcadeBody";
 import { addBobbingTween } from "./bobbingTween";
+import { withLoadingOverlay } from "../../../ui/loadingOverlay";
 
 /**
  * Loads an area into the running `WorldScene` instance.
@@ -312,6 +314,16 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     }
 
     // Full reset between areas to avoid lingering physics/overlap/input state.
+    if (exitDef.toArea === "town") {
+      scene.suppressExitUntilTs = Date.now() + 1200;
+      void withLoadingOverlay(
+        async () => {
+          scene.scene.restart({ areaId: exitDef.toArea, entry: exitDef.toEntry });
+        },
+        { message: "Syncing with the town hub...", minDurationMs: 1000 },
+      );
+      return;
+    }
     scene.scene.restart({ areaId: exitDef.toArea, entry: exitDef.toEntry });
   });
 
@@ -379,6 +391,15 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       scene.uiCam.ignore(img);
       scene.villageHouses.push(img);
     }
+  }
+
+  if (scene.area.id === "town") {
+    ensureVillageHouseTexture(scene);
+    const houseX = TOWN_HOUSE_TOP_LEFT.x * tileSize + (7 * tileSize) / 2;
+    const houseY = TOWN_HOUSE_TOP_LEFT.y * tileSize + (4 * tileSize) / 2;
+    const img = scene.add.image(houseX, houseY, "prop_house_village");
+    img.setDepth(TOWN_HOUSE_TOP_LEFT.y * tileSize + 4 * tileSize - 2);
+    scene.uiCam.ignore(img);
   }
 
   // House chest
