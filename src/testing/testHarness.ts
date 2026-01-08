@@ -13,6 +13,7 @@ export type TestHarnessState = {
   areaId?: string;
   player?: { x: number; y: number };
   dialog?: { open: boolean; scriptId?: string; nodeId?: string };
+  townPresence?: { active: boolean; peerCount: number };
 };
 
 export type TestHarness = {
@@ -74,10 +75,15 @@ export function installTestHarness(game: Phaser.Game): void {
     getState: () => {
       const scene = getWorldScene(game);
       if (!scene) return null;
+      const townPresenceActive =
+        typeof (scene as any).isTownPresenceActive === "function" ? (scene as any).isTownPresenceActive() : false;
+      const townPresencePeers =
+        typeof (scene as any).getTownPresencePeers === "function" ? (scene as any).getTownPresencePeers() : [];
       return {
         areaId: scene.area?.id,
         player: scene.player ? { x: scene.player.x, y: scene.player.y } : undefined,
         dialog: scene.dialog,
+        townPresence: { active: townPresenceActive, peerCount: townPresencePeers.length },
       } satisfies TestHarnessState;
     },
     getDialogChoiceTexts: () => {

@@ -63,4 +63,39 @@ test.describe("Town hub travel", () => {
     expect(elapsedMs).not.toBeNull();
     expect(elapsedMs).toBeGreaterThanOrEqual(1000);
   });
+
+  test("starts and stops town presence around town visits", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /start/i }).click();
+    await page.getByRole("button", { name: /continue as guest/i }).click();
+
+    const harness = await getHarness(page);
+    const enteredTown = await harness.evaluate((h) => h.restartInArea({ areaId: "town", entry: "start" }));
+    expect(enteredTown).toBe(true);
+
+    await page.waitForFunction(
+      () => window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.areaId === "town",
+      undefined,
+      { timeout: 20_000 },
+    );
+
+    await page.waitForFunction(() => {
+      const state = window.__GREENHOLLOW_TEST_HOOKS__?.getState();
+      return state?.townPresence?.active === true;
+    });
+
+    const exitedTown = await harness.evaluate((h) => h.restartInArea({ areaId: "village", entry: "start" }));
+    expect(exitedTown).toBe(true);
+
+    await page.waitForFunction(
+      () => window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.areaId === "village",
+      undefined,
+      { timeout: 20_000 },
+    );
+
+    await page.waitForFunction(() => {
+      const state = window.__GREENHOLLOW_TEST_HOOKS__?.getState();
+      return state?.townPresence?.active === false;
+    });
+  });
 });

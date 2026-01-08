@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-13
+- Add a Town presence service that publishes player tile/facing and listens for other players while in the hub.
+- Wire the town entry/exit flow to start and stop presence updates.
+- Add core helper tests plus a Playwright regression to confirm presence toggles with town visits.
+
 ## 2026-01-12
 - Add a Town Hub area linked from the village, including a house exterior and wandering NPC.
 - Route town entry through the loading overlay with a minimum one-second display to prep for multiplayer syncing.

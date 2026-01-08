@@ -313,6 +313,10 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
       }
     }
 
+    if (scene.area.id === "town" && exitDef.toArea !== "town") {
+      if (typeof scene.stopTownPresence === "function") scene.stopTownPresence();
+    }
+
     // Full reset between areas to avoid lingering physics/overlap/input state.
     if (exitDef.toArea === "town") {
       scene.suppressExitUntilTs = Date.now() + 1200;
@@ -1179,5 +1183,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   } else {
     scene.swordSprite?.destroy();
     scene.swordSprite = undefined;
+  }
+
+  if (scene.area.id === "town") {
+    if (typeof scene.startTownPresence === "function") scene.startTownPresence();
+  } else if (typeof scene.stopTownPresence === "function") {
+    scene.stopTownPresence();
   }
 }

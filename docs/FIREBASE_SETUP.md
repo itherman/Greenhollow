@@ -31,9 +31,9 @@ Current auth/profile + save system uses:
 - `usernames/{username}`: `{ uid, createdAt }` (enforces unique usernames)
 - `users/{uid}`: `{ username, createdAt }` (created at signup)
 - `users/{uid}.state`: player save state (merged on save so it won’t overwrite `createdAt`)
+- `presence/{uid}`: `{ areaId, username, x, y, facing, updatedAtMs, updatedAt }` (town hub presence)
 
 ## 7) Planned (not implemented yet)
 - `leaderboards/global/scores/{uid}`: `{ username, score, updatedAt }` (global leaderboard)
-
 
 
