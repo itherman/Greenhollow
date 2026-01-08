@@ -1,5 +1,8 @@
 # Devlog
 
+## 2026-01-15
+- Allow authenticated reads on the town presence list so players can see each other in the hub.
+
 ## 2026-01-14
 - Move Town presence syncing to Firebase Realtime Database with on-disconnect cleanup.
 - Add a helper to build town presence paths and cover it with unit tests.
