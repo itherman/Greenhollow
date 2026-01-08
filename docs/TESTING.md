@@ -14,6 +14,8 @@ We avoid brittle tests for rendering. Phaser scenes should be thin wrappers arou
 npm test
 ```
 
+`npm test` runs both the Vitest unit suite and Playwright end-to-end checks. Use `npm run test:unit` or `npm run test:e2e` when you only need one layer.
+
 ```bash
 npm run test:watch
 ```
@@ -45,5 +47,4 @@ npm run test:watch -- -t "movement"
 - `src/core/`: pure functions, reducers/state transitions, validation/normalization.
 - `src/services/`: IO and adapters (localStorage, Firebase). Keep logic thin; push rules down into `src/core/` where possible.
 - `src/game/`: Phaser scenes. Prefer calling into `src/core/` for rules and layout computations.
-
 

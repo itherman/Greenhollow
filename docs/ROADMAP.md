@@ -26,4 +26,9 @@
 - [ ] Save/load (cloud + local)
 - [ ] Basic accessibility and controls remapping
 
+## Milestone: Town multiplayer (alpha)
+- [ ] Tier 1 data model scope: town presence, listings (buy/sell), and trades (player-to-player)
+- [ ] Real-time presence sync (position + facing + sprite)
+- [ ] Town listings board (basic buy/sell loop)
+- [ ] Trade offers UI and state sync
 
