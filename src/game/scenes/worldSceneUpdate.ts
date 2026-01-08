@@ -553,6 +553,7 @@ export function worldSceneUpdate(scene: any): void {
     this.hpText.setText(`HP: ${this.hp}/${this.maxHp}`);
     this.writeProgress(false);
     this.publishTownPresence();
+    this.syncTownPresenceSprites();
 
     // Re-evaluate mobile Attack visibility while playing (enemy proximity changes over time).
     // Throttled to avoid doing extra work every frame.
