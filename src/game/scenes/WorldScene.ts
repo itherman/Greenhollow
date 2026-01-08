@@ -42,6 +42,9 @@ import { closeDialogUiInWorldScene, renderDialogInWorldScene } from "./world/dia
 import { worldSceneUpdate } from "./worldSceneUpdate";
 import { ensureTilesetTexture } from "./worldSceneTilesetTexture";
 import { worldSceneCreate } from "./worldSceneCreate";
+import { loadSession } from "../../services/auth/session";
+import { createTownPresenceSession, type TownPresenceEntry, type TownPresenceSession } from "../../services/game/presence";
+import { buildTownPresencePayload, isSameTownPresence, type TownPresencePayload } from "../../core/presence";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -64,7 +67,6 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private player!: Phaser.Physics.Arcade.Sprite;
-  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
   private facing: Exclude<Direction, "none"> = "down";
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private wasd!: {
@@ -134,6 +136,11 @@ export class WorldScene extends Phaser.Scene {
   private currentEntry: EntryId = "start";
   private lastProgressWriteAtMs = 0;
   private lastHpWritten = -1;
+  private townPresence?: TownPresenceSession;
+  private townPresenceUnsubscribe?: () => void;
+  private townPresencePeers: TownPresenceEntry[] = [];
+  private lastTownPresencePayload?: TownPresencePayload;
+  private lastTownPresencePublishAtMs = 0;
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private inventoryKey!: Phaser.Input.Keyboard.Key;
@@ -1257,6 +1264,60 @@ export class WorldScene extends Phaser.Scene {
     this.closeDialogUi();
     this.scene.restart({ areaId: dest.areaId, entry: dest.entry });
     return true;
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts and worldSceneUpdate.ts
+  private startTownPresence(): void {
+    if (this.townPresence) return;
+    const session = loadSession();
+    this.townPresence = createTownPresenceSession(session);
+    this.townPresencePeers = [];
+    this.lastTownPresencePayload = undefined;
+    this.lastTownPresencePublishAtMs = 0;
+    this.townPresenceUnsubscribe = this.townPresence.subscribe((entries) => {
+      this.townPresencePeers = entries;
+    });
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts and worldSceneUpdate.ts
+  private stopTownPresence(): void {
+    if (!this.townPresence) return;
+    if (this.townPresenceUnsubscribe) this.townPresenceUnsubscribe();
+    this.townPresenceUnsubscribe = undefined;
+    void this.townPresence.stop();
+    this.townPresence = undefined;
+    this.townPresencePeers = [];
+    this.lastTownPresencePayload = undefined;
+    this.lastTownPresencePublishAtMs = 0;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and tests
+  private getTownPresencePeers(): TownPresenceEntry[] {
+    return this.townPresencePeers;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and tests
+  private isTownPresenceActive(): boolean {
+    return !!this.townPresence;
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
+  private publishTownPresence(): void {
+    if (!this.area || this.area.id !== "town") return;
+    if (!this.townPresence) return;
+    const nowMs = Date.now();
+    if (nowMs - this.lastTownPresencePublishAtMs < 250) return;
+    const next = buildTownPresencePayload({
+      playerX: this.player.x,
+      playerY: this.player.y,
+      facing: this.facing,
+      tileSize: 32,
+      nowMs,
+    });
+    if (this.lastTownPresencePayload && isSameTownPresence(this.lastTownPresencePayload, next)) return;
+    this.lastTownPresencePayload = next;
+    this.lastTownPresencePublishAtMs = nowMs;
+    void this.townPresence.publish(next);
   }
 
   update() {

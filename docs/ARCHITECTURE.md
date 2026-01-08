@@ -47,6 +47,11 @@ If Firebase is configured and the session mode is `firebase`:
   - The payload is versioned via `src/core/playerStateCodec.ts` (currently `v: 1`).
   - Writes use Firestore `merge: true` so fields like `createdAt` aren’t overwritten.
 
+### Town presence (firebase mode only)
+When a player enters the Town hub:
+- `src/services/game/presence.ts` publishes tile + facing data to `presence/{uid}`.
+- Other clients subscribe to the `presence` collection filtered to `areaId = "town"`.
+
 ## Auth model (username + password)
 - The UI collects `username` + `password`.
 - Internally, we map the normalized username to a synthetic email: `<username>@game.local` (see `src/core/username.ts`).
@@ -56,5 +61,4 @@ If Firebase is configured and the session mode is `firebase`:
 ## Testing strategy
 - Vitest runs in **Node** (`vitest.config.ts`), so code under test should not require `window`.
 - If a module needs storage, prefer injecting a `StorageLike` interface (many modules already do).
-
 

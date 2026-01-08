@@ -155,6 +155,7 @@ export function worldSceneCreate(scene: any): void {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.onWorldPointerDown) this.input.off("pointerdown", this.onWorldPointerDown);
       if (this.onScaleResize) this.scale.off("resize", this.onScaleResize);
+      if (typeof this.stopTownPresence === "function") this.stopTownPresence();
     });
 
     // Previously: inline handler (kept for reference)

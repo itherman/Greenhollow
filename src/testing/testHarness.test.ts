@@ -63,6 +63,7 @@ describe("testHarness", () => {
       areaId: "village",
       player: { x: 100, y: 200 },
       dialog: { open: false, scriptId: undefined, nodeId: undefined },
+      townPresence: { active: false, peerCount: 0 },
     });
   });
 
@@ -107,4 +108,3 @@ describe("testHarness", () => {
     expect(restarts).toEqual([{ areaId: "troll_clearing", entry: "fromTrollBridge" }]);
   });
 });
-
