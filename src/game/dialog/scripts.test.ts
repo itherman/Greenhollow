@@ -20,6 +20,7 @@ import {
   swordTaken,
   villagerGossip,
   riverSailor,
+  townPlayer,
 } from "./scripts";
 
 describe("dialog scripts", () => {
@@ -87,5 +88,9 @@ describe("dialog scripts", () => {
 
   it("riverSailor validates", () => {
     expect(validateScript(riverSailor)).toEqual({ ok: true });
+  });
+
+  it("townPlayer validates", () => {
+    expect(validateScript(townPlayer)).toEqual({ ok: true });
   });
 });

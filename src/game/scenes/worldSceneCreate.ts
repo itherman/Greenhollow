@@ -151,11 +151,22 @@ export function worldSceneCreate(scene: any): void {
     this.input.off("pointerdown", this.onWorldPointerDown);
     this.input.on("pointerdown", this.onWorldPointerDown);
 
+    if (!this.onDialogWheel) {
+      this.onDialogWheel = (_pointer, _gameObjects, _dx, dy) => {
+        if (typeof this.handleDialogWheel === "function") this.handleDialogWheel(dy);
+      };
+    }
+    this.input.off("wheel", this.onDialogWheel);
+    this.input.on("wheel", this.onDialogWheel);
+
     // Ensure we detach global listeners on shutdown to avoid stale callbacks during restart.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.onWorldPointerDown) this.input.off("pointerdown", this.onWorldPointerDown);
+      if (this.onDialogWheel) this.input.off("wheel", this.onDialogWheel);
       if (this.onScaleResize) this.scale.off("resize", this.onScaleResize);
       if (typeof this.stopTownPresence === "function") this.stopTownPresence();
+      if (typeof this.stopTownChat === "function") this.stopTownChat();
+      if (typeof this.stopTownTrade === "function") this.stopTownTrade();
     });
 
     // Previously: inline handler (kept for reference)
