@@ -7,7 +7,7 @@ import {
 } from "../../core/dialog";
 import { getDialogScript } from "../dialog/scripts";
 import { clearFlags, hasFlag, setFlag } from "../../services/game/flags";
-import { ITEMS, addItemIfFits, addItemsIfFit, getItemCount, type ItemId } from "../../core/inventory";
+import { ITEMS, addItem, addItemIfFits, addItemsIfFit, cloneInventory, getItemCount, removeItem, type ItemId } from "../../core/inventory";
 import { clearInventory, loadInventory, saveInventory } from "../../services/game/inventoryStore";
 import { ensureItemAndPropTextures } from "../art/sprites";
 import { createExitGate, type TilePos } from "../../core/exitGate";
@@ -28,6 +28,7 @@ import { computePouchIconLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild } from "../../core/pouchUi";
 import { getArmorBonus, getShopEntry, isMeleeWeapon } from "../../core/shopCatalog";
 import { attemptSaleFromSlot, getSellOfferForQty } from "../../core/shopLogic";
+import { attemptTradePurchase } from "../../core/trade";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { getEnemyDefinition, type EnemyId } from "../../core/enemies";
@@ -45,6 +46,10 @@ import { worldSceneCreate } from "./worldSceneCreate";
 import { loadSession } from "../../services/auth/session";
 import { createTownPresenceSession, type TownPresenceEntry, type TownPresenceSession } from "../../services/game/presence";
 import { buildTownPresencePayload, isSameTownPresence, type TownPresencePayload } from "../../core/presence";
+import { applyArmorVisuals } from "./world/equipmentVisuals";
+import { renderHeldItem } from "./world/heldItemRendering";
+import { createTownChatSession, type TownChatMessage, type TownChatSession } from "../../services/game/townChat";
+import { createTownTradeSession, type TownTradeListing, type TownTradeSale, type TownTradeSession } from "../../services/game/townTrade";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -61,6 +66,14 @@ type ChestContents = {
   openedDialog: string;
   emptyDialog: string;
   resetOnAreaLoad?: boolean;
+};
+
+type TownPresenceSpriteBundle = {
+  base: Phaser.GameObjects.Sprite;
+  head?: Phaser.GameObjects.Sprite;
+  body?: Phaser.GameObjects.Sprite;
+  legs?: Phaser.GameObjects.Sprite;
+  held?: Phaser.GameObjects.Sprite;
 };
 
 export class WorldScene extends Phaser.Scene {
@@ -114,6 +127,12 @@ export class WorldScene extends Phaser.Scene {
   private dialogChoicesText?: Phaser.GameObjects.Text;
   // @ts-expect-error TS6133 - Used in dialogUi.ts
   private shopCoinsText?: Phaser.GameObjects.Text;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  private dialogChatText?: Phaser.GameObjects.Text;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  private dialogChatMaskRect?: Phaser.GameObjects.Rectangle;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  private dialogChatMask?: Phaser.Display.Masks.GeometryMask;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
   // @ts-expect-error TS6133 - Used in dialogUi.ts
@@ -141,7 +160,23 @@ export class WorldScene extends Phaser.Scene {
   private townPresencePeers: TownPresenceEntry[] = [];
   private lastTownPresencePayload?: TownPresencePayload;
   private lastTownPresencePublishAtMs = 0;
-  private townPresenceSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private townPresenceSprites: Map<string, TownPresenceSpriteBundle> = new Map();
+  private townChat?: TownChatSession;
+  private townChatUnsubscribe?: () => void;
+  private townChatMessages: TownChatMessage[] = [];
+  private townChatScrollOffset = 0;
+  private townChatScrollMax = 0;
+  private townChatAutoScroll = true;
+  private townTrade?: TownTradeSession;
+  private townTradeListings: TownTradeListing[] = [];
+  private townTradeUnsubscribe?: () => void;
+  private townTradeSalesUnsubscribe?: () => void;
+  private tradeDialogPage = 0;
+  private tradeSelectionActive = false;
+  private tradeOffer:
+    | { slotIndex: number; coins: number; itemName: string; qty: number; maxQty: number; itemId: ItemId }
+    | null = null;
+  private townPlayerTarget?: { uid: string; username: string };
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private inventoryKey!: Phaser.Input.Keyboard.Key;
@@ -219,6 +254,14 @@ export class WorldScene extends Phaser.Scene {
   private onWorldPointerDown?: (pointer: Phaser.Input.Pointer) => void;
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
   private onScaleResize?: (gameSize: Phaser.Structs.Size) => void;
+  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
+  private onDialogWheel?: (
+    pointer: Phaser.Input.Pointer,
+    gameObjects: Phaser.GameObjects.GameObject[],
+    deltaX: number,
+    deltaY: number,
+    deltaZ: number,
+  ) => void;
   private mobileUi?: {
     attackHit: Phaser.GameObjects.Rectangle;
     attackBg: Phaser.GameObjects.Rectangle;
@@ -406,6 +449,14 @@ export class WorldScene extends Phaser.Scene {
       return true;
     };
 
+    const tryPeer = () => {
+      if (!this.area || this.area.id !== "town") return false;
+      const peer = this.findTownPresencePeer(targetId);
+      if (!peer) return false;
+      this.openTownPlayerDialog(peer);
+      return true;
+    };
+
     const ordered: Array<() => boolean> =
       prefer === "key"
         ? [tryKey]
@@ -413,15 +464,41 @@ export class WorldScene extends Phaser.Scene {
           ? [trySword]
           : prefer === "bow"
             ? [tryBow]
-          : prefer === "chest"
-            ? [tryChest]
-            : prefer === "npc"
-              ? [tryNpc]
-              : // default priority
-              [tryKey, trySword, tryBow, tryChest, tryNpc];
+            : prefer === "chest"
+              ? [tryChest]
+              : prefer === "npc"
+                ? [tryNpc]
+                : prefer === "peer"
+                  ? [tryPeer]
+                  : // default priority
+              [tryKey, trySword, tryBow, tryChest, tryPeer, tryNpc];
 
     for (const fn of ordered) if (fn()) return true;
     return false;
+  }
+
+  private findTownPresencePeer(targetId?: string): TownPresenceEntry | null {
+    if (!this.townPresencePeers.length) return null;
+    const tileSize = 32;
+    const playerPos = { x: this.player.x, y: this.player.y };
+    const rangePx = getTapInteractRangePx("peer");
+    const range2 = rangePx * rangePx;
+    let best: TownPresenceEntry | null = null;
+    let bestD2 = Number.POSITIVE_INFINITY;
+    for (const peer of this.townPresencePeers) {
+      if (targetId && peer.uid !== targetId) continue;
+      const px = (peer.x + 0.5) * tileSize;
+      const py = (peer.y + 0.5) * tileSize;
+      const dx = px - playerPos.x;
+      const dy = py - playerPos.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > range2) continue;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = peer;
+      }
+    }
+    return best;
   }
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
@@ -861,6 +938,7 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
   private getTapCandidates() {
     const out: { kind: TapCandidateKind; x: number; y: number; id?: string }[] = [];
+    const tileSize = 32;
     if (this.heartSprite?.active) out.push({ kind: "heart", x: this.heartSprite.x, y: this.heartSprite.y });
     if (this.keySprite?.active) out.push({ kind: "key", x: this.keySprite.x, y: this.keySprite.y });
     if (this.swordSprite?.active) out.push({ kind: "sword", x: this.swordSprite.x, y: this.swordSprite.y });
@@ -874,6 +952,16 @@ export class WorldScene extends Phaser.Scene {
         const npcDef = (s as any).npcDef as { dialogScriptId?: string } | undefined;
         if (!npcDef?.dialogScriptId) continue;
         out.push({ kind: "npc", x: s.x, y: s.y, id: npcDef.dialogScriptId });
+      }
+    }
+    if (this.area?.id === "town") {
+      for (const peer of this.townPresencePeers) {
+        out.push({
+          kind: "peer",
+          x: (peer.x + 0.5) * tileSize,
+          y: (peer.y + 0.5) * tileSize,
+          id: peer.uid,
+        });
       }
     }
     return out;
@@ -988,6 +1076,44 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private handleInventorySlotClick(slotIndex: number): boolean {
+    if (this.tradeSelectionActive && this.dialog.open && this.dialog.scriptId === "townPlayer") {
+      const inv = loadInventory();
+      const slot = inv.slots[slotIndex];
+      this.tradeSelectionActive = false;
+      this.inventoryOpen = false;
+      this.renderInventoryPanel();
+
+      const script = getDialogScript("townPlayer");
+      if (!script) return false;
+
+      if (!slot) {
+        this.tradeOffer = null;
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
+        this.renderDialog(script);
+        return true;
+      }
+
+      const offer = getSellOfferForQty(slot, slot.qty);
+      if (!offer.ok) {
+        this.tradeOffer = null;
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoValue" };
+        this.renderDialog(script);
+        return true;
+      }
+
+      this.tradeOffer = {
+        slotIndex,
+        coins: offer.coins,
+        itemName: slot.name,
+        qty: slot.qty,
+        maxQty: slot.qty,
+        itemId: slot.id,
+      };
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeOffer" };
+      this.renderDialog(script);
+      return true;
+    }
+
     if (!this.buyerSelectionActive || !this.dialog.open || this.dialog.scriptId !== "buyerNpc") return false;
 
     const inv = loadInventory();
@@ -1028,6 +1154,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getInventoryHint(inv: ReturnType<typeof loadInventory>): string | null {
+    if (this.tradeSelectionActive && this.dialog.open && this.dialog.scriptId === "townPlayer") {
+      const hasItem = inv.slots.some(Boolean);
+      return hasItem ? "Tap an item to list for trade." : "Your pouch is empty.";
+    }
     if (this.buyerSelectionActive && this.dialog.open && this.dialog.scriptId === "buyerNpc") {
       const hasItem = inv.slots.some(Boolean);
       return hasItem ? "Tap an item to offer for sale." : "Your pouch is empty.";
@@ -1142,17 +1272,101 @@ export class WorldScene extends Phaser.Scene {
     this.pendingPurchaseItemId = null;
     this.pendingPurchaseQty = 1;
     this.resetBuyerFlow();
+    this.resetTradeFlow();
     this.dialog = openDialog(script);
     this.renderDialog(script);
   }
 
+  private openTownPlayerDialog(peer: TownPresenceEntry) {
+    const script = getDialogScript("townPlayer");
+    if (!script) return;
+    this.townPlayerTarget = { uid: peer.uid, username: peer.username };
+    if (this.inventoryOpen) {
+      this.inventoryOpen = false;
+      this.renderInventoryPanel();
+    }
+    this.tapTarget = undefined;
+    this.tapIntent = undefined;
+    this.shopDialogPage = 0;
+    this.pendingPurchaseItemId = null;
+    this.pendingPurchaseQty = 1;
+    this.resetBuyerFlow();
+    this.resetTradeFlow();
+    this.townChatAutoScroll = true;
+    this.dialog = openDialog(script);
+    this.renderDialog(script);
+  }
+
+  private adjustTownChatScroll(delta: number): void {
+    if (!Number.isFinite(delta)) return;
+    const next = Math.max(0, Math.min(this.townChatScrollMax, this.townChatScrollOffset + delta));
+    if (next === this.townChatScrollOffset) return;
+    this.townChatScrollOffset = next;
+    this.townChatAutoScroll = false;
+  }
+
+  private handleDialogWheel(deltaY: number): void {
+    if (!this.dialog.open) return;
+    const script = getDialogScript(this.dialog.scriptId);
+    if (!script || script.id !== "townPlayer") return;
+    if (this.dialog.nodeId !== "chat") return;
+    this.adjustTownChatScroll(deltaY);
+    this.renderDialog(script);
+  }
+
   private renderDialog(script: NonNullable<ReturnType<typeof getDialogScript>>) {
+    if (script.id === "townPlayer") this.updateTownPlayerDialog(script);
     renderDialogInWorldScene(this as any, script);
+  }
+
+  private updateTownPlayerDialog(script: NonNullable<ReturnType<typeof getDialogScript>>): void {
+    if (script.id !== "townPlayer") return;
+    const targetName = this.townPlayerTarget?.username ?? "Traveler";
+    const menuNode = script.nodes.menu;
+    if (menuNode && menuNode.kind === "choice") {
+      menuNode.text = `You see ${targetName}.`;
+    }
+
+    const tradeMenu = script.nodes.tradeMenu;
+    if (tradeMenu && tradeMenu.kind === "choice") {
+      tradeMenu.text = `Trade with ${targetName}.`;
+    }
+
+    const chatNode = script.nodes.chat;
+    if (chatNode && chatNode.kind === "choice") {
+      chatNode.text = "Town chat";
+    }
+
+    const browseNode = script.nodes.tradeBrowse;
+    if (browseNode && browseNode.kind === "choice") {
+      if (!this.townTradeListings.length) {
+        browseNode.text = "No listings available right now.";
+        browseNode.choices = [{ id: "trade_back", text: "Back", next: "tradeMenu" }];
+        return;
+      }
+
+      const sessionUid = loadSession()?.uid;
+      browseNode.text = "Listings in town:";
+      browseNode.choices = [
+        ...this.townTradeListings.map((listing) => {
+          const label = `${ITEMS[listing.itemId]?.name ?? listing.itemId} x${listing.qty} • ${listing.price}c (${listing.sellerName})`;
+          const mine = sessionUid ? listing.sellerUid === sessionUid : false;
+          return {
+            id: `${mine ? "trade_cancel" : "trade_buy"}_${listing.id}`,
+            text: mine ? `Cancel: ${label}` : `Buy: ${label}`,
+            next: "tradeBrowse",
+          };
+        }),
+        { id: "trade_back", text: "Back", next: "tradeMenu" },
+      ];
+    }
   }
 
   private closeDialogUi() {
     closeDialogUiInWorldScene(this as any);
     this.resetBuyerFlow();
+    this.resetTradeFlow();
+    this.townPlayerTarget = undefined;
   }
 
   private resetBuyerFlow() {
@@ -1169,6 +1383,23 @@ export class WorldScene extends Phaser.Scene {
     this.buyerOffer = null;
     this.inventoryOpen = true;
     this.renderInventoryPanel();
+  }
+
+  private startTradeSelection() {
+    this.tradeSelectionActive = true;
+    this.tradeOffer = null;
+    this.inventoryOpen = true;
+    this.renderInventoryPanel();
+  }
+
+  private resetTradeFlow() {
+    if (this.tradeSelectionActive && this.inventoryOpen) {
+      this.inventoryOpen = false;
+      this.renderInventoryPanel();
+    }
+    this.tradeSelectionActive = false;
+    this.tradeOffer = null;
+    this.tradeDialogPage = 0;
   }
 
   // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
@@ -1212,6 +1443,170 @@ export class WorldScene extends Phaser.Scene {
     return false;
   }
 
+  private async submitTradeListing(offer: NonNullable<typeof this.tradeOffer>): Promise<void> {
+    const inv = loadInventory();
+    const removed = removeItem(inv, offer.itemId, offer.qty);
+    if (!removed) {
+      const script = getDialogScript("townPlayer");
+      if (script) {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoValue" };
+        this.renderDialog(script);
+      }
+      return;
+    }
+    saveInventory(inv);
+    if (this.inventoryOpen) this.renderInventoryPanel();
+
+    const listingId = await this.townTrade?.createListing({
+      itemId: offer.itemId,
+      qty: offer.qty,
+      price: offer.coins,
+    });
+    if (!listingId) {
+      addItem(inv, ITEMS[offer.itemId], offer.qty);
+      saveInventory(inv);
+      if (this.inventoryOpen) this.renderInventoryPanel();
+      const script = getDialogScript("townPlayer");
+      if (script) {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeError" };
+        this.renderDialog(script);
+      }
+      return;
+    }
+
+    const script = getDialogScript("townPlayer");
+    if (script) {
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeListed" };
+      this.renderDialog(script);
+    }
+  }
+
+  private async purchaseTradeListing(listingId: string): Promise<void> {
+    const listing = this.townTradeListings.find((l) => l.id === listingId);
+    const script = getDialogScript("townPlayer");
+    if (!listing || !script) {
+      if (script) {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeUnavailable" };
+        this.renderDialog(script);
+      }
+      return;
+    }
+
+    const inv = loadInventory();
+    const staged = cloneInventory(inv);
+    const res = attemptTradePurchase(staged, listing.itemId, listing.qty, listing.price);
+    if (!res.ok) {
+      const nodeId = res.reason === "insufficient_coins" ? "tradeNoCoins" : "tradeNoSpace";
+      this.dialog = { open: true, scriptId: script.id, nodeId };
+      this.renderDialog(script);
+      return;
+    }
+
+    const claimed = await this.townTrade?.claimListing(listingId);
+    if (!claimed) {
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeUnavailable" };
+      this.renderDialog(script);
+      return;
+    }
+
+    inv.slots = staged.slots;
+    saveInventory(inv);
+    if (this.inventoryOpen) this.renderInventoryPanel();
+    this.dialog = { open: true, scriptId: script.id, nodeId: "tradeBought" };
+    this.renderDialog(script);
+  }
+
+  private async cancelTradeListing(listingId: string): Promise<void> {
+    const script = getDialogScript("townPlayer");
+    const listing = this.townTradeListings.find((l) => l.id === listingId);
+    if (!listing || !script) return;
+    const inv = loadInventory();
+    const added = addItemIfFits(inv, ITEMS[listing.itemId], listing.qty);
+    if (!added.ok) {
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoSpace" };
+      this.renderDialog(script);
+      return;
+    }
+    saveInventory(inv);
+    if (this.inventoryOpen) this.renderInventoryPanel();
+    await this.townTrade?.cancelListing(listingId);
+    this.dialog = { open: true, scriptId: script.id, nodeId: "tradeCancelled" };
+    this.renderDialog(script);
+  }
+
+  private handleTownPlayerChoice(choiceId: string, script: NonNullable<ReturnType<typeof getDialogScript>>): boolean {
+    if (script.id !== "townPlayer") return false;
+
+    if (choiceId === "chat") {
+      this.townChatAutoScroll = true;
+      return false;
+    }
+
+    if (choiceId === "chat_back") return false;
+
+    if (choiceId.startsWith("chat_")) {
+      const text =
+        choiceId === "chat_hello"
+          ? "Hello!"
+          : choiceId === "chat_trade"
+            ? "Looking to trade?"
+            : choiceId === "chat_party"
+              ? "Anyone up for a quest?"
+              : null;
+      if (text) void this.townChat?.sendMessage(text);
+      this.dialog = { open: true, scriptId: script.id, nodeId: "chat" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    if (choiceId === "trade_list") {
+      this.startTradeSelection();
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    if (choiceId === "trade_offer_pick") {
+      this.startTradeSelection();
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    if (choiceId === "trade_offer_list") {
+      const offer = this.tradeOffer;
+      this.resetTradeFlow();
+      if (!offer) {
+        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeMenu" };
+        this.renderDialog(script);
+        return true;
+      }
+      void this.submitTradeListing(offer);
+      return true;
+    }
+
+    if (choiceId === "trade_browse") {
+      this.tradeDialogPage = 0;
+      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeBrowse" };
+      this.renderDialog(script);
+      return true;
+    }
+
+    if (choiceId.startsWith("trade_buy_")) {
+      const listingId = choiceId.replace("trade_buy_", "");
+      void this.purchaseTradeListing(listingId);
+      return true;
+    }
+
+    if (choiceId.startsWith("trade_cancel_")) {
+      const listingId = choiceId.replace("trade_cancel_", "");
+      void this.cancelTradeListing(listingId);
+      return true;
+    }
+
+    return false;
+  }
+
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and dialogUi.ts
   private adjustPurchaseQuantity(delta: number): boolean {
     if (!this.pendingPurchaseItemId) return false;
@@ -1241,6 +1636,22 @@ export class WorldScene extends Phaser.Scene {
     );
     if (!nextOffer.ok) return false;
     this.buyerOffer = { ...offer, qty: nextQty, coins: nextOffer.coins };
+    return true;
+  }
+
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
+  private adjustTradeOfferQuantity(delta: number): boolean {
+    const offer = this.tradeOffer;
+    if (!offer) return false;
+    const nextQty = Math.max(1, Math.min(offer.maxQty, offer.qty + delta));
+    if (nextQty === offer.qty) return false;
+    const def = ITEMS[offer.itemId];
+    const nextOffer = getSellOfferForQty(
+      { id: offer.itemId, name: offer.itemName, qty: offer.maxQty, maxStack: def.maxStack },
+      nextQty,
+    );
+    if (!nextOffer.ok) return false;
+    this.tradeOffer = { ...offer, qty: nextQty, coins: nextOffer.coins };
     return true;
   }
 
@@ -1294,6 +1705,83 @@ export class WorldScene extends Phaser.Scene {
     this.clearTownPresenceSprites();
   }
 
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private startTownChat(): void {
+    if (this.townChat) return;
+    const session = loadSession();
+    this.townChat = createTownChatSession(session);
+    this.townChatMessages = [];
+    this.townChatScrollOffset = 0;
+    this.townChatScrollMax = 0;
+    this.townChatAutoScroll = true;
+    this.townChatUnsubscribe = this.townChat.subscribe((messages) => {
+      this.townChatMessages = messages;
+      if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
+        const script = getDialogScript("townPlayer");
+        if (script) this.renderDialog(script);
+      }
+    });
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private stopTownChat(): void {
+    if (!this.townChat) return;
+    if (this.townChatUnsubscribe) this.townChatUnsubscribe();
+    this.townChatUnsubscribe = undefined;
+    void this.townChat.stop();
+    this.townChat = undefined;
+    this.townChatMessages = [];
+    this.townChatScrollOffset = 0;
+    this.townChatScrollMax = 0;
+    this.townChatAutoScroll = true;
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private startTownTrade(): void {
+    if (this.townTrade) return;
+    const session = loadSession();
+    this.townTrade = createTownTradeSession(session);
+    this.townTradeListings = [];
+    this.townTradeUnsubscribe = this.townTrade.subscribeListings((listings) => {
+      this.townTradeListings = listings;
+      if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
+        const script = getDialogScript("townPlayer");
+        if (script) this.renderDialog(script);
+      }
+    });
+    this.townTradeSalesUnsubscribe = this.townTrade.subscribeSales((sales) => {
+      this.handleTownTradeSales(sales);
+    });
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private stopTownTrade(): void {
+    if (!this.townTrade) return;
+    if (this.townTradeUnsubscribe) this.townTradeUnsubscribe();
+    if (this.townTradeSalesUnsubscribe) this.townTradeSalesUnsubscribe();
+    this.townTradeUnsubscribe = undefined;
+    this.townTradeSalesUnsubscribe = undefined;
+    void this.townTrade.stop();
+    this.townTrade = undefined;
+    this.townTradeListings = [];
+  }
+
+  private handleTownTradeSales(sales: TownTradeSale[]): void {
+    if (!sales.length) return;
+    const inv = loadInventory();
+    let updated = false;
+    for (const sale of sales) {
+      const added = addItem(inv, ITEMS.coins, sale.price);
+      if (!added.ok || added.remaining > 0) continue;
+      updated = true;
+      void this.townTrade?.acknowledgeSale(sale.id);
+    }
+    if (updated) {
+      saveInventory(inv);
+      if (this.inventoryOpen) this.renderInventoryPanel();
+    }
+  }
+
   // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts and tests
   private getTownPresencePeers(): TownPresenceEntry[] {
     return this.townPresencePeers;
@@ -1315,9 +1803,30 @@ export class WorldScene extends Phaser.Scene {
     this.syncTownPresenceSprites();
   }
 
+  // @ts-expect-error TS6133 - Used in tests
+  private setTownChatMessagesForTest(messages: TownChatMessage[]): void {
+    this.townChatMessages = messages;
+    this.townChatAutoScroll = true;
+  }
+
+  // @ts-expect-error TS6133 - Used in tests
+  private setTownTradeListingsForTest(listings: TownTradeListing[]): void {
+    this.townTradeListings = listings;
+  }
+
+  // @ts-expect-error TS6133 - Used in tests
+  private openTownPlayerDialogForTest(peer: { uid: string; username: string }): void {
+    this.townPlayerTarget = { uid: peer.uid, username: peer.username };
+    this.openTownPlayerDialog({ ...peer, x: 0, y: 0, facing: "down", updatedAtMs: Date.now() } as TownPresenceEntry);
+  }
+
   private clearTownPresenceSprites(): void {
-    for (const sprite of this.townPresenceSprites.values()) {
-      sprite.destroy();
+    for (const bundle of this.townPresenceSprites.values()) {
+      bundle.base.destroy();
+      bundle.head?.destroy();
+      bundle.body?.destroy();
+      bundle.legs?.destroy();
+      bundle.held?.destroy();
     }
     this.townPresenceSprites.clear();
   }
@@ -1338,27 +1847,75 @@ export class WorldScene extends Phaser.Scene {
 
     for (const peer of this.townPresencePeers) {
       seen.add(peer.uid);
-      let sprite = this.townPresenceSprites.get(peer.uid);
-      if (!sprite || !sprite.active) {
-        sprite?.destroy();
-        sprite = this.add.sprite(0, 0, "player");
-        sprite.setOrigin(0.5, 0.5);
-        sprite.setScale(1);
-        sprite.setAlpha(0.85);
-        this.uiCam?.ignore(sprite);
-        this.townPresenceSprites.set(peer.uid, sprite);
+      let bundle = this.townPresenceSprites.get(peer.uid);
+      if (!bundle || !bundle.base.active) {
+        bundle?.base.destroy();
+        bundle?.head?.destroy();
+        bundle?.body?.destroy();
+        bundle?.legs?.destroy();
+        bundle?.held?.destroy();
+        const base = this.add.sprite(0, 0, "player");
+        base.setOrigin(0.5, 0.5);
+        base.setScale(1);
+        base.setAlpha(0.85);
+        this.uiCam?.ignore(base);
+
+        const body = this.add.sprite(0, 0, "player_armor_body_leather");
+        body.setOrigin(0.5, 0.5).setScale(1).setAlpha(0.85).setVisible(false);
+        const head = this.add.sprite(0, 0, "player_armor_head_mythril");
+        head.setOrigin(0.5, 0.5).setScale(1).setAlpha(0.85).setVisible(false);
+        const legs = this.add.sprite(0, 0, "player_armor_legs_mythril");
+        legs.setOrigin(0.5, 0.5).setScale(1).setAlpha(0.85).setVisible(false);
+        this.uiCam?.ignore(body);
+        this.uiCam?.ignore(head);
+        this.uiCam?.ignore(legs);
+
+        bundle = { base, body, head, legs };
+        this.townPresenceSprites.set(peer.uid, bundle);
       }
 
       const px = (peer.x + 0.5) * tileSize;
       const py = (peer.y + 0.5) * tileSize;
-      sprite.setPosition(px, py);
-      sprite.setFrame(this.getPresenceFrame(peer.facing));
-      sprite.setDepth(getFeetDepth(sprite as any));
+      const base = bundle.base;
+      base.setPosition(px, py);
+      base.setFrame(this.getPresenceFrame(peer.facing));
+      const baseDepth = getFeetDepth(base as any);
+      base.setDepth(baseDepth);
+
+      const armorSprites = applyArmorVisuals({
+        sprites: { head: bundle.head, body: bundle.body, legs: bundle.legs },
+        equipment: {
+          heldItemId: peer.heldItemId ?? null,
+          headArmorItemId: peer.headArmorItemId ?? null,
+          bodyArmorItemId: peer.bodyArmorItemId ?? null,
+          legArmorItemId: peer.legArmorItemId ?? null,
+        },
+        frame: (base.frame as any)?.name ?? (base.frame as any),
+        player: base,
+        baseDepth,
+        textureExists: (key) => this.textures?.exists?.(key) ?? true,
+      });
+      bundle.head = armorSprites.head as any;
+      bundle.body = armorSprites.body as any;
+      bundle.legs = armorSprites.legs as any;
+
+      bundle.held = renderHeldItem({
+        scene: this,
+        uiCam: this.uiCam,
+        player: base,
+        facing: peer.facing,
+        heldItemId: peer.heldItemId ?? undefined,
+        heldItemSprite: bundle.held,
+      }) as any;
     }
 
-    for (const [uid, sprite] of this.townPresenceSprites.entries()) {
+    for (const [uid, bundle] of this.townPresenceSprites.entries()) {
       if (!seen.has(uid)) {
-        sprite.destroy();
+        bundle.base.destroy();
+        bundle.head?.destroy();
+        bundle.body?.destroy();
+        bundle.legs?.destroy();
+        bundle.held?.destroy();
         this.townPresenceSprites.delete(uid);
       }
     }
@@ -1375,6 +1932,7 @@ export class WorldScene extends Phaser.Scene {
       playerY: this.player.y,
       facing: this.facing,
       tileSize: 32,
+      equipment: this.equipment,
       nowMs,
     });
     if (this.lastTownPresencePayload && isSameTownPresence(this.lastTownPresencePayload, next)) return;

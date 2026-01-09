@@ -338,6 +338,75 @@ export const bowFound: DialogScript = {
   },
 };
 
+export const townPlayer: DialogScript = {
+  id: "townPlayer",
+  start: "menu",
+  nodes: {
+    menu: {
+      id: "menu",
+      kind: "choice",
+      text: "You see another traveler.",
+      choices: [
+        { id: "chat", text: "Chat", next: "chat" },
+        { id: "trade", text: "Trade", next: "tradeMenu" },
+        { id: "leave", text: "Leave", next: "end" },
+      ],
+    },
+    chat: {
+      id: "chat",
+      kind: "choice",
+      text: "Town chat",
+      choices: [
+        { id: "chat_hello", text: "Say hello", next: "chat" },
+        { id: "chat_trade", text: "Looking to trade?", next: "chat" },
+        { id: "chat_party", text: "Anyone up for a quest?", next: "chat" },
+        { id: "chat_back", text: "Back", next: "menu" },
+      ],
+    },
+    tradeMenu: {
+      id: "tradeMenu",
+      kind: "choice",
+      text: "Trade with a traveler.",
+      choices: [
+        { id: "trade_list", text: "List an item", next: "tradeWaitPick" },
+        { id: "trade_browse", text: "Browse listings", next: "tradeBrowse" },
+        { id: "trade_back", text: "Back", next: "menu" },
+      ],
+    },
+    tradeWaitPick: {
+      id: "tradeWaitPick",
+      kind: "line",
+      text: "Open your pouch and pick an item to list.",
+      next: "tradeMenu",
+    },
+    tradeOffer: {
+      id: "tradeOffer",
+      kind: "choice",
+      text: "Confirm your listing.",
+      choices: [
+        { id: "trade_offer_list", text: "List it", next: "tradeMenu" },
+        { id: "trade_offer_pick", text: "Pick another", next: "tradeWaitPick" },
+        { id: "trade_back", text: "Back", next: "tradeMenu" },
+      ],
+    },
+    tradeBrowse: {
+      id: "tradeBrowse",
+      kind: "choice",
+      text: "Listings in town.",
+      choices: [{ id: "trade_back", text: "Back", next: "tradeMenu" }],
+    },
+    tradeListed: { id: "tradeListed", kind: "line", text: "Your listing is posted.", next: "tradeMenu" },
+    tradeError: { id: "tradeError", kind: "line", text: "Could not post your listing.", next: "tradeMenu" },
+    tradeNoValue: { id: "tradeNoValue", kind: "line", text: "That item has no buyers here.", next: "tradeMenu" },
+    tradeBought: { id: "tradeBought", kind: "line", text: "Trade complete.", next: "tradeMenu" },
+    tradeNoCoins: { id: "tradeNoCoins", kind: "line", text: "You don't have enough coins.", next: "tradeMenu" },
+    tradeNoSpace: { id: "tradeNoSpace", kind: "line", text: "Your pouch is full.", next: "tradeMenu" },
+    tradeUnavailable: { id: "tradeUnavailable", kind: "line", text: "That listing is no longer available.", next: "tradeMenu" },
+    tradeCancelled: { id: "tradeCancelled", kind: "line", text: "Listing cancelled.", next: "tradeMenu" },
+    end: { id: "end", kind: "end", text: "Safe travels." },
+  },
+};
+
 export const riverSailor: DialogScript = {
   id: "riverSailor",
   start: "menu",
@@ -399,6 +468,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return swordTaken;
     case "bowFound":
       return bowFound;
+    case "townPlayer":
+      return townPlayer;
     case "riverSailor":
       return riverSailor;
     default:

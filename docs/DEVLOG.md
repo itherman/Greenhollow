@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-17
+- Sync town presence with equipment so remote players render with armor and held weapons.
+- Add town chat and player-to-player trade listings inside the dialog UI, including scrollable chat history.
+- Extend the Playwright suite with coverage for the town chat + trade dialog.
+
 ## 2026-01-16
 - Render town presence peers as visible player sprites in the town hub.
 - Extend the Playwright suite with a regression that injects town presence peers and verifies sprites appear.

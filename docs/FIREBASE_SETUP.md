@@ -13,7 +13,7 @@
 ## 4) Create Firestore database
 - Firestore Database → Create database (test mode is OK for initial local dev)
 
-## 5) Create Realtime Database (for town presence)
+## 5) Create Realtime Database (for town multiplayer)
 - Realtime Database → Create database (locked mode recommended)
 - Add the rules from the "Realtime Database rules" section below
 
@@ -31,8 +31,8 @@ Required keys (must all be present for Firebase mode to work):
 
 If these are missing, the game still works in **guest mode** (offline), but login/cloud save will show a friendly error.
 
-## 7) Realtime Database rules (town presence)
-Use these rules so authenticated players can publish their own presence and read town presence:
+## 7) Realtime Database rules (town presence + chat + trades)
+Use these rules so authenticated players can publish their own presence, chat, and trade listings:
 
 ```json
 {
@@ -43,6 +43,20 @@ Use these rules so authenticated players can publish their own presence and read
           ".read": "auth != null",
           "$uid": {
             ".write": "auth != null && auth.uid == $uid"
+          }
+        },
+        "chat": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "listings": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "sales": {
+          "$sellerUid": {
+            ".read": "auth != null && auth.uid == $sellerUid",
+            ".write": "auth != null"
           }
         }
       }
@@ -59,4 +73,7 @@ Current auth/profile + save system uses:
 - `leaderboards/global/scores/{uid}` (planned, not implemented)
 
 ## 9) Realtime Database data used today
-- `towns/town/presence/{uid}`: `{ areaId, username, x, y, facing, updatedAtMs, updatedAt }` (town hub presence)
+- `towns/town/presence/{uid}`: `{ areaId, username, x, y, facing, heldItemId, headArmorItemId, bodyArmorItemId, legArmorItemId, updatedAtMs, updatedAt }`
+- `towns/town/chat/{messageId}`: `{ uid, username, text, createdAtMs, createdAt }`
+- `towns/town/listings/{listingId}`: `{ sellerUid, sellerName, itemId, qty, price, status, createdAtMs }`
+- `towns/town/sales/{sellerUid}/{saleId}`: `{ listingId, itemId, qty, price, buyerUid, buyerName, soldAtMs }`

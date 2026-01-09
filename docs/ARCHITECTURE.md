@@ -52,6 +52,12 @@ When a player enters the Town hub:
 - `src/services/game/presence.ts` publishes tile + facing data to Realtime Database at `towns/town/presence/{uid}`.
 - Other clients subscribe to the `towns/town/presence` path and filter locally.
 
+### Town chat + trades (firebase mode only)
+While in the Town hub, realtime multiplayer features also flow through the Realtime Database:
+- `src/services/game/townChat.ts` publishes chat messages at `towns/town/chat/{messageId}`.
+- `src/services/game/townTrade.ts` manages listings at `towns/town/listings/{listingId}` and sale payouts at
+  `towns/town/sales/{sellerUid}/{saleId}`.
+
 ## Auth model (username + password)
 - The UI collects `username` + `password`.
 - Internally, we map the normalized username to a synthetic email: `<username>@game.local` (see `src/core/username.ts`).

@@ -1,4 +1,4 @@
-export type TapCandidateKind = "heart" | "key" | "sword" | "bow" | "chest" | "npc";
+export type TapCandidateKind = "heart" | "key" | "sword" | "bow" | "chest" | "npc" | "peer";
 
 export type TapCandidate = {
   kind: TapCandidateKind;
@@ -33,6 +33,7 @@ export function pickTapCandidate(params: {
     bow: 3,
     chest: 2,
     npc: 1,
+    peer: 1,
   };
 
   let best: TapCandidate | null = null;
@@ -55,5 +56,4 @@ export function pickTapCandidate(params: {
   if (!best) return { ok: false };
   return { ok: true, picked: best, dist2: bestD2 };
 }
-
 

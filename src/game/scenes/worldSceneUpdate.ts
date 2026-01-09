@@ -138,6 +138,12 @@ export function worldSceneUpdate(scene: any): void {
           this.tapTarget = undefined;
           this.tapIntent = undefined;
         }
+      } else if (this.tapIntent.kind === "peer") {
+        const ok = this.tryInteract("peer", this.tapIntent.id);
+        if (ok) {
+          this.tapTarget = undefined;
+          this.tapIntent = undefined;
+        }
       }
     }
 
@@ -230,9 +236,23 @@ export function worldSceneUpdate(scene: any): void {
 
       // Choice selection (1..4)
       const node = getNode(script, this.dialog);
+      if (node && script.id === "townPlayer" && node.id === "chat") {
+        const scrollDelta = Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.UP)
+          ? -24
+          : Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.DOWN)
+            ? 24
+            : 0;
+        if (scrollDelta !== 0) {
+          this.adjustTownChatScroll(scrollDelta);
+          this.renderDialog(script);
+          return;
+        }
+      }
       if (node && node.kind === "choice") {
         const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
         const isBuyer = script.id === "buyerNpc";
+        const isTownPlayer = script.id === "townPlayer";
+        const isTradeOffer = isTownPlayer && node.id === "tradeOffer";
         const qtyDelta = Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.UP)
           ? 1
           : Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.DOWN)
@@ -245,6 +265,10 @@ export function worldSceneUpdate(scene: any): void {
           }
           if (isBuyer && node.id === "offer") {
             if (this.adjustBuyerOfferQuantity(qtyDelta)) this.renderDialog(script);
+            return;
+          }
+          if (isTradeOffer) {
+            if (this.adjustTradeOfferQuantity(qtyDelta)) this.renderDialog(script);
             return;
           }
         }
@@ -261,6 +285,7 @@ export function worldSceneUpdate(scene: any): void {
                 : -1;
         if (pick >= 0 && node.kind === "choice") {
           const isTravel = script.id === "riverSailor";
+          const isTradeBrowse = isTownPlayer && node.id === "tradeBrowse";
           if (isShop) {
             if (node.id === "menu") {
               const MORE_ID = "__more_items__";
@@ -334,6 +359,26 @@ export function worldSceneUpdate(scene: any): void {
             return;
           }
 
+          if (isTradeBrowse) {
+            const MORE_ID = "__more_listings__";
+            const page = paginateDialogChoices(node.choices, this.tradeDialogPage, 3);
+            const list = page.hasMore
+              ? [...page.visible, { id: MORE_ID, text: "More listings...", next: node.id }]
+              : page.visible;
+            if (pick < list.length) {
+              const ch = list[pick]!;
+              if (ch.id === MORE_ID) {
+                this.tradeDialogPage = page.nextPage ?? 0;
+                this.renderDialog(script);
+                return;
+              }
+              if (this.handleTownPlayerChoice(ch.id, script)) return;
+              this.dialog = choose(script, this.dialog, ch.id);
+              this.renderDialog(script);
+            }
+            return;
+          }
+
           if (isTravel) {
             const travelChoices = filterTravelChoices(node.choices, this.area?.id);
             if (pick < travelChoices.length) {
@@ -344,6 +389,8 @@ export function worldSceneUpdate(scene: any): void {
           }
 
           if (pick < node.choices.length) {
+            const ch = node.choices[pick]!;
+            if (this.handleTownPlayerChoice(ch.id, script)) return;
             this.dialog = choose(script, this.dialog, node.choices[pick]!.id);
             this.renderDialog(script);
           }
