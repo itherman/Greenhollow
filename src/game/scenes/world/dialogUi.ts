@@ -282,6 +282,13 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           ];
         }
       }
+      if (isChatNode) {
+        const choicesCount = choicesToRender.length;
+        const choicesHeight = choicesCount * lineH + 8;
+        const chatTop = layout.y - layout.h / 2 + 10 + headerH + 6;
+        const chatBottom = Math.max(chatTop + 24, layout.y + layout.h / 2 - 34 - choicesHeight);
+        baseY = chatBottom + 6;
+      }
 
       const wantsQtyControl =
         (isShop && node.id === "confirm" && this.pendingPurchaseItemId) ||

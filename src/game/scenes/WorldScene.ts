@@ -24,7 +24,7 @@ import { shouldShowAttackButton } from "../../core/attackButtonVisibility";
 import { clearProgress, saveProgress, type PlayerProgress as LocalProgress } from "../../services/game/progressStore";
 import { clearSession } from "../../services/auth/session";
 import { canToggleInventory } from "../../core/uiGating";
-import { computePouchIconLayout } from "../../core/pouchIconLayout";
+import { computePouchIconLayout, computeTownChatButtonLayout } from "../../core/pouchIconLayout";
 import { needsPouchUiRebuild } from "../../core/pouchUi";
 import { getArmorBonus, getShopEntry, isMeleeWeapon } from "../../core/shopCatalog";
 import { attemptSaleFromSlot, getSellOfferForQty } from "../../core/shopLogic";
@@ -217,6 +217,9 @@ export class WorldScene extends Phaser.Scene {
   private hpText!: Phaser.GameObjects.Text;
   private pouchIcon?: Phaser.GameObjects.Image;
   private pouchHit?: Phaser.GameObjects.Rectangle;
+  private townChatButtonBg?: Phaser.GameObjects.Rectangle;
+  private townChatButtonText?: Phaser.GameObjects.Text;
+  private townChatButtonHit?: Phaser.GameObjects.Rectangle;
   private keySprite?: Phaser.Physics.Arcade.Sprite;
   private swordSprite?: Phaser.Physics.Arcade.Sprite;
   private bowSprite?: Phaser.Physics.Arcade.Sprite;
@@ -1214,6 +1217,88 @@ export class WorldScene extends Phaser.Scene {
     this.pouchHit.setSize(l.hit.w, l.hit.h);
   }
 
+  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
+  private ensureTownChatButton(): void {
+    const active =
+      this.townChatButtonBg?.active &&
+      this.townChatButtonText?.active &&
+      this.townChatButtonHit?.active;
+    if (active) return;
+
+    this.townChatButtonBg?.destroy();
+    this.townChatButtonText?.destroy();
+    this.townChatButtonHit?.destroy();
+    this.townChatButtonBg = undefined;
+    this.townChatButtonText = undefined;
+    this.townChatButtonHit = undefined;
+
+    const bg = this.add
+      .rectangle(0, 0, 10, 10, 0x0f1418, 0.92)
+      .setStrokeStyle(1, 0x2a3a44, 1)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(1100)
+      .setAlpha(0.9);
+    const label = this.add
+      .text(0, 0, "Chat", {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "12px",
+        color: "#d2dde6",
+      })
+      .setOrigin(0.5, 0.5)
+      .setScrollFactor(0)
+      .setDepth(1101);
+    const hit = this.add.rectangle(0, 0, 10, 10, 0x000000, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(1102);
+
+    this.cameras.main.ignore([bg, label, hit]);
+
+    hit.setInteractive({ useHandCursor: true });
+    hit.on("pointerdown", (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: any) => {
+      event?.stopPropagation?.();
+      this.suppressWorldPointerUntilTs = Date.now() + 250;
+      this.tapTarget = undefined;
+      this.tapIntent = undefined;
+      if (!this.area || this.area.id !== "town") return;
+      this.openTownChatDialog();
+    });
+
+    this.townChatButtonBg = bg;
+    this.townChatButtonText = label;
+    this.townChatButtonHit = hit;
+    this.updateTownChatButtonVisibility();
+  }
+
+  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
+  private layoutTownChatButton(): void {
+    if (!this.townChatButtonBg || !this.townChatButtonText || !this.townChatButtonHit) return;
+    if (!this.townChatButtonBg.active || !this.townChatButtonText.active || !this.townChatButtonHit.active) return;
+
+    const { w, h } = normalizeScreenSize(this.scale.width, this.scale.height);
+    const pouchLayout = computePouchIconLayout({ screenW: w, screenH: h });
+    const chatLayout = computeTownChatButtonLayout({ screenW: w, screenH: h, pouchLayout });
+
+    this.townChatButtonBg.setPosition(chatLayout.button.x, chatLayout.button.y);
+    this.townChatButtonBg.setSize(chatLayout.button.w, chatLayout.button.h);
+    this.townChatButtonText.setPosition(
+      chatLayout.button.x + chatLayout.button.w / 2,
+      chatLayout.button.y + chatLayout.button.h / 2,
+    );
+    this.townChatButtonHit.setPosition(chatLayout.hit.x, chatLayout.hit.y);
+    this.townChatButtonHit.setSize(chatLayout.hit.w, chatLayout.hit.h);
+  }
+
+  // @ts-expect-error TS6133 - Used in loadArea.ts
+  private updateTownChatButtonVisibility(): void {
+    const visible = !!this.area && this.area.id === "town";
+    this.townChatButtonBg?.setVisible(visible);
+    this.townChatButtonText?.setVisible(visible);
+    this.townChatButtonHit?.setVisible(visible);
+    if (this.townChatButtonHit) {
+      if (visible) this.townChatButtonHit.setInteractive({ useHandCursor: true });
+      else this.townChatButtonHit.disableInteractive();
+    }
+  }
+
   private exitToTitle(): void {
     // Clear local state and sign out before returning to the intro/title.
     clearInventory();
@@ -1294,6 +1379,27 @@ export class WorldScene extends Phaser.Scene {
     this.resetTradeFlow();
     this.townChatAutoScroll = true;
     this.dialog = openDialog(script);
+    this.renderDialog(script);
+  }
+
+  private openTownChatDialog() {
+    if (!this.area || this.area.id !== "town") return;
+    const script = getDialogScript("townPlayer");
+    if (!script) return;
+    this.townPlayerTarget = { uid: "town", username: "Town" };
+    if (this.inventoryOpen) {
+      this.inventoryOpen = false;
+      this.renderInventoryPanel();
+    }
+    this.tapTarget = undefined;
+    this.tapIntent = undefined;
+    this.shopDialogPage = 0;
+    this.pendingPurchaseItemId = null;
+    this.pendingPurchaseQty = 1;
+    this.resetBuyerFlow();
+    this.resetTradeFlow();
+    this.townChatAutoScroll = true;
+    this.dialog = { open: true, scriptId: script.id, nodeId: "chat" };
     this.renderDialog(script);
   }
 
@@ -1539,7 +1645,9 @@ export class WorldScene extends Phaser.Scene {
 
     if (choiceId === "chat") {
       this.townChatAutoScroll = true;
-      return false;
+      this.dialog = { open: true, scriptId: script.id, nodeId: "chat" };
+      this.renderDialog(script);
+      return true;
     }
 
     if (choiceId === "chat_back") return false;
@@ -1807,6 +1915,10 @@ export class WorldScene extends Phaser.Scene {
   private setTownChatMessagesForTest(messages: TownChatMessage[]): void {
     this.townChatMessages = messages;
     this.townChatAutoScroll = true;
+    if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
+      const script = getDialogScript("townPlayer");
+      if (script) this.renderDialog(script);
+    }
   }
 
   // @ts-expect-error TS6133 - Used in tests

@@ -61,6 +61,23 @@ describe("town presence helpers", () => {
       bodyArmorItemId: "iron_armor",
       legArmorItemId: "scout_boots",
     });
+
+    const legacy = parseTownPresencePayload({
+      x: 4,
+      y: 6,
+      facing: "left",
+      updatedAt: 99,
+    });
+    expect(legacy).toEqual({
+      x: 4,
+      y: 6,
+      facing: "left",
+      updatedAtMs: 99,
+      heldItemId: null,
+      headArmorItemId: null,
+      bodyArmorItemId: null,
+      legArmorItemId: null,
+    });
   });
 
   it("rejects invalid presence payloads", () => {

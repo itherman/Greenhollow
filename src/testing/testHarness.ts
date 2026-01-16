@@ -21,6 +21,7 @@ export type TestHarness = {
   getState: () => TestHarnessState | null;
   getDialogChoiceTexts: () => string[];
   getDialogHeaderText: () => string | null;
+  getTownChatButtonRect: () => { x: number; y: number; w: number; h: number } | null;
   getBoatAndSailorTiles: () => { boat?: { x: number; y: number; tileIndex?: number }; sailor?: { x: number; y: number; tileIndex?: number } } | null;
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
   tileCenterToScreen: (tile: { x: number; y: number }) => { x: number; y: number } | null;
@@ -95,6 +96,22 @@ function getWorldScene(game: Phaser.Game) {
 export function installTestHarness(game: Phaser.Game): void {
   if (typeof window === "undefined") return;
 
+  const canvasToScreenRect = (rect: { x: number; y: number; width: number; height: number }) => {
+    const canvas = game.canvas as HTMLCanvasElement | undefined;
+    if (!canvas) return null;
+    const bounds = canvas.getBoundingClientRect();
+    const cw = canvas.width || 1;
+    const ch = canvas.height || 1;
+    const scaleX = bounds.width / cw;
+    const scaleY = bounds.height / ch;
+    return {
+      x: bounds.left + rect.x * scaleX,
+      y: bounds.top + rect.y * scaleY,
+      w: rect.width * scaleX,
+      h: rect.height * scaleY,
+    };
+  };
+
   const harness: TestHarness = {
     version: "0.1",
     getState: () => {
@@ -123,10 +140,22 @@ export function installTestHarness(game: Phaser.Game): void {
       if (!scene?.dialogText) return null;
       return scene.dialogText.text ?? null;
     },
+    getTownChatButtonRect: () => {
+      const scene = getWorldScene(game) as any;
+      const hit = scene?.townChatButtonHit;
+      if (!hit || typeof hit.getBounds !== "function") return null;
+      const bounds = hit.getBounds();
+      return canvasToScreenRect(bounds);
+    },
     getDialogChatLog: () => {
       const scene = getWorldScene(game) as any;
-      if (!scene?.dialogChatText) return null;
-      return scene.dialogChatText.text ?? null;
+      if (!scene) return null;
+      const dialog = scene.dialog as { open?: boolean; scriptId?: string; nodeId?: string } | undefined;
+      if (!dialog?.open || dialog.scriptId !== "townPlayer" || dialog.nodeId !== "chat") return null;
+      if (scene.dialogChatText?.text) return scene.dialogChatText.text;
+      const messages = Array.isArray(scene.townChatMessages) ? scene.townChatMessages : [];
+      if (!messages.length) return null;
+      return messages.map((m: { username?: string; text?: string }) => `${m.username ?? "?"}: ${m.text ?? ""}`).join("\n");
     },
     getBoatAndSailorTiles: () => {
       const scene = getWorldScene(game) as any;

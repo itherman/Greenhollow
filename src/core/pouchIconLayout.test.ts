@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePouchIconLayout } from "./pouchIconLayout";
+import { computePouchIconLayout, computeTownChatButtonLayout } from "./pouchIconLayout";
 
 describe("computePouchIconLayout", () => {
   it("returns an icon fully on-screen", () => {
@@ -19,6 +19,15 @@ describe("computePouchIconLayout", () => {
     expect(r.icon.x).toBe(0);
     expect(r.icon.y).toBe(0);
   });
-});
 
+  it("positions the chat button next to the pouch icon", () => {
+    const pouch = computePouchIconLayout({ screenW: 320, screenH: 180 });
+    const chat = computeTownChatButtonLayout({ screenW: 320, screenH: 180, pouchLayout: pouch });
+    expect(chat.button.x).toBeGreaterThanOrEqual(pouch.icon.x + pouch.icon.w);
+    expect(chat.button.y).toBeGreaterThanOrEqual(0);
+    expect(chat.button.x + chat.button.w).toBeLessThanOrEqual(320);
+    expect(chat.button.y + chat.button.h).toBeLessThanOrEqual(180);
+    expect(chat.hit.w).toBeGreaterThan(chat.button.w);
+  });
+});
 

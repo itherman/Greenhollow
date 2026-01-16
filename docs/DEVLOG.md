@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-18
+- Restore town presence visibility by accepting legacy timestamps in the presence payload parser.
+- Keep town chat inside the dialog box with proper spacing and scrolling, and add a HUD chat button beside the pouch.
+- Add Playwright coverage for opening town chat from the HUD button.
+
 ## 2026-01-17
 - Sync town presence with equipment so remote players render with armor and held weapons.
 - Add town chat and player-to-player trade listings inside the dialog UI, including scrollable chat history.
