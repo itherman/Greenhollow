@@ -28,6 +28,12 @@
 npm install
 ```
 
+### Playwright browser setup (for e2e tests)
+
+```bash
+npm run setup:playwright
+```
+
 ### Run dev server
 
 ```bash
@@ -82,5 +88,4 @@ npm run deploy
 - `docs/TESTING.md`
 - `docs/FIREBASE_SETUP.md`
 - `docs/adr/` (architecture decision records)
-
 

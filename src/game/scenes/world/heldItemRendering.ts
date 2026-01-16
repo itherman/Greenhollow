@@ -26,7 +26,7 @@ export type SceneLike = {
   add: { sprite: (x: number, y: number, textureKey: string) => SpriteLike };
 };
 
-export type CameraLike = { ignore: (obj: unknown) => void };
+export type CameraLike = { ignore: (obj: unknown) => unknown };
 
 export type SpriteLike = {
   x: number;
@@ -143,4 +143,3 @@ export function anchorSlashSprite(args: {
   slashSwordSprite.setPosition(player.x + pose.dx, player.y + pose.dy);
   slashSwordSprite.setDepth(player.y + 5);
 }
-

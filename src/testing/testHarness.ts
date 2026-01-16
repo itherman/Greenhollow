@@ -1,5 +1,6 @@
 import type Phaser from "phaser";
 import type { AreaId, EntryId } from "../core/areas";
+import { getNode, choose } from "../core/dialog";
 import { ITEMS, addItem, addItemsIfFit, getItemCount, removeItem } from "../core/inventory";
 import { getDialogScript } from "../game/dialog/scripts";
 import { hasFlag, setFlag } from "../services/game/flags";
@@ -20,6 +21,7 @@ export type TestHarness = {
   version: string;
   getState: () => TestHarnessState | null;
   getDialogChoiceTexts: () => string[];
+  chooseDialogChoice: (matchText: string) => boolean;
   getDialogHeaderText: () => string | null;
   getTownChatButtonRect: () => { x: number; y: number; w: number; h: number } | null;
   getBoatAndSailorTiles: () => { boat?: { x: number; y: number; tileIndex?: number }; sailor?: { x: number; y: number; tileIndex?: number } } | null;
@@ -134,6 +136,26 @@ export function installTestHarness(game: Phaser.Game): void {
       const scene = getWorldScene(game) as any;
       if (!scene?.dialogChoiceTexts) return [];
       return scene.dialogChoiceTexts.map((t: any) => t?.text ?? "").filter((t: string) => t.length > 0);
+    },
+    chooseDialogChoice: (matchText) => {
+      const scene = getWorldScene(game) as any;
+      if (!scene?.dialog?.open || !scene.dialog.scriptId) return false;
+      const script = getDialogScript(scene.dialog.scriptId);
+      if (!script) return false;
+      const node = getNode(script, scene.dialog);
+      if (!node || node.kind !== "choice") return false;
+      const needle = matchText.trim().toLowerCase();
+      const choice = node.choices.find((c) => {
+        const text = (c.text ?? "").toLowerCase();
+        const id = c.id.toLowerCase();
+        return text.includes(needle) || id.includes(needle);
+      });
+      if (!choice) return false;
+      scene.dialog = choose(script, scene.dialog, choice.id);
+      if (typeof scene.renderDialog === "function") {
+        scene.renderDialog(script);
+      }
+      return true;
     },
     getDialogHeaderText: () => {
       const scene = getWorldScene(game) as any;

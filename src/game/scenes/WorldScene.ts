@@ -163,14 +163,17 @@ export class WorldScene extends Phaser.Scene {
   private townPresenceSprites: Map<string, TownPresenceSpriteBundle> = new Map();
   private townChat?: TownChatSession;
   private townChatUnsubscribe?: () => void;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private townChatMessages: TownChatMessage[] = [];
   private townChatScrollOffset = 0;
   private townChatScrollMax = 0;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private townChatAutoScroll = true;
   private townTrade?: TownTradeSession;
   private townTradeListings: TownTradeListing[] = [];
   private townTradeUnsubscribe?: () => void;
   private townTradeSalesUnsubscribe?: () => void;
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private tradeDialogPage = 0;
   private tradeSelectionActive = false;
   private tradeOffer:
@@ -1287,7 +1290,7 @@ export class WorldScene extends Phaser.Scene {
     this.townChatButtonHit.setSize(chatLayout.hit.w, chatLayout.hit.h);
   }
 
-  // @ts-expect-error TS6133 - Used in loadArea.ts
+  // Used in loadArea.ts
   private updateTownChatButtonVisibility(): void {
     const visible = !!this.area && this.area.id === "town";
     this.townChatButtonBg?.setVisible(visible);
@@ -1411,6 +1414,7 @@ export class WorldScene extends Phaser.Scene {
     this.townChatAutoScroll = false;
   }
 
+  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
   private handleDialogWheel(deltaY: number): void {
     if (!this.dialog.open) return;
     const script = getDialogScript(this.dialog.scriptId);
@@ -1640,6 +1644,7 @@ export class WorldScene extends Phaser.Scene {
     this.renderDialog(script);
   }
 
+  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private handleTownPlayerChoice(choiceId: string, script: NonNullable<ReturnType<typeof getDialogScript>>): boolean {
     if (script.id !== "townPlayer") return false;
 
