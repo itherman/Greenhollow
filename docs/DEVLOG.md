@@ -1,5 +1,8 @@
 # Devlog
 
+## 2026-01-20
+- Fix structural sprite/camera type compatibility so town presence visuals compile cleanly.
+
 ## 2026-01-19
 - Add a Playwright setup script for installing browsers + deps and document it in the setup/testing docs.
 

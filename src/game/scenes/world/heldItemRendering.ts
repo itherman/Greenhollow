@@ -26,7 +26,7 @@ export type SceneLike = {
   add: { sprite: (x: number, y: number, textureKey: string) => SpriteLike };
 };
 
-export type CameraLike = { ignore: (obj: unknown) => unknown };
+export type CameraLike = { ignore: (obj: any) => any };
 
 export type SpriteLike = {
   x: number;

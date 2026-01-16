@@ -1953,6 +1953,14 @@ export class WorldScene extends Phaser.Scene {
     return row * 4;
   }
 
+  private getPresenceFrameKey(frame: unknown): number | string {
+    if (typeof frame === "number" || typeof frame === "string") return frame;
+    const withName = frame as { name?: number | string; index?: number } | null;
+    if (withName?.name !== undefined) return withName.name;
+    if (typeof withName?.index === "number") return withName.index;
+    return 0;
+  }
+
   private syncTownPresenceSprites(): void {
     if (!this.area || this.area.id !== "town") {
       this.clearTownPresenceSprites();
@@ -2007,7 +2015,7 @@ export class WorldScene extends Phaser.Scene {
           bodyArmorItemId: peer.bodyArmorItemId ?? null,
           legArmorItemId: peer.legArmorItemId ?? null,
         },
-        frame: (base.frame as any)?.name ?? (base.frame as any),
+        frame: this.getPresenceFrameKey((base as unknown as { frame?: unknown }).frame),
         player: base,
         baseDepth,
         textureExists: (key) => this.textures?.exists?.(key) ?? true,
