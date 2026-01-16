@@ -56,14 +56,14 @@ test.describe("Town chat and trade", () => {
       window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChoiceTexts().some((t) => /Chat/i.test(t)),
     );
 
-    await page.keyboard.press("Digit1");
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Chat") === true);
     await page.waitForFunction(() =>
       window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChatLog()?.includes("Mara: Welcome to town."),
     );
 
-    await page.keyboard.press("Digit4");
-    await page.keyboard.press("Digit2");
-    await page.keyboard.press("Digit2");
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Back") === true);
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Trade") === true);
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Browse") === true);
 
     await page.waitForFunction(() =>
       window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChoiceTexts().some((t) => /Buy: Dagger/i.test(t)),

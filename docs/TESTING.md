@@ -10,6 +10,12 @@ We avoid brittle tests for rendering. Phaser scenes should be thin wrappers arou
 
 ## Running tests
 
+Before the Playwright end-to-end suite can run, install the browser binaries and OS deps:
+
+```bash
+npm run setup:playwright
+```
+
 ```bash
 npm test
 ```
@@ -47,4 +53,3 @@ npm run test:watch -- -t "movement"
 - `src/core/`: pure functions, reducers/state transitions, validation/normalization.
 - `src/services/`: IO and adapters (localStorage, Firebase). Keep logic thin; push rules down into `src/core/` where possible.
 - `src/game/`: Phaser scenes. Prefer calling into `src/core/` for rules and layout computations.
-

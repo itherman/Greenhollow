@@ -152,7 +152,12 @@ export function worldSceneCreate(scene: any): void {
     this.input.on("pointerdown", this.onWorldPointerDown);
 
     if (!this.onDialogWheel) {
-      this.onDialogWheel = (_pointer, _gameObjects, _dx, dy) => {
+      this.onDialogWheel = (
+        _pointer: Phaser.Input.Pointer,
+        _gameObjects: Phaser.GameObjects.GameObject[],
+        _dx: number,
+        dy: number,
+      ) => {
         if (typeof this.handleDialogWheel === "function") this.handleDialogWheel(dy);
       };
     }

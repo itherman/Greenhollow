@@ -9,7 +9,7 @@ export type ArmorSprites = {
 
 export type SpriteLike = {
   visible?: boolean;
-  texture?: string;
+  texture?: unknown;
   frame?: number | string;
   x?: number;
   y?: number;

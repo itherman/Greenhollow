@@ -1,5 +1,8 @@
 # Devlog
 
+## 2026-01-19
+- Add a Playwright setup script for installing browsers + deps and document it in the setup/testing docs.
+
 ## 2026-01-18
 - Restore town presence visibility by accepting legacy timestamps in the presence payload parser.
 - Keep town chat inside the dialog box with proper spacing and scrolling, and add a HUD chat button beside the pouch.
