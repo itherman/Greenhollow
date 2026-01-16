@@ -1194,4 +1194,6 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
     if (typeof scene.stopTownChat === "function") scene.stopTownChat();
     if (typeof scene.stopTownTrade === "function") scene.stopTownTrade();
   }
+
+  if (typeof scene.updateTownChatButtonVisibility === "function") scene.updateTownChatButtonVisibility();
 }

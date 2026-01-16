@@ -67,7 +67,13 @@ export function parseTownPresencePayload(raw: unknown): TownPresencePayload | nu
   const data = raw as Record<string, unknown>;
   if (typeof data.x !== "number" || !Number.isFinite(data.x)) return null;
   if (typeof data.y !== "number" || !Number.isFinite(data.y)) return null;
-  if (typeof data.updatedAtMs !== "number" || !Number.isFinite(data.updatedAtMs)) return null;
+  const updatedAtMs =
+    typeof data.updatedAtMs === "number" && Number.isFinite(data.updatedAtMs)
+      ? data.updatedAtMs
+      : typeof data.updatedAt === "number" && Number.isFinite(data.updatedAt)
+        ? data.updatedAt
+        : null;
+  if (updatedAtMs == null) return null;
   if (typeof data.facing !== "string" || !VALID_FACING.has(data.facing)) return null;
   const heldItemId = parseItemId(data.heldItemId);
   const headArmorItemId = parseItemId(data.headArmorItemId);
@@ -81,7 +87,7 @@ export function parseTownPresencePayload(raw: unknown): TownPresencePayload | nu
     x: data.x,
     y: data.y,
     facing: data.facing as Exclude<Direction, "none">,
-    updatedAtMs: data.updatedAtMs,
+    updatedAtMs,
     heldItemId,
     headArmorItemId,
     bodyArmorItemId,

@@ -206,6 +206,8 @@ export function worldSceneCreate(scene: any): void {
     ensureUiPouchTexture(this);
     this.ensurePouchButton();
     this.layoutPouchButton();
+    this.ensureTownChatButton();
+    this.layoutTownChatButton();
 
     // Keep UI camera + modal layouts correct across resizes (mobile address bar, rotation, etc).
     if (!this.onScaleResize) {
@@ -226,6 +228,7 @@ export function worldSceneCreate(scene: any): void {
         this.layoutMobileControls();
         // Re-layout pouch icon.
         this.layoutPouchButton();
+        this.layoutTownChatButton();
       };
     }
     this.scale.off("resize", this.onScaleResize);
