@@ -188,7 +188,6 @@ export class WorldScene extends Phaser.Scene {
     | null = null;
   private townPlayerTarget?: { uid: string; username: string };
   private townChatInput?: TownChatInputHandle;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private townChatInputRect: { x: number; y: number; w: number; h: number } | null = null;
   private townChatNeedsFocus = false;
 

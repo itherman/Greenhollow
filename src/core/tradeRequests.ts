@@ -7,13 +7,13 @@ export type TradeRequestLike = {
   status: TradeRequestStatus;
 };
 
-export function partitionTradeRequestsForTarget(input: {
-  requests: TradeRequestLike[];
+export function partitionTradeRequestsForTarget<T extends TradeRequestLike>(input: {
+  requests: T[];
   sessionUid: string | null | undefined;
   targetUid: string | null | undefined;
 }) {
   const { requests, sessionUid, targetUid } = input;
-  if (!sessionUid || !targetUid) return { incoming: [], outgoing: [] };
+  if (!sessionUid || !targetUid) return { incoming: [] as T[], outgoing: [] as T[] };
 
   const relevant = requests.filter(
     (request) =>

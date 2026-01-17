@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-01-22
+- Fix trade request partition typing so request item details stay available when building town trade menus.
+- Remove the unused town chat input `@ts-expect-error` now that it no longer suppresses a compiler error.
+
 ## 2026-01-21
 - Replace town trade listings with direct player-to-player trade requests, including accept/decline flows and price/quantity controls.
 - Refactor town chat UI to support typed messages, show a 4–8 line scrollable window, and cap stored history at 50 messages.
