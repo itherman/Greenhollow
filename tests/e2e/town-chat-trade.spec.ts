@@ -12,7 +12,7 @@ async function getHarness(page: Page): Promise<HarnessHandle> {
 }
 
 test.describe("Town chat and trade", () => {
-  test("opens chat log and trade listings from a player dialog", async ({ page }) => {
+  test("opens chat log and trade requests from a player dialog", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /start/i }).click();
     await page.getByRole("button", { name: /continue as guest/i }).click();
@@ -34,20 +34,30 @@ test.describe("Town chat and trade", () => {
       ]),
     );
 
-    await harness.evaluate((h) =>
-      h.setTownTradeListings([
+    await harness.evaluate((h) => {
+      localStorage.setItem(
+        "game.session.v1",
+        JSON.stringify({ mode: "guest", uid: "test-player", username: "Test" }),
+      );
+    });
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.getSessionUid() === "test-player");
+
+    await harness.evaluate((h) => {
+      h.setTownTradeRequests([
         {
-          id: "listing-1",
-          sellerUid: "peer-1",
-          sellerName: "Mara",
+          id: "request-1",
+          senderUid: "peer-1",
+          senderName: "Mara",
+          recipientUid: "test-player",
+          recipientName: "You",
           itemId: "dagger",
           qty: 1,
           price: 40,
-          status: "open",
+          status: "pending",
           createdAtMs: Date.now(),
         },
-      ]),
-    );
+      ]);
+    });
 
     const opened = await harness.evaluate((h) => h.openTownPlayerDialog({ uid: "peer-1", username: "Mara" }));
     expect(opened).toBe(true);
@@ -60,13 +70,16 @@ test.describe("Town chat and trade", () => {
     await page.waitForFunction(() =>
       window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChatLog()?.includes("Mara: Welcome to town."),
     );
+    await expect(page.getByPlaceholder("Type a message…")).toBeVisible();
 
-    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Back") === true);
+    const reopened = await harness.evaluate((h) => h.openTownPlayerDialog({ uid: "peer-1", username: "Mara" }));
+    expect(reopened).toBe(true);
+
     await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Trade") === true);
-    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Browse") === true);
+    await page.waitForFunction(() => window.__GREENHOLLOW_TEST_HOOKS__?.chooseDialogChoice("Review") === true);
 
     await page.waitForFunction(() =>
-      window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChoiceTexts().some((t) => /Buy: Dagger/i.test(t)),
+      window.__GREENHOLLOW_TEST_HOOKS__?.getDialogChoiceTexts().some((t) => /Accept: Dagger/i.test(t)),
     );
   });
 });
