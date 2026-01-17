@@ -23,6 +23,7 @@ export type TestHarness = {
   getDialogChoiceTexts: () => string[];
   chooseDialogChoice: (matchText: string) => boolean;
   getDialogHeaderText: () => string | null;
+  getSessionUid: () => string | null;
   getTownChatButtonRect: () => { x: number; y: number; w: number; h: number } | null;
   getBoatAndSailorTiles: () => { boat?: { x: number; y: number; tileIndex?: number }; sailor?: { x: number; y: number; tileIndex?: number } } | null;
   worldToScreen: (world: { x: number; y: number }) => { x: number; y: number } | null;
@@ -55,14 +56,16 @@ export type TestHarness = {
   openTownPlayerDialog: (peer: { uid: string; username: string }) => boolean;
   setTownChatMessages: (messages: Array<{ id: string; uid: string; username: string; text: string; createdAtMs: number }>) => boolean;
   getDialogChatLog: () => string | null;
-  setTownTradeListings: (listings: Array<{
+  setTownTradeRequests: (requests: Array<{
     id: string;
-    sellerUid: string;
-    sellerName: string;
+    senderUid: string;
+    senderName: string;
+    recipientUid: string;
+    recipientName: string;
     itemId: ItemId;
     qty: number;
     price: number;
-    status: "open" | "sold" | "cancelled";
+    status: "pending" | "accepted" | "declined" | "cancelled";
     createdAtMs: number;
   }>) => boolean;
 };
@@ -161,6 +164,12 @@ export function installTestHarness(game: Phaser.Game): void {
       const scene = getWorldScene(game) as any;
       if (!scene?.dialogText) return null;
       return scene.dialogText.text ?? null;
+    },
+    getSessionUid: () => {
+      const scene = getWorldScene(game) as any;
+      if (!scene) return null;
+      if (typeof scene.getSessionUidForTest !== "function") return null;
+      return scene.getSessionUidForTest();
     },
     getTownChatButtonRect: () => {
       const scene = getWorldScene(game) as any;
@@ -411,11 +420,11 @@ export function installTestHarness(game: Phaser.Game): void {
       scene.setTownChatMessagesForTest(messages);
       return true;
     },
-    setTownTradeListings: (listings) => {
+    setTownTradeRequests: (requests) => {
       const scene = getWorldScene(game) as any;
       if (!scene) return false;
-      if (typeof scene.setTownTradeListingsForTest !== "function") return false;
-      scene.setTownTradeListingsForTest(listings);
+      if (typeof scene.setTownTradeRequestsForTest !== "function") return false;
+      scene.setTownTradeRequestsForTest(requests);
       return true;
     },
   };

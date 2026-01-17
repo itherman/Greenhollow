@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-01-21
+- Replace town trade listings with direct player-to-player trade requests, including accept/decline flows and price/quantity controls.
+- Refactor town chat UI to support typed messages, show a 4–8 line scrollable window, and cap stored history at 50 messages.
+- Update the town chat/trade Playwright regression to cover the new request flow and chat input.
+
 ## 2026-01-20
 - Fix structural sprite/camera type compatibility so town presence visuals compile cleanly.
 

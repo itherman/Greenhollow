@@ -155,10 +155,10 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       header = "Open your pouch and pick an item to sell.";
       if (!this.buyerSelectionActive) this.startBuyerSelection(script);
     } else if (isTownPlayer && node.id === "tradeWaitPick") {
-      header = "Open your pouch and pick an item to list.";
+      header = "Open your pouch and pick an item to offer.";
       if (!this.tradeSelectionActive) this.startTradeSelection();
     } else if (isTradeOffer && this.tradeOffer) {
-      header = `List ${this.tradeOffer.itemName} x${this.tradeOffer.qty} for ${this.tradeOffer.coins}c?`;
+      header = `Offer ${this.tradeOffer.itemName} x${this.tradeOffer.qty} for ${this.tradeOffer.coins}c?`;
     } else if (isShop && node.id === "confirm" && this.pendingPurchaseItemId) {
       const pendingItemId = this.pendingPurchaseItemId as ItemId | null;
       const entry = pendingItemId ? getShopEntry(pendingItemId) : null;
@@ -182,15 +182,22 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       this.dialogChatMaskRect = undefined;
       this.dialogChatMask = undefined;
       this.townChatScrollMax = 0;
+      this.townChatInputRect = null;
     } else {
       const baseX = layout.x - layout.w / 2 + layout.padding;
       const headerH = Math.max(18, Math.ceil(this.dialogText!.getBounds().height));
-      const lineH = 22;
+      const lineH = 20;
+      const minLines = 4;
+      const maxLines = 8;
+      const inputHeight = 26;
+      const inputGap = 6;
       const choicesCount = node.kind === "choice" ? node.choices.length : 0;
       const choicesHeight = choicesCount * lineH + 8;
       const chatTop = layout.y - layout.h / 2 + 10 + headerH + 6;
-      const chatBottom = Math.max(chatTop + 24, layout.y + layout.h / 2 - 34 - choicesHeight);
-      const chatHeight = Math.max(24, chatBottom - chatTop);
+      const availableBottom = layout.y + layout.h / 2 - 34 - choicesHeight - inputHeight - inputGap;
+      const chatBottom = Math.max(chatTop + minLines * lineH, availableBottom);
+      const maxChatHeight = Math.min(maxLines * lineH, Math.max(minLines * lineH, chatBottom - chatTop));
+      const chatHeight = Math.max(minLines * lineH, Math.min(maxChatHeight, chatBottom - chatTop));
 
       if (!this.dialogChatText) {
         this.dialogChatText = this.add
@@ -228,6 +235,13 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       this.dialogChatMaskRect!
         .setPosition(layout.x, chatTop + chatHeight / 2)
         .setSize(layout.w - layout.padding * 2, chatHeight);
+
+      this.townChatInputRect = {
+        x: baseX,
+        y: chatTop + chatHeight + inputGap,
+        w: layout.w - layout.padding * 2,
+        h: inputHeight,
+      };
     }
 
     // Rebuild tappable choice lines each render (keeps handlers consistent).
@@ -248,14 +262,11 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const lineH = 22;
 
       const MORE_ID = "__more_items__";
-      const MORE_LISTINGS_ID = "__more_listings__";
       const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
       const isBuyer = script.id === "buyerNpc";
-      const isTradeBrowse = isTownPlayer && node.id === "tradeBrowse";
       const isTradeOffer = isTownPlayer && node.id === "tradeOffer";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
-      let tradeNextPage: number | null = null;
       if (isTravel) {
         choicesToRender = filterTravelChoices(choicesToRender, this.area?.id);
       }
@@ -271,23 +282,14 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           ];
         }
       }
-      if (isTradeBrowse) {
-        const page = paginateDialogChoices(node.choices, this.tradeDialogPage, 3);
-        choicesToRender = page.visible;
-        tradeNextPage = page.nextPage;
-        if (page.hasMore) {
-          choicesToRender = [
-            ...choicesToRender,
-            { id: MORE_LISTINGS_ID, text: "More listings...", next: node.id },
-          ];
-        }
-      }
       if (isChatNode) {
         const choicesCount = choicesToRender.length;
         const choicesHeight = choicesCount * lineH + 8;
         const chatTop = layout.y - layout.h / 2 + 10 + headerH + 6;
-        const chatBottom = Math.max(chatTop + 24, layout.y + layout.h / 2 - 34 - choicesHeight);
-        baseY = chatBottom + 6;
+        const inputHeight = 26;
+        const inputGap = 6;
+        const chatBottom = Math.max(chatTop + 24, layout.y + layout.h / 2 - 34 - choicesHeight - inputHeight - inputGap);
+        baseY = chatBottom + inputHeight + inputGap;
       }
 
       const wantsQtyControl =
@@ -385,6 +387,83 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
         baseY += lineH + 4;
       }
 
+      if (isTradeOffer && this.tradeOffer) {
+        const rightEdge = layout.x + layout.w / 2 - layout.padding;
+        const btnSize = 18;
+        const minusX = rightEdge - btnSize * 2 - 10;
+        const plusX = rightEdge - btnSize;
+        const controlY = baseY + 2;
+        const label = this.add
+          .text(baseX + 10, baseY, `Price: ${this.tradeOffer.coins}c`, {
+            fontFamily: "monospace",
+            fontSize: "13px",
+            color: "#f5d76e",
+          })
+          .setScrollFactor(0)
+          .setDepth(2002);
+        const minusBg = this.add
+          .rectangle(minusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
+          .setStrokeStyle(1, 0x2a3a44, 1)
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2001);
+        const minusText = this.add
+          .text(minusX, controlY + 8, "-", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#e2e8f0",
+          })
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2002);
+        const plusBg = this.add
+          .rectangle(plusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
+          .setStrokeStyle(1, 0x2a3a44, 1)
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2001);
+        const plusText = this.add
+          .text(plusX, controlY + 8, "+", {
+            fontFamily: "monospace",
+            fontSize: "14px",
+            color: "#e2e8f0",
+          })
+          .setOrigin(0.5, 0.5)
+          .setScrollFactor(0)
+          .setDepth(2002);
+
+        const adjustPrice = (delta: number) => {
+          const changed = this.adjustTradeOfferPrice(delta);
+          if (changed) this.renderDialog(script);
+        };
+        const attachRepeater = (obj: Phaser.GameObjects.GameObject, delta: number) => {
+          obj.setInteractive({ useHandCursor: true });
+          obj.on("pointerdown", () => {
+            adjustPrice(delta);
+            const event = this.time.addEvent({
+              delay: 140,
+              loop: true,
+              callback: () => adjustPrice(delta),
+            });
+            this.dialogQtyRepeatEvents.push(event);
+            obj.once("pointerup", () => event.remove());
+            obj.once("pointerout", () => event.remove());
+          });
+        };
+
+        attachRepeater(minusBg, -1);
+        attachRepeater(minusText, -1);
+        attachRepeater(plusBg, 1);
+        attachRepeater(plusText, 1);
+
+        for (const obj of [label, minusBg, minusText, plusBg, plusText] as const) {
+          this.cameras.main.ignore(obj);
+          this.dialogQtyControls.push(obj);
+        }
+
+        baseY += lineH + 4;
+      }
+
       for (let i = 0; i < choicesToRender.length; i++) {
         const ch = choicesToRender[i]!;
         const y = baseY + i * lineH;
@@ -422,12 +501,6 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
             this.renderDialog(script);
             return;
           }
-          if (isTradeBrowse && ch.id === MORE_LISTINGS_ID) {
-            this.tradeDialogPage = tradeNextPage ?? 0;
-            this.renderDialog(script);
-            return;
-          }
-
           if (isShop && node.id === "menu" && ch.id.startsWith("buy_")) {
             this.pendingPurchaseItemId = ch.id.slice("buy_".length) as ItemId;
             this.pendingPurchaseQty = 1;
@@ -487,12 +560,14 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
         this.dialogChoiceBgs.push(bg);
       }
 
-      this.dialogChoicesText!.setText(
-        isChatNode
-          ? "Scroll to read chat • Tap a choice"
+      const tradeHint =
+        isTradeOffer && this.tradeOffer
+          ? "Tap a choice • +/- or ↑/↓ for qty • ←/→ for price"
           : wantsQtyControl
             ? "Tap a choice • Tap +/- or use ↑/↓ for qty"
-            : "Tap a choice • Tap dialog to close",
+            : "Tap a choice • Tap dialog to close";
+      this.dialogChoicesText!.setText(
+        isChatNode ? "Type a message • Enter to send • Scroll for history" : tradeHint,
       );
     } else if (node.kind === "line") {
       this.dialogChoicesText!.setText("Tap dialog to continue");

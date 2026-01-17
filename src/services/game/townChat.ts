@@ -22,7 +22,7 @@ const noopSession: TownChatSession = {
   stop: async () => {},
 };
 
-const MAX_CHAT_MESSAGES = 60;
+const MAX_CHAT_MESSAGES = 50;
 
 export function createTownChatSession(session: Session | null): TownChatSession {
   if (!session || session.mode !== "firebase" || !hasFirebaseConfig()) return noopSession;
