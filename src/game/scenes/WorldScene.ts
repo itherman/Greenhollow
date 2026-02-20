@@ -1629,7 +1629,10 @@ export class WorldScene extends Phaser.Scene {
     this.townChat = undefined;
     this.townChatMessages = [];
     this.destroyTownChatPanel();
-    this.updateTownChatButtonVisibility();
+    // Note: button visibility is updated by loadAreaIntoWorldScene after this runs;
+    // do NOT call updateTownChatButtonVisibility() here because stopTownChat may be
+    // invoked during the SHUTDOWN event, when Phaser's input plugin is tearing down
+    // and calling setInteractive/disableInteractive would crash the scene restart.
   }
 
   // @ts-expect-error TS6133 - Used in loadArea.ts

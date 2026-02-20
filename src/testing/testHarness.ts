@@ -56,18 +56,6 @@ export type TestHarness = {
   openTownPlayerDialog: (peer: { uid: string; username: string }) => boolean;
   setTownChatMessages: (messages: Array<{ id: string; uid: string; username: string; text: string; createdAtMs: number }>) => boolean;
   getDialogChatLog: () => string | null;
-  setTownTradeRequests: (requests: Array<{
-    id: string;
-    senderUid: string;
-    senderName: string;
-    recipientUid: string;
-    recipientName: string;
-    itemId: ItemId;
-    qty: number;
-    price: number;
-    status: "pending" | "accepted" | "declined" | "cancelled";
-    createdAtMs: number;
-  }>) => boolean;
 };
 
 declare global {
@@ -181,9 +169,8 @@ export function installTestHarness(game: Phaser.Game): void {
     getDialogChatLog: () => {
       const scene = getWorldScene(game) as any;
       if (!scene) return null;
-      const dialog = scene.dialog as { open?: boolean; scriptId?: string; nodeId?: string } | undefined;
-      if (!dialog?.open || dialog.scriptId !== "townPlayer" || dialog.nodeId !== "chat") return null;
-      if (scene.dialogChatText?.text) return scene.dialogChatText.text;
+      // Return formatted messages when the chat panel is visible.
+      if (!(scene.townChatPanel?.isVisible?.() ?? false)) return null;
       const messages = Array.isArray(scene.townChatMessages) ? scene.townChatMessages : [];
       if (!messages.length) return null;
       return messages.map((m: { username?: string; text?: string }) => `${m.username ?? "?"}: ${m.text ?? ""}`).join("\n");
@@ -418,13 +405,6 @@ export function installTestHarness(game: Phaser.Game): void {
       if (!scene) return false;
       if (typeof scene.setTownChatMessagesForTest !== "function") return false;
       scene.setTownChatMessagesForTest(messages);
-      return true;
-    },
-    setTownTradeRequests: (requests) => {
-      const scene = getWorldScene(game) as any;
-      if (!scene) return false;
-      if (typeof scene.setTownTradeRequestsForTest !== "function") return false;
-      scene.setTownTradeRequestsForTest(requests);
       return true;
     },
   };

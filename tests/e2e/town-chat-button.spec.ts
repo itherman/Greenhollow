@@ -12,7 +12,7 @@ async function getHarness(page: Page): Promise<HarnessHandle> {
 }
 
 test.describe("Town chat button", () => {
-  test("opens the town chat dialog from the HUD button", async ({ page }) => {
+  test("opens the town chat panel from the HUD button", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /start/i }).click();
     await page.getByRole("button", { name: /continue as guest/i }).click();
@@ -32,15 +32,13 @@ test.describe("Town chat button", () => {
     if (!rect) throw new Error("Missing town chat button");
     await page.mouse.click(rect.x + rect.w / 2, rect.y + rect.h / 2);
 
-    await page.waitForFunction(() => {
-      const dialog = window.__GREENHOLLOW_TEST_HOOKS__?.getState()?.dialog;
-      return dialog?.open && dialog?.scriptId === "townPlayer" && dialog?.nodeId === "chat";
-    });
+    // Panel should now be visible — the input field is the canonical anchor.
+    await expect(page.getByPlaceholder("Type a message\u2026")).toBeVisible();
 
     await harness.evaluate((h) =>
       h.setTownChatMessages([{ id: "m1", uid: "peer-1", username: "Lysa", text: "Hello town!", createdAtMs: Date.now() }]),
     );
-    const chatLog = await harness.evaluate((h) => h.getDialogChatLog());
-    expect(chatLog).toContain("Hello town!");
+    // Message should appear in the panel DOM.
+    await expect(page.getByText("Hello town!")).toBeVisible();
   });
 });
