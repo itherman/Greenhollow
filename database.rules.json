@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "towns": {
+      "$townId": {
+        "presence": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid"
+          }
+        },
+        "chat": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "listings": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        },
+        "sales": {
+          "$sellerUid": {
+            ".read": "auth != null && auth.uid == $sellerUid",
+            ".write": "auth != null"
+          }
+        },
+        "tradeSessions": {
+          ".read": "auth != null",
+          "$sessionId": {
+            ".write": "auth != null"
+          }
+        }
+      }
+    }
+  }
+}

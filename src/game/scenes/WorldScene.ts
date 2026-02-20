@@ -1666,7 +1666,11 @@ export class WorldScene extends Phaser.Scene {
       const incoming = sessions.find(
         (s) => s.recipientId === myUid && s.status === "pending" && s.expiresAtMs > now,
       );
-      if (incoming && (!this.dialog.open || this.dialog.nodeId === "end")) {
+      const canAutoPrompt =
+        !this.dialog.open ||
+        this.dialog.nodeId === "end" ||
+        (this.dialog.scriptId === "townPlayer" && this.dialog.nodeId === "menu");
+      if (incoming && canAutoPrompt) {
         this.currentSessionId = incoming.id;
         this.townPlayerTarget = { uid: incoming.requesterId, username: incoming.requesterName };
         const script = getDialogScript("townPlayer");

@@ -37,6 +37,7 @@ docs/           # Architecture, roadmap, ADRs, devlog
 
 ## Architecture rules
 
+- Use the planner subagent first, then frontend and backend agents as needed.
 - **`src/core/` is the source of truth for rules.** New game logic (movement, combat, dialog, inventory, validation) goes here as pure functions with no `window` or Phaser dependencies.
 - **Phaser scenes (`src/game/`) are thin wrappers.** They translate input/events into calls to `src/core/` and render the results.
 - **`src/services/` is IO only.** Push business logic down into `src/core/` rather than keeping it in service files.

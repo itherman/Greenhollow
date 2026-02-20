@@ -32,38 +32,16 @@ Required keys (must all be present for Firebase mode to work):
 If these are missing, the game still works in **guest mode** (offline), but login/cloud save will show a friendly error.
 
 ## 7) Realtime Database rules (town presence + chat + trades)
-Use these rules so authenticated players can publish their own presence, chat, and trade listings:
+Rules are tracked as code in `database.rules.json` and deployed automatically by `firebase deploy`.
+If you need to apply them manually (e.g. before first deploy), copy the contents of that file into
+the Firebase Console → Realtime Database → Rules tab.
 
-```json
-{
-  "rules": {
-    "towns": {
-      "$townId": {
-        "presence": {
-          ".read": "auth != null",
-          "$uid": {
-            ".write": "auth != null && auth.uid == $uid"
-          }
-        },
-        "chat": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        },
-        "listings": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        },
-        "sales": {
-          "$sellerUid": {
-            ".read": "auth != null && auth.uid == $sellerUid",
-            ".write": "auth != null"
-          }
-        }
-      }
-    }
-  }
-}
-```
+The rules cover these paths:
+- `presence` — each player writes only their own entry
+- `chat` — any authenticated player can read/write
+- `listings` — any authenticated player can read/write
+- `sales` — seller reads own sales; any authenticated player writes
+- `tradeSessions` — any authenticated player can read all sessions (needed for subscription); any authenticated player can write individual sessions
 
 ## 8) Firestore data used today
 Current auth/profile + save system uses:
@@ -77,3 +55,4 @@ Current auth/profile + save system uses:
 - `towns/town/chat/{messageId}`: `{ uid, username, text, createdAtMs, createdAt }`
 - `towns/town/listings/{listingId}`: `{ sellerUid, sellerName, itemId, qty, price, status, createdAtMs }`
 - `towns/town/sales/{sellerUid}/{saleId}`: `{ listingId, itemId, qty, price, buyerUid, buyerName, soldAtMs }`
+- `towns/town/tradeSessions/{sessionId}`: `{ requesterId, requesterName, recipientId, recipientName, status, requesterConfirmed, recipientConfirmed, createdAtMs, expiresAtMs, createdAt }`
