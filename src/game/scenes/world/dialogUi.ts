@@ -147,18 +147,12 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       this.shopCoinsText = undefined;
     }
 
-    const isTradeOffer = isTownPlayer && node.id === "tradeOffer";
     let header = node.kind === "end" ? (node.text ?? "") : node.text;
     if (isBuyer && node.id === "offer" && this.buyerOffer) {
       header = `I can pay ${this.buyerOffer.coins}c for ${this.buyerOffer.itemName} x${this.buyerOffer.qty}.`;
     } else if (isBuyer && node.id === "waitPick") {
       header = "Open your pouch and pick an item to sell.";
       if (!this.buyerSelectionActive) this.startBuyerSelection(script);
-    } else if (isTownPlayer && node.id === "tradeWaitPick") {
-      header = "Open your pouch and pick an item to offer.";
-      if (!this.tradeSelectionActive) this.startTradeSelection();
-    } else if (isTradeOffer && this.tradeOffer) {
-      header = `Offer ${this.tradeOffer.itemName} x${this.tradeOffer.qty} for ${this.tradeOffer.coins}c?`;
     } else if (isShop && node.id === "confirm" && this.pendingPurchaseItemId) {
       const pendingItemId = this.pendingPurchaseItemId as ItemId | null;
       const entry = pendingItemId ? getShopEntry(pendingItemId) : null;
@@ -174,75 +168,11 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
     }
     this.dialogText!.setText(header);
 
-    const isChatNode = isTownPlayer && node.id === "chat";
-    if (!isChatNode) {
-      this.dialogChatText?.destroy();
-      this.dialogChatMaskRect?.destroy();
-      this.dialogChatText = undefined;
-      this.dialogChatMaskRect = undefined;
-      this.dialogChatMask = undefined;
-      this.townChatScrollMax = 0;
-      this.townChatInputRect = null;
-    } else {
-      const baseX = layout.x - layout.w / 2 + layout.padding;
-      const headerH = Math.max(18, Math.ceil(this.dialogText!.getBounds().height));
-      const lineH = 20;
-      const minLines = 4;
-      const maxLines = 8;
-      const inputHeight = 26;
-      const inputGap = 6;
-      const choicesCount = node.kind === "choice" ? node.choices.length : 0;
-      const choicesHeight = choicesCount * lineH + 8;
-      const chatTop = layout.y - layout.h / 2 + 10 + headerH + 6;
-      const availableBottom = layout.y + layout.h / 2 - 34 - choicesHeight - inputHeight - inputGap;
-      const chatBottom = Math.max(chatTop + minLines * lineH, availableBottom);
-      const maxChatHeight = Math.min(maxLines * lineH, Math.max(minLines * lineH, chatBottom - chatTop));
-      const chatHeight = Math.max(minLines * lineH, Math.min(maxChatHeight, chatBottom - chatTop));
-
-      if (!this.dialogChatText) {
-        this.dialogChatText = this.add
-          .text(baseX, chatTop, "", {
-            fontFamily: "system-ui, sans-serif",
-            fontSize: "13px",
-            color: "#d2dde6",
-            wordWrap: { width: layout.w - layout.padding * 2 },
-          })
-          .setScrollFactor(0)
-          .setDepth(2001);
-        this.dialogChatMaskRect = this.add
-          .rectangle(layout.x, chatTop + chatHeight / 2, layout.w - layout.padding * 2, chatHeight, 0x000000, 0)
-          .setOrigin(0.5, 0.5)
-          .setScrollFactor(0);
-        this.dialogChatMask = this.dialogChatMaskRect.createGeometryMask();
-        this.dialogChatText.setMask(this.dialogChatMask);
-        this.cameras.main.ignore([this.dialogChatText, this.dialogChatMaskRect]);
-      }
-
-      const lines =
-        this.townChatMessages && this.townChatMessages.length
-          ? this.townChatMessages.map((m: any) => `${m.username}: ${m.text}`)
-          : ["No messages yet."];
-      this.dialogChatText!
-        .setText(lines.join("\n"))
-        .setWordWrapWidth(layout.w - layout.padding * 2);
-
-      const bounds = this.dialogChatText!.getBounds();
-      const maxScroll = Math.max(0, bounds.height - chatHeight);
-      this.townChatScrollMax = maxScroll;
-      if (this.townChatAutoScroll) this.townChatScrollOffset = maxScroll;
-      this.townChatScrollOffset = Math.max(0, Math.min(maxScroll, this.townChatScrollOffset));
-      this.dialogChatText!.setPosition(baseX, chatTop - this.townChatScrollOffset);
-      this.dialogChatMaskRect!
-        .setPosition(layout.x, chatTop + chatHeight / 2)
-        .setSize(layout.w - layout.padding * 2, chatHeight);
-
-      this.townChatInputRect = {
-        x: baseX,
-        y: chatTop + chatHeight + inputGap,
-        w: layout.w - layout.padding * 2,
-        h: inputHeight,
-      };
-    }
+    this.dialogChatText?.destroy();
+    this.dialogChatMaskRect?.destroy();
+    this.dialogChatText = undefined;
+    this.dialogChatMaskRect = undefined;
+    this.dialogChatMask = undefined;
 
     // Rebuild tappable choice lines each render (keeps handlers consistent).
     for (const t of this.dialogChoiceTexts) t.destroy();
@@ -264,7 +194,6 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       const MORE_ID = "__more_items__";
       const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
       const isBuyer = script.id === "buyerNpc";
-      const isTradeOffer = isTownPlayer && node.id === "tradeOffer";
       let choicesToRender = node.choices;
       let nextPage: number | null = null;
       if (isTravel) {
@@ -282,28 +211,15 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           ];
         }
       }
-      if (isChatNode) {
-        const choicesCount = choicesToRender.length;
-        const choicesHeight = choicesCount * lineH + 8;
-        const chatTop = layout.y - layout.h / 2 + 10 + headerH + 6;
-        const inputHeight = 26;
-        const inputGap = 6;
-        const chatBottom = Math.max(chatTop + 24, layout.y + layout.h / 2 - 34 - choicesHeight - inputHeight - inputGap);
-        baseY = chatBottom + inputHeight + inputGap;
-      }
-
       const wantsQtyControl =
         (isShop && node.id === "confirm" && this.pendingPurchaseItemId) ||
-        (isBuyer && node.id === "offer" && this.buyerOffer) ||
-        (isTradeOffer && this.tradeOffer);
+        (isBuyer && node.id === "offer" && this.buyerOffer);
       if (wantsQtyControl) {
         const qty =
           isShop && node.id === "confirm"
             ? this.pendingPurchaseQty ?? 1
             : isBuyer && node.id === "offer" && this.buyerOffer
               ? this.buyerOffer.qty
-              : isTradeOffer && this.tradeOffer
-                ? this.tradeOffer.qty
               : 1;
         const rightEdge = layout.x + layout.w / 2 - layout.padding;
         const btnSize = 18;
@@ -354,9 +270,7 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
           const changed =
             isShop && node.id === "confirm"
               ? this.adjustPurchaseQuantity(delta)
-              : isBuyer && node.id === "offer"
-                ? this.adjustBuyerOfferQuantity(delta)
-                : this.adjustTradeOfferQuantity(delta);
+              : this.adjustBuyerOfferQuantity(delta);
           if (changed) this.renderDialog(script);
         };
         const attachRepeater = (obj: Phaser.GameObjects.GameObject, delta: number) => {
@@ -367,83 +281,6 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
               delay: 140,
               loop: true,
               callback: () => adjustQty(delta),
-            });
-            this.dialogQtyRepeatEvents.push(event);
-            obj.once("pointerup", () => event.remove());
-            obj.once("pointerout", () => event.remove());
-          });
-        };
-
-        attachRepeater(minusBg, -1);
-        attachRepeater(minusText, -1);
-        attachRepeater(plusBg, 1);
-        attachRepeater(plusText, 1);
-
-        for (const obj of [label, minusBg, minusText, plusBg, plusText] as const) {
-          this.cameras.main.ignore(obj);
-          this.dialogQtyControls.push(obj);
-        }
-
-        baseY += lineH + 4;
-      }
-
-      if (isTradeOffer && this.tradeOffer) {
-        const rightEdge = layout.x + layout.w / 2 - layout.padding;
-        const btnSize = 18;
-        const minusX = rightEdge - btnSize * 2 - 10;
-        const plusX = rightEdge - btnSize;
-        const controlY = baseY + 2;
-        const label = this.add
-          .text(baseX + 10, baseY, `Price: ${this.tradeOffer.coins}c`, {
-            fontFamily: "monospace",
-            fontSize: "13px",
-            color: "#f5d76e",
-          })
-          .setScrollFactor(0)
-          .setDepth(2002);
-        const minusBg = this.add
-          .rectangle(minusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
-          .setStrokeStyle(1, 0x2a3a44, 1)
-          .setOrigin(0.5, 0.5)
-          .setScrollFactor(0)
-          .setDepth(2001);
-        const minusText = this.add
-          .text(minusX, controlY + 8, "-", {
-            fontFamily: "monospace",
-            fontSize: "14px",
-            color: "#e2e8f0",
-          })
-          .setOrigin(0.5, 0.5)
-          .setScrollFactor(0)
-          .setDepth(2002);
-        const plusBg = this.add
-          .rectangle(plusX, controlY + 8, btnSize, btnSize, 0x0b1116, 0.9)
-          .setStrokeStyle(1, 0x2a3a44, 1)
-          .setOrigin(0.5, 0.5)
-          .setScrollFactor(0)
-          .setDepth(2001);
-        const plusText = this.add
-          .text(plusX, controlY + 8, "+", {
-            fontFamily: "monospace",
-            fontSize: "14px",
-            color: "#e2e8f0",
-          })
-          .setOrigin(0.5, 0.5)
-          .setScrollFactor(0)
-          .setDepth(2002);
-
-        const adjustPrice = (delta: number) => {
-          const changed = this.adjustTradeOfferPrice(delta);
-          if (changed) this.renderDialog(script);
-        };
-        const attachRepeater = (obj: Phaser.GameObjects.GameObject, delta: number) => {
-          obj.setInteractive({ useHandCursor: true });
-          obj.on("pointerdown", () => {
-            adjustPrice(delta);
-            const event = this.time.addEvent({
-              delay: 140,
-              loop: true,
-              callback: () => adjustPrice(delta),
             });
             this.dialogQtyRepeatEvents.push(event);
             obj.once("pointerup", () => event.remove());
@@ -560,14 +397,10 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
         this.dialogChoiceBgs.push(bg);
       }
 
-      const tradeHint =
-        isTradeOffer && this.tradeOffer
-          ? "Tap a choice • +/- or ↑/↓ for qty • ←/→ for price"
-          : wantsQtyControl
-            ? "Tap a choice • Tap +/- or use ↑/↓ for qty"
-            : "Tap a choice • Tap dialog to close";
       this.dialogChoicesText!.setText(
-        isChatNode ? "Type a message • Enter to send • Scroll for history" : tradeHint,
+        wantsQtyControl
+          ? "Tap a choice • Tap +/- or use ↑/↓ for qty"
+          : "Tap a choice • Tap dialog to close",
       );
     } else if (node.kind === "line") {
       this.dialogChoicesText!.setText("Tap dialog to continue");
@@ -583,9 +416,6 @@ export function closeDialogUiInWorldScene(scene: any): void {
     this.dialogText?.destroy();
     this.dialogChoicesText?.destroy();
     this.shopCoinsText?.destroy();
-    this.dialogChatText?.destroy();
-    this.dialogChatMaskRect?.destroy();
-    this.dialogChatMask = undefined;
     for (const t of this.dialogChoiceTexts) t.destroy();
     this.dialogChoiceTexts = [];
     for (const r of this.dialogChoiceBgs) r.destroy();
@@ -598,8 +428,6 @@ export function closeDialogUiInWorldScene(scene: any): void {
     this.dialogText = undefined;
     this.dialogChoicesText = undefined;
     this.shopCoinsText = undefined;
-    this.dialogChatText = undefined;
-    this.dialogChatMaskRect = undefined;
     this.shopDialogPage = 0;
   }).call(scene);
 }

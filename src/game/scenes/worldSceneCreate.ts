@@ -43,10 +43,6 @@ export function worldSceneCreate(scene: any): void {
       UP: Phaser.Input.Keyboard.Key;
       DOWN: Phaser.Input.Keyboard.Key;
     };
-    this.priceAdjustKeys = this.input.keyboard!.addKeys("LEFT,RIGHT") as {
-      LEFT: Phaser.Input.Keyboard.Key;
-      RIGHT: Phaser.Input.Keyboard.Key;
-    };
 
     this.ensureTilesetTexture();
     // Ensure item textures exist for held-item rendering even in areas that don't spawn items.
@@ -175,8 +171,7 @@ export function worldSceneCreate(scene: any): void {
       if (this.onScaleResize) this.scale.off("resize", this.onScaleResize);
       if (typeof this.stopTownPresence === "function") this.stopTownPresence();
       if (typeof this.stopTownChat === "function") this.stopTownChat();
-      if (typeof this.stopTownTradeRequests === "function") this.stopTownTradeRequests();
-      if (typeof this.hideTownChatInput === "function") this.hideTownChatInput();
+      if (typeof this.stopTownTradeSession === "function") this.stopTownTradeSession();
     });
 
     // Previously: inline handler (kept for reference)

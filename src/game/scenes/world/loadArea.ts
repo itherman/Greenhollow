@@ -1188,11 +1188,11 @@ export function loadAreaIntoWorldScene(scene: any, areaId: AreaId, entry: EntryI
   if (scene.area.id === "town") {
     if (typeof scene.startTownPresence === "function") scene.startTownPresence();
     if (typeof scene.startTownChat === "function") scene.startTownChat();
-    if (typeof scene.startTownTradeRequests === "function") scene.startTownTradeRequests();
+    if (typeof scene.startTownTradeSession === "function") scene.startTownTradeSession();
   } else if (typeof scene.stopTownPresence === "function") {
     scene.stopTownPresence();
     if (typeof scene.stopTownChat === "function") scene.stopTownChat();
-    if (typeof scene.stopTownTradeRequests === "function") scene.stopTownTradeRequests();
+    if (typeof scene.stopTownTradeSession === "function") scene.stopTownTradeSession();
   }
 
   if (typeof scene.updateTownChatButtonVisibility === "function") scene.updateTownChatButtonVisibility();

@@ -347,81 +347,38 @@ export const townPlayer: DialogScript = {
       kind: "choice",
       text: "You see another traveler.",
       choices: [
-        { id: "chat", text: "Chat", next: "chat" },
-        { id: "trade", text: "Trade", next: "tradeMenu" },
+        { id: "trade", text: "Trade", next: "tradeWaiting" },
         { id: "leave", text: "Leave", next: "end" },
       ],
     },
-    chat: {
-      id: "chat",
+    tradeWaiting: {
+      id: "tradeWaiting",
       kind: "choice",
-      text: "Town chat",
+      text: "Waiting for response...",
+      choices: [{ id: "trade_cancel_wait", text: "Cancel", next: "end" }],
+    },
+    tradeIncoming: {
+      id: "tradeIncoming",
+      kind: "choice",
+      text: "Someone wants to trade.",
       choices: [
-        { id: "chat_back", text: "Back", next: "menu" },
+        { id: "trade_accept", text: "Accept", next: "tradeActive" },
+        { id: "trade_decline", text: "Decline", next: "end" },
       ],
     },
-    tradeMenu: {
-      id: "tradeMenu",
+    tradeActive: {
+      id: "tradeActive",
       kind: "choice",
-      text: "Trade with a traveler.",
+      text: "Trading session.",
       choices: [
-        { id: "trade_offer", text: "Offer a trade", next: "tradeWaitPick" },
-        { id: "trade_requests", text: "Review requests", next: "tradeRequests" },
-        { id: "trade_back", text: "Back", next: "menu" },
+        { id: "trade_confirm", text: "Confirm trade", next: "tradeDone" },
+        { id: "trade_cancel", text: "Cancel", next: "end" },
       ],
     },
-    tradeWaitPick: {
-      id: "tradeWaitPick",
-      kind: "line",
-      text: "Open your pouch and pick an item to offer.",
-      next: "tradeMenu",
-    },
-    tradeOffer: {
-      id: "tradeOffer",
-      kind: "choice",
-      text: "Confirm your trade offer.",
-      choices: [
-        { id: "trade_offer_send", text: "Send request", next: "tradeMenu" },
-        { id: "trade_offer_pick", text: "Pick another", next: "tradeWaitPick" },
-        { id: "trade_back", text: "Back", next: "tradeMenu" },
-      ],
-    },
-    tradeRequests: {
-      id: "tradeRequests",
-      kind: "choice",
-      text: "Trade requests in town.",
-      choices: [{ id: "trade_back", text: "Back", next: "tradeMenu" }],
-    },
-    tradeRequestSent: { id: "tradeRequestSent", kind: "line", text: "Trade request sent.", next: "tradeMenu" },
-    tradeRequestError: { id: "tradeRequestError", kind: "line", text: "Could not send trade request.", next: "tradeMenu" },
-    tradeRequestAccepted: {
-      id: "tradeRequestAccepted",
-      kind: "line",
-      text: "Trade request accepted.",
-      next: "tradeMenu",
-    },
-    tradeRequestDeclined: {
-      id: "tradeRequestDeclined",
-      kind: "line",
-      text: "Trade request declined.",
-      next: "tradeMenu",
-    },
-    tradeRequestCancelled: {
-      id: "tradeRequestCancelled",
-      kind: "line",
-      text: "Trade request cancelled.",
-      next: "tradeMenu",
-    },
-    tradeRequestUnavailable: {
-      id: "tradeRequestUnavailable",
-      kind: "line",
-      text: "That trade request is no longer available.",
-      next: "tradeMenu",
-    },
-    tradeNoItems: { id: "tradeNoItems", kind: "line", text: "You don't have enough of that item.", next: "tradeMenu" },
-    tradeNoValue: { id: "tradeNoValue", kind: "line", text: "That item has no buyers here.", next: "tradeMenu" },
-    tradeNoCoins: { id: "tradeNoCoins", kind: "line", text: "You don't have enough coins.", next: "tradeMenu" },
-    tradeNoSpace: { id: "tradeNoSpace", kind: "line", text: "Your pouch is full.", next: "tradeMenu" },
+    tradeDone: { id: "tradeDone", kind: "line", text: "Trade agreed!", next: "end" },
+    tradeDeclined: { id: "tradeDeclined", kind: "line", text: "Trade declined.", next: "end" },
+    tradeCancelled: { id: "tradeCancelled", kind: "line", text: "Trade cancelled.", next: "end" },
+    tradeLeft: { id: "tradeLeft", kind: "line", text: "They left the area.", next: "end" },
     end: { id: "end", kind: "end", text: "Safe travels." },
   },
 };
@@ -487,6 +444,8 @@ export function getDialogScript(scriptId: string): DialogScript | null {
       return swordTaken;
     case "bowFound":
       return bowFound;
+    case "trollWarning":
+      return trollWarning;
     case "townPlayer":
       return townPlayer;
     case "riverSailor":

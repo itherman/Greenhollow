@@ -236,23 +236,9 @@ export function worldSceneUpdate(scene: any): void {
 
       // Choice selection (1..4)
       const node = getNode(script, this.dialog);
-      if (node && script.id === "townPlayer" && node.id === "chat") {
-        const scrollDelta = Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.UP)
-          ? -24
-          : Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.DOWN)
-            ? 24
-            : 0;
-        if (scrollDelta !== 0) {
-          this.adjustTownChatScroll(scrollDelta);
-          this.renderDialog(script);
-          return;
-        }
-      }
       if (node && node.kind === "choice") {
         const isShop = script.id === "shopkeeper" || script.id === "rareShopkeeper";
         const isBuyer = script.id === "buyerNpc";
-        const isTownPlayer = script.id === "townPlayer";
-        const isTradeOffer = isTownPlayer && node.id === "tradeOffer";
         const qtyDelta = Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.UP)
           ? 1
           : Phaser.Input.Keyboard.JustDown(this.qtyAdjustKeys.DOWN)
@@ -265,21 +251,6 @@ export function worldSceneUpdate(scene: any): void {
           }
           if (isBuyer && node.id === "offer") {
             if (this.adjustBuyerOfferQuantity(qtyDelta)) this.renderDialog(script);
-            return;
-          }
-          if (isTradeOffer) {
-            if (this.adjustTradeOfferQuantity(qtyDelta)) this.renderDialog(script);
-            return;
-          }
-        }
-        if (isTradeOffer) {
-          const priceDelta = Phaser.Input.Keyboard.JustDown(this.priceAdjustKeys.LEFT)
-            ? -1
-            : Phaser.Input.Keyboard.JustDown(this.priceAdjustKeys.RIGHT)
-              ? 1
-              : 0;
-          if (priceDelta !== 0) {
-            if (this.adjustTradeOfferPrice(priceDelta)) this.renderDialog(script);
             return;
           }
         }
@@ -383,6 +354,31 @@ export function worldSceneUpdate(scene: any): void {
             if (this.handleTownPlayerChoice(ch.id, script)) return;
             this.dialog = choose(script, this.dialog, node.choices[pick]!.id);
             this.renderDialog(script);
+          }
+        }
+      }
+
+      // Walk-away detection for active trade sessions
+      if (this.currentSessionId !== null && this.dialog.scriptId === "townPlayer" &&
+          (this.dialog.nodeId === "tradeActive" || this.dialog.nodeId === "tradeWaiting")) {
+        const target = this.townPlayerTarget;
+        if (target) {
+          const tileSize = 32;
+          const rangePx = 96; // ~3 tiles
+          const inRange = this.townPresencePeers.some((peer: any) => {
+            if (peer.uid !== target.uid) return false;
+            const px = (peer.x + 0.5) * tileSize;
+            const py = (peer.y + 0.5) * tileSize;
+            const dx = px - this.player.x;
+            const dy = py - this.player.y;
+            return dx * dx + dy * dy <= rangePx * rangePx;
+          });
+          if (!inRange) {
+            void this.townTradeSession?.cancelSession(this.currentSessionId);
+            this.currentSessionId = null;
+            this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeLeft" };
+            const tradeScript = getDialogScript("townPlayer");
+            if (tradeScript) this.renderDialog(tradeScript);
           }
         }
       }

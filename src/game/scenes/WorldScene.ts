@@ -7,7 +7,7 @@ import {
 } from "../../core/dialog";
 import { getDialogScript } from "../dialog/scripts";
 import { clearFlags, hasFlag, setFlag } from "../../services/game/flags";
-import { ITEMS, addItem, addItemIfFits, addItemsIfFit, cloneInventory, getItemCount, removeItem, type ItemId } from "../../core/inventory";
+import { ITEMS, addItemIfFits, addItemsIfFit, getItemCount, type ItemId } from "../../core/inventory";
 import { clearInventory, loadInventory, saveInventory } from "../../services/game/inventoryStore";
 import { ensureItemAndPropTextures } from "../art/sprites";
 import { createExitGate, type TilePos } from "../../core/exitGate";
@@ -28,8 +28,6 @@ import { computePouchIconLayout, computeTownChatButtonLayout } from "../../core/
 import { needsPouchUiRebuild } from "../../core/pouchUi";
 import { getArmorBonus, getShopEntry, isMeleeWeapon } from "../../core/shopCatalog";
 import { attemptSaleFromSlot, getSellOfferForQty } from "../../core/shopLogic";
-import { attemptTradePurchase } from "../../core/trade";
-import { partitionTradeRequestsForTarget } from "../../core/tradeRequests";
 import { ARROW_HITBOX } from "../../core/physicsTuning";
 import { rollEnemyDrop, type EnemyDrop } from "../../core/enemyDrops";
 import { getEnemyDefinition, type EnemyId } from "../../core/enemies";
@@ -50,9 +48,9 @@ import { buildTownPresencePayload, isSameTownPresence, type TownPresencePayload 
 import { applyArmorVisuals } from "./world/equipmentVisuals";
 import { renderHeldItem } from "./world/heldItemRendering";
 import { createTownChatSession, type TownChatMessage, type TownChatSession } from "../../services/game/townChat";
-import { createTownTradeRequestSession, type TownTradeRequest, type TownTradeRequestSession } from "../../services/game/townTradeRequests";
+import { createTownTradeSession, type TownTradeSessionService, type TownTradeSessionData } from "../../services/game/townTradeSession";
 import { setGameKeyboardEnabled } from "../keyboardGate";
-import { createTownChatInput, type TownChatInputHandle } from "../../ui/townChatInput";
+import { createTownChatPanel, type TownChatPanelHandle } from "../../ui/townChatPanel";
 
 type NpcMovementState = {
   target?: Phaser.Math.Vector2;
@@ -118,11 +116,6 @@ export class WorldScene extends Phaser.Scene {
     UP: Phaser.Input.Keyboard.Key;
     DOWN: Phaser.Input.Keyboard.Key;
   };
-  // @ts-expect-error TS6133 - Used in worldSceneUpdate.ts
-  private priceAdjustKeys!: {
-    LEFT: Phaser.Input.Keyboard.Key;
-    RIGHT: Phaser.Input.Keyboard.Key;
-  };
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private escapeKey!: Phaser.Input.Keyboard.Key;
   private uiCam!: Phaser.Cameras.Scene2D.Camera;
@@ -135,11 +128,11 @@ export class WorldScene extends Phaser.Scene {
   private dialogChoicesText?: Phaser.GameObjects.Text;
   // @ts-expect-error TS6133 - Used in dialogUi.ts
   private shopCoinsText?: Phaser.GameObjects.Text;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  // @ts-expect-error TS6133 - Used in dialogUi.ts (set/cleared during render cycles)
   private dialogChatText?: Phaser.GameObjects.Text;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  // @ts-expect-error TS6133 - Used in dialogUi.ts (set/cleared during render cycles)
   private dialogChatMaskRect?: Phaser.GameObjects.Rectangle;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
+  // @ts-expect-error TS6133 - Used in dialogUi.ts (set/cleared during render cycles)
   private dialogChatMask?: Phaser.Display.Masks.GeometryMask;
   private dialogChoiceTexts: Phaser.GameObjects.Text[] = [];
   private dialogChoiceBgs: Phaser.GameObjects.Rectangle[] = [];
@@ -171,25 +164,12 @@ export class WorldScene extends Phaser.Scene {
   private townPresenceSprites: Map<string, TownPresenceSpriteBundle> = new Map();
   private townChat?: TownChatSession;
   private townChatUnsubscribe?: () => void;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
   private townChatMessages: TownChatMessage[] = [];
-  private townChatScrollOffset = 0;
-  private townChatScrollMax = 0;
-  // @ts-expect-error TS6133 - Used in dialogUi.ts
-  private townChatAutoScroll = true;
-  private townTradeRequests?: TownTradeRequestSession;
-  private townTradeRequestsUnsubscribe?: () => void;
-  private townTradeRequestsList: TownTradeRequest[] = [];
-  private townTradeEscrow: Map<string, { itemId: ItemId; qty: number; price: number }> = new Map();
-  private tradePriceStep = 5;
-  private tradeSelectionActive = false;
-  private tradeOffer:
-    | { slotIndex: number; coins: number; itemName: string; qty: number; maxQty: number; itemId: ItemId }
-    | null = null;
   private townPlayerTarget?: { uid: string; username: string };
-  private townChatInput?: TownChatInputHandle;
-  private townChatInputRect: { x: number; y: number; w: number; h: number } | null = null;
-  private townChatNeedsFocus = false;
+  private townChatPanel?: TownChatPanelHandle;
+  private townTradeSession?: TownTradeSessionService;
+  private townTradeSessionUnsubscribe?: () => void;
+  private currentSessionId: string | null = null;
 
   // @ts-expect-error TS6133 - Used in worldSceneCreate.ts and worldSceneUpdate.ts
   private inventoryKey!: Phaser.Input.Keyboard.Key;
@@ -1089,48 +1069,9 @@ export class WorldScene extends Phaser.Scene {
       });
     }
     this.inventoryUi.render(this.inventoryOpen);
-    this.syncTradeEscrowUpdates();
   }
 
   private handleInventorySlotClick(slotIndex: number): boolean {
-    if (this.tradeSelectionActive && this.dialog.open && this.dialog.scriptId === "townPlayer") {
-      const inv = loadInventory();
-      const slot = inv.slots[slotIndex];
-      this.tradeSelectionActive = false;
-      this.inventoryOpen = false;
-      this.renderInventoryPanel();
-
-      const script = getDialogScript("townPlayer");
-      if (!script) return false;
-
-      if (!slot) {
-        this.tradeOffer = null;
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
-        this.renderDialog(script);
-        return true;
-      }
-
-      const offer = getSellOfferForQty(slot, slot.qty);
-      if (!offer.ok) {
-        this.tradeOffer = null;
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoValue" };
-        this.renderDialog(script);
-        return true;
-      }
-
-      this.tradeOffer = {
-        slotIndex,
-        coins: offer.coins,
-        itemName: slot.name,
-        qty: slot.qty,
-        maxQty: slot.qty,
-        itemId: slot.id,
-      };
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeOffer" };
-      this.renderDialog(script);
-      return true;
-    }
-
     if (!this.buyerSelectionActive || !this.dialog.open || this.dialog.scriptId !== "buyerNpc") return false;
 
     const inv = loadInventory();
@@ -1171,10 +1112,6 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getInventoryHint(inv: ReturnType<typeof loadInventory>): string | null {
-    if (this.tradeSelectionActive && this.dialog.open && this.dialog.scriptId === "townPlayer") {
-      const hasItem = inv.slots.some(Boolean);
-      return hasItem ? "Tap an item to list for trade." : "Your pouch is empty.";
-    }
     if (this.buyerSelectionActive && this.dialog.open && this.dialog.scriptId === "buyerNpc") {
       const hasItem = inv.slots.some(Boolean);
       return hasItem ? "Tap an item to offer for sale." : "Your pouch is empty.";
@@ -1273,7 +1210,18 @@ export class WorldScene extends Phaser.Scene {
       this.tapTarget = undefined;
       this.tapIntent = undefined;
       if (!this.area || this.area.id !== "town") return;
-      this.openTownChatDialog();
+      if (!this.townChatPanel) {
+        this.townChatPanel = createTownChatPanel({
+          onSend: (text) => void this.townChat?.sendMessage(text),
+          onFocusChange: (focused) => setGameKeyboardEnabled(this.game, !focused),
+        });
+        this.townChatPanel.setMessages(this.townChatMessages);
+      }
+      if (this.townChatPanel.isVisible()) {
+        this.townChatPanel.hide();
+      } else {
+        this.townChatPanel.show();
+      }
     });
 
     this.townChatButtonBg = bg;
@@ -1299,6 +1247,11 @@ export class WorldScene extends Phaser.Scene {
     );
     this.townChatButtonHit.setPosition(chatLayout.hit.x, chatLayout.hit.y);
     this.townChatButtonHit.setSize(chatLayout.hit.w, chatLayout.hit.h);
+  }
+
+  private destroyTownChatPanel(): void {
+    this.townChatPanel?.destroy();
+    this.townChatPanel = undefined;
   }
 
   // Used in loadArea.ts
@@ -1371,7 +1324,6 @@ export class WorldScene extends Phaser.Scene {
     this.pendingPurchaseItemId = null;
     this.pendingPurchaseQty = 1;
     this.resetBuyerFlow();
-    this.resetTradeFlow();
     this.dialog = openDialog(script);
     this.renderDialog(script);
   }
@@ -1390,157 +1342,58 @@ export class WorldScene extends Phaser.Scene {
     this.pendingPurchaseItemId = null;
     this.pendingPurchaseQty = 1;
     this.resetBuyerFlow();
-    this.resetTradeFlow();
-    this.townChatAutoScroll = true;
     this.dialog = openDialog(script);
-    this.renderDialog(script);
-  }
-
-  private openTownChatDialog() {
-    if (!this.area || this.area.id !== "town") return;
-    const script = getDialogScript("townPlayer");
-    if (!script) return;
-    this.townPlayerTarget = { uid: "town", username: "Town" };
-    if (this.inventoryOpen) {
-      this.inventoryOpen = false;
-      this.renderInventoryPanel();
-    }
-    this.tapTarget = undefined;
-    this.tapIntent = undefined;
-    this.shopDialogPage = 0;
-    this.pendingPurchaseItemId = null;
-    this.pendingPurchaseQty = 1;
-    this.resetBuyerFlow();
-    this.resetTradeFlow();
-    this.townChatAutoScroll = true;
-    this.dialog = { open: true, scriptId: script.id, nodeId: "chat" };
-    this.townChatNeedsFocus = true;
-    this.renderDialog(script);
-  }
-
-  private adjustTownChatScroll(delta: number): void {
-    if (!Number.isFinite(delta)) return;
-    const next = Math.max(0, Math.min(this.townChatScrollMax, this.townChatScrollOffset + delta));
-    if (next === this.townChatScrollOffset) return;
-    this.townChatScrollOffset = next;
-    this.townChatAutoScroll = false;
-  }
-
-  private ensureTownChatInput(): TownChatInputHandle {
-    if (this.townChatInput) return this.townChatInput;
-    this.townChatInput = createTownChatInput({
-      onSend: (text) => void this.townChat?.sendMessage(text),
-      onFocusChange: (focused) => setGameKeyboardEnabled(this.game, !focused),
-    });
-    return this.townChatInput;
-  }
-
-  private syncTownChatInput(): void {
-    const isChatOpen =
-      this.dialog.open && this.dialog.scriptId === "townPlayer" && this.dialog.nodeId === "chat";
-    if (!isChatOpen || !this.townChatInputRect) {
-      this.hideTownChatInput();
-      return;
-    }
-    const canvas = this.game.canvas as HTMLCanvasElement | undefined;
-    if (!canvas) return;
-    const bounds = canvas.getBoundingClientRect();
-    const scaleX = bounds.width / (canvas.width || 1);
-    const scaleY = bounds.height / (canvas.height || 1);
-    const rect = this.townChatInputRect;
-    const input = this.ensureTownChatInput();
-    input.show({
-      x: bounds.left + rect.x * scaleX,
-      y: bounds.top + rect.y * scaleY,
-      w: rect.w * scaleX,
-      h: rect.h * scaleY,
-    });
-    if (this.townChatNeedsFocus) {
-      input.focus();
-      this.townChatNeedsFocus = false;
-    }
-  }
-
-  private hideTownChatInput(): void {
-    this.townChatInput?.hide();
-    this.townChatNeedsFocus = false;
-    this.townChatInputRect = null;
-  }
-
-  // @ts-expect-error TS6133 - Used in worldSceneCreate.ts
-  private handleDialogWheel(deltaY: number): void {
-    if (!this.dialog.open) return;
-    const script = getDialogScript(this.dialog.scriptId);
-    if (!script || script.id !== "townPlayer") return;
-    if (this.dialog.nodeId !== "chat") return;
-    this.adjustTownChatScroll(deltaY);
     this.renderDialog(script);
   }
 
   private renderDialog(script: NonNullable<ReturnType<typeof getDialogScript>>) {
     if (script.id === "townPlayer") this.updateTownPlayerDialog(script);
     renderDialogInWorldScene(this as any, script);
-    if (script.id === "townPlayer") this.syncTownChatInput();
   }
 
   private updateTownPlayerDialog(script: NonNullable<ReturnType<typeof getDialogScript>>): void {
     if (script.id !== "townPlayer") return;
     const targetName = this.townPlayerTarget?.username ?? "Traveler";
+
     const menuNode = script.nodes.menu;
     if (menuNode && menuNode.kind === "choice") {
-      menuNode.text = `You see ${targetName}.`;
+      menuNode.text = `Trade with ${targetName}?`;
     }
-
-    const tradeMenu = script.nodes.tradeMenu;
-    if (tradeMenu && tradeMenu.kind === "choice") {
-      tradeMenu.text = `Trade with ${targetName}.`;
+    const tradeWaitingNode = script.nodes.tradeWaiting;
+    if (tradeWaitingNode && tradeWaitingNode.kind === "choice") {
+      tradeWaitingNode.text = "Waiting for response...";
     }
-
-    const chatNode = script.nodes.chat;
-    if (chatNode && chatNode.kind === "choice") {
-      chatNode.text = "Town chat";
+    const tradeIncomingNode = script.nodes.tradeIncoming;
+    if (tradeIncomingNode && tradeIncomingNode.kind === "choice") {
+      tradeIncomingNode.text = `${targetName} wants to trade.`;
     }
-
-    const requestNode = script.nodes.tradeRequests;
-    if (requestNode && requestNode.kind === "choice") {
-      const sessionUid = loadSession()?.uid ?? null;
-      const targetUid = this.townPlayerTarget?.uid ?? null;
-      const { incoming, outgoing } = partitionTradeRequestsForTarget({
-        requests: this.townTradeRequestsList,
-        sessionUid,
-        targetUid,
-      });
-      const incomingPending = incoming.filter((request) => request.status === "pending");
-      const outgoingPending = outgoing.filter((request) => request.status === "pending");
-      if (!incomingPending.length && !outgoingPending.length) {
-        requestNode.text = "No pending trade requests.";
-        requestNode.choices = [{ id: "trade_back", text: "Back", next: "tradeMenu" }];
-        return;
-      }
-      requestNode.text = `Requests with ${targetName}:`;
-      requestNode.choices = [
-        ...incomingPending.flatMap((request) => {
-          const label = `${ITEMS[request.itemId]?.name ?? request.itemId} x${request.qty} • ${request.price}c`;
-          return [
-            { id: `trade_accept_${request.id}`, text: `Accept: ${label}`, next: "tradeRequests" },
-            { id: `trade_decline_${request.id}`, text: `Decline: ${label}`, next: "tradeRequests" },
-          ];
-        }),
-        ...outgoingPending.map((request) => {
-          const label = `${ITEMS[request.itemId]?.name ?? request.itemId} x${request.qty} • ${request.price}c`;
-          return { id: `trade_cancel_${request.id}`, text: `Cancel: ${label}`, next: "tradeRequests" };
-        }),
-        { id: "trade_back", text: "Back", next: "tradeMenu" },
-      ];
+    const tradeActiveNode = script.nodes.tradeActive;
+    if (tradeActiveNode && tradeActiveNode.kind === "choice") {
+      tradeActiveNode.text = `Trading session with ${targetName}.`;
+    }
+    const tradeDoneNode = script.nodes.tradeDone;
+    if (tradeDoneNode && tradeDoneNode.kind === "line") {
+      tradeDoneNode.text = "Trade agreed!";
+    }
+    const tradeDeclinedNode = script.nodes.tradeDeclined;
+    if (tradeDeclinedNode && tradeDeclinedNode.kind === "line") {
+      tradeDeclinedNode.text = `${targetName} declined.`;
+    }
+    const tradeCancelledNode = script.nodes.tradeCancelled;
+    if (tradeCancelledNode && tradeCancelledNode.kind === "line") {
+      tradeCancelledNode.text = "Trade cancelled.";
+    }
+    const tradeLeftNode = script.nodes.tradeLeft;
+    if (tradeLeftNode && tradeLeftNode.kind === "line") {
+      tradeLeftNode.text = `${targetName} left the area.`;
     }
   }
 
   private closeDialogUi() {
     closeDialogUiInWorldScene(this as any);
     this.resetBuyerFlow();
-    this.resetTradeFlow();
     this.townPlayerTarget = undefined;
-    this.hideTownChatInput();
+    this.currentSessionId = null;
   }
 
   private resetBuyerFlow() {
@@ -1557,22 +1410,6 @@ export class WorldScene extends Phaser.Scene {
     this.buyerOffer = null;
     this.inventoryOpen = true;
     this.renderInventoryPanel();
-  }
-
-  private startTradeSelection() {
-    this.tradeSelectionActive = true;
-    this.tradeOffer = null;
-    this.inventoryOpen = true;
-    this.renderInventoryPanel();
-  }
-
-  private resetTradeFlow() {
-    if (this.tradeSelectionActive && this.inventoryOpen) {
-      this.inventoryOpen = false;
-      this.renderInventoryPanel();
-    }
-    this.tradeSelectionActive = false;
-    this.tradeOffer = null;
   }
 
   // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
@@ -1616,193 +1453,73 @@ export class WorldScene extends Phaser.Scene {
     return false;
   }
 
-  private async submitTradeRequest(offer: NonNullable<typeof this.tradeOffer>): Promise<void> {
-    const target = this.townPlayerTarget;
-    if (!target) return;
-    const inv = loadInventory();
-    const removed = removeItem(inv, offer.itemId, offer.qty);
-    if (!removed) {
-      const script = getDialogScript("townPlayer");
-      if (script) {
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoItems" };
-        this.renderDialog(script);
-      }
-      return;
-    }
-    saveInventory(inv);
-    if (this.inventoryOpen) this.renderInventoryPanel();
-
-    const requestId = await this.townTradeRequests?.sendRequest({
-      recipientUid: target.uid,
-      recipientName: target.username,
-      itemId: offer.itemId,
-      qty: offer.qty,
-      price: offer.coins,
-    });
-    if (!requestId) {
-      addItem(inv, ITEMS[offer.itemId], offer.qty);
-      saveInventory(inv);
-      if (this.inventoryOpen) this.renderInventoryPanel();
-      const script = getDialogScript("townPlayer");
-      if (script) {
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestError" };
-        this.renderDialog(script);
-      }
-      return;
-    }
-    this.townTradeEscrow.set(requestId, { itemId: offer.itemId, qty: offer.qty, price: offer.coins });
-
-    const script = getDialogScript("townPlayer");
-    if (script) {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestSent" };
-      this.renderDialog(script);
-    }
-  }
-
-  private async acceptTradeRequest(requestId: string): Promise<void> {
-    const request = this.townTradeRequestsList.find((entry) => entry.id === requestId);
-    const script = getDialogScript("townPlayer");
-    if (!request || !script) {
-      if (script) {
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestUnavailable" };
-        this.renderDialog(script);
-      }
-      return;
-    }
-    if (request.status !== "pending") {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestUnavailable" };
-      this.renderDialog(script);
-      return;
-    }
-
-    const inv = loadInventory();
-    const staged = cloneInventory(inv);
-    const res = attemptTradePurchase(staged, request.itemId, request.qty, request.price);
-    if (!res.ok) {
-      const nodeId = res.reason === "insufficient_coins" ? "tradeNoCoins" : "tradeNoSpace";
-      this.dialog = { open: true, scriptId: script.id, nodeId };
-      this.renderDialog(script);
-      return;
-    }
-    const updated = await this.townTradeRequests?.updateRequestStatus(request, "accepted");
-    if (!updated) {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestError" };
-      this.renderDialog(script);
-      return;
-    }
-    inv.slots = staged.slots;
-    saveInventory(inv);
-    if (this.inventoryOpen) this.renderInventoryPanel();
-    this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestAccepted" };
-    this.renderDialog(script);
-  }
-
-  private async declineTradeRequest(requestId: string): Promise<void> {
-    const request = this.townTradeRequestsList.find((entry) => entry.id === requestId);
-    const script = getDialogScript("townPlayer");
-    if (!request || !script) return;
-    if (request.status !== "pending") {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestUnavailable" };
-      this.renderDialog(script);
-      return;
-    }
-    const updated = await this.townTradeRequests?.updateRequestStatus(request, "declined");
-    this.dialog = { open: true, scriptId: script.id, nodeId: updated ? "tradeRequestDeclined" : "tradeRequestError" };
-    this.renderDialog(script);
-  }
-
-  private async cancelTradeRequest(requestId: string): Promise<void> {
-    const request = this.townTradeRequestsList.find((entry) => entry.id === requestId);
-    const script = getDialogScript("townPlayer");
-    if (!request || !script) return;
-    if (request.status !== "pending") {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequestUnavailable" };
-      this.renderDialog(script);
-      return;
-    }
-    const inv = loadInventory();
-    const staged = cloneInventory(inv);
-    const added = addItemIfFits(staged, ITEMS[request.itemId], request.qty);
-    if (!added.ok) {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeNoSpace" };
-      this.renderDialog(script);
-      return;
-    }
-    const updated = await this.townTradeRequests?.updateRequestStatus(request, "cancelled");
-    if (updated) {
-      inv.slots = staged.slots;
-      saveInventory(inv);
-      if (this.inventoryOpen) this.renderInventoryPanel();
-    }
-    this.dialog = {
-      open: true,
-      scriptId: script.id,
-      nodeId: updated ? "tradeRequestCancelled" : "tradeRequestError",
-    };
-    this.renderDialog(script);
-  }
-
   // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
   private handleTownPlayerChoice(choiceId: string, script: NonNullable<ReturnType<typeof getDialogScript>>): boolean {
     if (script.id !== "townPlayer") return false;
 
-    if (choiceId === "chat") {
-      this.townChatAutoScroll = true;
-      this.dialog = { open: true, scriptId: script.id, nodeId: "chat" };
-      this.townChatNeedsFocus = true;
+    if (choiceId === "trade") {
+      const target = this.townPlayerTarget;
+      if (!target) return false;
+      void (async () => {
+        const sessionId = await this.townTradeSession?.sendRequest({ uid: target.uid, username: target.username });
+        const s = getDialogScript("townPlayer");
+        if (!s) return;
+        if (sessionId) {
+          this.currentSessionId = sessionId;
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeWaiting" };
+        } else {
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "end" };
+        }
+        this.renderDialog(s);
+      })();
+      this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeWaiting" };
       this.renderDialog(script);
       return true;
     }
 
-    if (choiceId === "chat_back") return false;
-
-    if (choiceId === "trade_offer") {
-      this.startTradeSelection();
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
-      this.renderDialog(script);
-      return true;
-    }
-
-    if (choiceId === "trade_offer_pick") {
-      this.startTradeSelection();
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeWaitPick" };
-      this.renderDialog(script);
-      return true;
-    }
-
-    if (choiceId === "trade_offer_send") {
-      const offer = this.tradeOffer;
-      this.resetTradeFlow();
-      if (!offer) {
-        this.dialog = { open: true, scriptId: script.id, nodeId: "tradeMenu" };
-        this.renderDialog(script);
-        return true;
+    if (choiceId === "trade_cancel_wait") {
+      if (this.currentSessionId) {
+        void this.townTradeSession?.cancelSession(this.currentSessionId);
+        this.currentSessionId = null;
       }
-      void this.submitTradeRequest(offer);
+      this.dialog = { open: false };
+      this.closeDialogUi();
       return true;
     }
 
-    if (choiceId === "trade_requests") {
-      this.dialog = { open: true, scriptId: script.id, nodeId: "tradeRequests" };
-      this.renderDialog(script);
+    if (choiceId === "trade_accept") {
+      if (this.currentSessionId) {
+        void this.townTradeSession?.respondToRequest(this.currentSessionId, true);
+        this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeActive" };
+        this.renderDialog(script);
+      }
       return true;
     }
 
-    if (choiceId.startsWith("trade_accept_")) {
-      const requestId = choiceId.replace("trade_accept_", "");
-      void this.acceptTradeRequest(requestId);
+    if (choiceId === "trade_decline") {
+      if (this.currentSessionId) {
+        void this.townTradeSession?.respondToRequest(this.currentSessionId, false);
+        this.currentSessionId = null;
+      }
+      this.dialog = { open: false };
+      this.closeDialogUi();
       return true;
     }
 
-    if (choiceId.startsWith("trade_decline_")) {
-      const requestId = choiceId.replace("trade_decline_", "");
-      void this.declineTradeRequest(requestId);
+    if (choiceId === "trade_confirm") {
+      if (this.currentSessionId) {
+        void this.townTradeSession?.confirmTrade(this.currentSessionId);
+      }
       return true;
     }
 
-    if (choiceId.startsWith("trade_cancel_")) {
-      const requestId = choiceId.replace("trade_cancel_", "");
-      void this.cancelTradeRequest(requestId);
+    if (choiceId === "trade_cancel") {
+      if (this.currentSessionId) {
+        void this.townTradeSession?.cancelSession(this.currentSessionId);
+        this.currentSessionId = null;
+      }
+      this.dialog = { open: false };
+      this.closeDialogUi();
       return true;
     }
 
@@ -1838,29 +1555,6 @@ export class WorldScene extends Phaser.Scene {
     );
     if (!nextOffer.ok) return false;
     this.buyerOffer = { ...offer, qty: nextQty, coins: nextOffer.coins };
-    return true;
-  }
-
-  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
-  private adjustTradeOfferQuantity(delta: number): boolean {
-    const offer = this.tradeOffer;
-    if (!offer) return false;
-    const nextQty = Math.max(1, Math.min(offer.maxQty, offer.qty + delta));
-    if (nextQty === offer.qty) return false;
-    const unitPrice = offer.qty > 0 ? offer.coins / offer.qty : 0;
-    const nextPrice = Math.max(0, Math.round(unitPrice * nextQty));
-    this.tradeOffer = { ...offer, qty: nextQty, coins: nextPrice };
-    return true;
-  }
-
-  // @ts-expect-error TS6133 - Used in dialogUi.ts and worldSceneUpdate.ts
-  private adjustTradeOfferPrice(delta: number): boolean {
-    const offer = this.tradeOffer;
-    if (!offer) return false;
-    const step = Math.max(1, Math.floor(this.tradePriceStep));
-    const nextPrice = Math.max(0, offer.coins + delta * step);
-    if (nextPrice === offer.coins) return false;
-    this.tradeOffer = { ...offer, coins: nextPrice };
     return true;
   }
 
@@ -1920,15 +1614,9 @@ export class WorldScene extends Phaser.Scene {
     const session = loadSession();
     this.townChat = createTownChatSession(session);
     this.townChatMessages = [];
-    this.townChatScrollOffset = 0;
-    this.townChatScrollMax = 0;
-    this.townChatAutoScroll = true;
     this.townChatUnsubscribe = this.townChat.subscribe((messages) => {
       this.townChatMessages = messages;
-      if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
-        const script = getDialogScript("townPlayer");
-        if (script) this.renderDialog(script);
-      }
+      this.townChatPanel?.setMessages(messages);
     });
   }
 
@@ -1940,67 +1628,75 @@ export class WorldScene extends Phaser.Scene {
     void this.townChat.stop();
     this.townChat = undefined;
     this.townChatMessages = [];
-    this.townChatScrollOffset = 0;
-    this.townChatScrollMax = 0;
-    this.townChatAutoScroll = true;
-    this.hideTownChatInput();
+    this.destroyTownChatPanel();
+    this.updateTownChatButtonVisibility();
   }
 
   // @ts-expect-error TS6133 - Used in loadArea.ts
-  private startTownTradeRequests(): void {
-    if (this.townTradeRequests) return;
+  private startTownTradeSession(): void {
+    if (this.townTradeSession) return;
     const session = loadSession();
-    this.townTradeRequests = createTownTradeRequestSession(session);
-    this.townTradeRequestsList = [];
-    this.townTradeRequestsUnsubscribe = this.townTradeRequests.subscribeRequests((requests) => {
-      this.townTradeRequestsList = requests;
-      this.syncTradeEscrowUpdates();
-      if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
-        const script = getDialogScript("townPlayer");
-        if (script) this.renderDialog(script);
-      }
+    this.townTradeSession = createTownTradeSession(session);
+    this.currentSessionId = null;
+    this.townTradeSessionUnsubscribe = this.townTradeSession.subscribeToSessions((sessions) => {
+      this.handleTradeSessionUpdates(sessions);
     });
   }
 
   // @ts-expect-error TS6133 - Used in loadArea.ts
-  private stopTownTradeRequests(): void {
-    if (!this.townTradeRequests) return;
-    if (this.townTradeRequestsUnsubscribe) this.townTradeRequestsUnsubscribe();
-    this.townTradeRequestsUnsubscribe = undefined;
-    void this.townTradeRequests.stop();
-    this.townTradeRequests = undefined;
-    this.townTradeRequestsList = [];
-    this.townTradeEscrow.clear();
+  private stopTownTradeSession(): void {
+    if (!this.townTradeSession) return;
+    if (this.townTradeSessionUnsubscribe) this.townTradeSessionUnsubscribe();
+    this.townTradeSessionUnsubscribe = undefined;
+    void this.townTradeSession.stop();
+    this.townTradeSession = undefined;
+    this.currentSessionId = null;
   }
 
-  private syncTradeEscrowUpdates(): void {
-    const sessionUid = loadSession()?.uid;
-    if (!sessionUid) return;
-    const inv = loadInventory();
-    let updated = false;
-    for (const request of this.townTradeRequestsList) {
-      if (request.senderUid !== sessionUid) continue;
-      if (!this.townTradeEscrow.has(request.id)) continue;
-      if (request.status === "accepted") {
-        const added = addItemIfFits(inv, ITEMS.coins, request.price);
-        if (added.ok) {
-          updated = true;
-          this.townTradeEscrow.delete(request.id);
-        }
-      } else if (request.status === "declined" || request.status === "cancelled") {
-        const escrow = this.townTradeEscrow.get(request.id);
-        if (escrow) {
-          const added = addItemIfFits(inv, ITEMS[escrow.itemId], escrow.qty);
-          if (added.ok) {
-            updated = true;
-            this.townTradeEscrow.delete(request.id);
-          }
+  private handleTradeSessionUpdates(sessions: TownTradeSessionData[]): void {
+    const myUid = loadSession()?.uid;
+    if (!myUid) return;
+
+    const now = Date.now();
+    // Auto-prompt for new incoming pending requests
+    if (!this.currentSessionId) {
+      const incoming = sessions.find(
+        (s) => s.recipientId === myUid && s.status === "pending" && s.expiresAtMs > now,
+      );
+      if (incoming && (!this.dialog.open || this.dialog.nodeId === "end")) {
+        this.currentSessionId = incoming.id;
+        this.townPlayerTarget = { uid: incoming.requesterId, username: incoming.requesterName };
+        const script = getDialogScript("townPlayer");
+        if (script) {
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeIncoming" };
+          this.renderDialog(script);
         }
       }
     }
-    if (updated) {
-      saveInventory(inv);
-      if (this.inventoryOpen) this.renderInventoryPanel();
+
+    // Track state changes for the current session
+    if (this.currentSessionId) {
+      const session = sessions.find((s) => s.id === this.currentSessionId);
+      if (session && this.dialog.open && this.dialog.scriptId === "townPlayer") {
+        const script = getDialogScript("townPlayer");
+        if (!script) return;
+        if (session.status === "active" && this.dialog.nodeId === "tradeWaiting") {
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeActive" };
+          this.renderDialog(script);
+        } else if (session.status === "bothConfirmed" && this.dialog.nodeId !== "tradeDone") {
+          this.currentSessionId = null;
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeDone" };
+          this.renderDialog(script);
+        } else if (
+          session.status === "cancelled" &&
+          this.dialog.nodeId !== "tradeCancelled" &&
+          this.dialog.nodeId !== "tradeDone"
+        ) {
+          this.currentSessionId = null;
+          this.dialog = { open: true, scriptId: "townPlayer", nodeId: "tradeCancelled" };
+          this.renderDialog(script);
+        }
+      }
     }
   }
 
@@ -2028,20 +1724,7 @@ export class WorldScene extends Phaser.Scene {
   // @ts-expect-error TS6133 - Used in tests
   private setTownChatMessagesForTest(messages: TownChatMessage[]): void {
     this.townChatMessages = messages;
-    this.townChatAutoScroll = true;
-    if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
-      const script = getDialogScript("townPlayer");
-      if (script) this.renderDialog(script);
-    }
-  }
-
-  // @ts-expect-error TS6133 - Used in tests
-  private setTownTradeRequestsForTest(requests: TownTradeRequest[]): void {
-    this.townTradeRequestsList = requests;
-    if (this.dialog.open && this.dialog.scriptId === "townPlayer") {
-      const script = getDialogScript("townPlayer");
-      if (script) this.renderDialog(script);
-    }
+    this.townChatPanel?.setMessages(messages);
   }
 
   // @ts-expect-error TS6133 - Used in tests
