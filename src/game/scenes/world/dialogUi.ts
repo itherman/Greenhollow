@@ -43,8 +43,8 @@ export function renderDialogInWorldScene(scene: any, script: NonNullable<ReturnT
       !this.dialogText.active ||
       !this.dialogChoicesText ||
       !this.dialogChoicesText.active;
-    if (needsDialogUi && typeof this.closeDialogUi === "function") {
-      this.closeDialogUi();
+    if (needsDialogUi) {
+      closeDialogUiInWorldScene(this);
     }
 
     if (!this.dialogBox) {
